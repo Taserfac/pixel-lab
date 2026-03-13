@@ -1,0 +1,208 @@
+/**
+ * 【文件路径】src/assets/css/index.css
+ * 【文件功能说明】全局样式入口文件
+ * - 导入 CSS 变量
+ * - 定义全局基础样式
+ * - 覆盖 Element Plus 默认样式
+ */
+
+@import './variables.css';
+
+/* ============================================
+   基础样式重置
+   ============================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+  background-color: var(--background);
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+/* ============================================
+   Element Plus 主题覆盖
+   ============================================ */
+
+.el-button {
+  border-radius: var(--radius);
+  transition: all var(--transition-fast);
+}
+
+.el-button--primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.el-button--primary:hover {
+  background-color: var(--primary-light);
+  border-color: var(--primary-light);
+}
+
+.el-input__wrapper {
+  border-radius: var(--radius);
+}
+
+/* 修复输入框样式 */
+.el-input {
+  --el-input-height: 40px;
+}
+
+.el-input__inner {
+  height: 40px;
+  line-height: 40px;
+}
+
+.el-card {
+  border-radius: var(--radius-lg);
+  border-color: var(--border);
+  background-color: var(--background);
+}
+
+.el-menu {
+  border-right: none;
+  background-color: transparent;
+}
+
+.el-menu-item {
+  border-radius: var(--radius);
+  margin: 0.25rem 0.5rem;
+}
+
+.el-menu-item.is-active {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.el-menu-item:hover {
+  background-color: var(--background-muted);
+}
+
+[data-theme='dark'] .el-menu-item:hover {
+  background-color: var(--background-muted);
+}
+
+/* ============================================
+   通用工具类
+   ============================================ */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: var(--space-2);
+}
+
+.gap-4 {
+  gap: var(--space-4);
+}
+
+.gap-6 {
+  gap: var(--space-6);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.p-4 {
+  padding: var(--space-4);
+}
+
+.p-6 {
+  padding: var(--space-6);
+}
+
+.m-4 {
+  margin: var(--space-4);
+}
+
+.rounded {
+  border-radius: var(--radius);
+}
+
+.rounded-lg {
+  border-radius: var(--radius-lg);
+}
+
+.shadow {
+  box-shadow: var(--shadow);
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+/* ============================================
+   动画
+   ============================================ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-slow) ease-out;
+}
+
+.animate-slide-in-up {
+  animation: slideInUp var(--transition-slow) ease-out;
+}

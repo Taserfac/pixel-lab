@@ -1,0 +1,31 @@
+{
+  "name": "pixel-lab-frontend",
+  "version": "1.0.0",
+  "description": "Pixel Lab Pro - 数字图像创作与管理平台前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.5",
+    "browser-image-compression": "^2.0.2",
+    "echarts": "^5.4.3",
+    "element-plus": "^2.5.1",
+    "file-saver": "^2.0.5",
+    "jszip": "^3.10.1",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.3",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.20.1",
+    "vite": "^5.0.11",
+    "vite-plugin-eslint": "^1.8.1"
+  }
+}

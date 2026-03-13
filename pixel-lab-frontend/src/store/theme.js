@@ -1,0 +1,112 @@
+/**
+ * 【文件路径】src/store/theme.js
+ * 【文件功能说明】主题状态管理 Store
+ * - 管理亮色/暗色主题
+ * - 主题切换持久化到 localStorage
+ * - 自动同步 Element Plus 主题
+ */
+
+import { defineStore } from 'pinia'
+import { ref, watch } from 'vue'
+import * as storage from '@/utils/storage'
+
+export const useThemeStore = defineStore('theme', () => {
+  // ==================== State ====================
+  
+  // 当前主题：'light' | 'dark'
+  const theme = ref(storage.getItem('theme', 'light'))
+  
+  // 是否跟随系统
+  const followSystem = ref(storage.getItem('followSystem', false))
+  
+  // ==================== Actions ====================
+  
+  /**
+   * 设置主题
+   * @param {'light' | 'dark'} newTheme
+   */
+  const setTheme = (newTheme) => {
+    theme.value = newTheme
+    storage.setItem('theme', newTheme)
+    applyTheme(newTheme)
+  }
+  
+  /**
+   * 切换主题
+   */
+  const toggleTheme = () => {
+    const newTheme = theme.value === 'light' ? 'dark' : 'light'
+    setTheme(newTheme)
+  }
+  
+  /**
+   * 应用主题到 DOM
+   * @param {'light' | 'dark'} themeValue
+   */
+  const applyTheme = (themeValue) => {
+    const html = document.documentElement
+    
+    if (themeValue === 'dark') {
+      html.setAttribute('data-theme', 'dark')
+      html.classList.add('dark')
+    } else {
+      html.removeAttribute('data-theme')
+      html.classList.remove('dark')
+    }
+  }
+  
+  /**
+   * 设置是否跟随系统
+   * @param {boolean} value
+   */
+  const setFollowSystem = (value) => {
+    followSystem.value = value
+    storage.setItem('followSystem', value)
+    
+    if (value) {
+      // 监听系统主题变化
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      const handleChange = (e) => {
+        setTheme(e.matches ? 'dark' : 'light')
+      }
+      
+      mediaQuery.addEventListener('change', handleChange)
+      // 立即应用当前系统主题
+      setTheme(mediaQuery.matches ? 'dark' : 'light')
+    }
+  }
+  
+  /**
+   * 初始化主题
+   */
+  const init = () => {
+    const savedTheme = storage.getItem('theme', 'light')
+    const savedFollowSystem = storage.getItem('followSystem', false)
+    
+    theme.value = savedTheme
+    followSystem.value = savedFollowSystem
+    
+    if (savedFollowSystem) {
+      setFollowSystem(true)
+    } else {
+      applyTheme(savedTheme)
+    }
+  }
+  
+  // 监听主题变化，自动应用
+  watch(theme, (newTheme) => {
+    applyTheme(newTheme)
+  })
+  
+  return {
+    // State
+    theme,
+    followSystem,
+    
+    // Actions
+    setTheme,
+    toggleTheme,
+    setFollowSystem,
+    init
+  }
+})
