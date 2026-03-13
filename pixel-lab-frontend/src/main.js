@@ -27,10 +27,17 @@ import './assets/css/index.css'
 // ECharts
 import * as echarts from 'echarts'
 
+// 用户 Store
+import { useUserStore } from './store/user'
+
 const app = createApp(App)
 
 // 注册 Pinia
 app.use(createPinia())
+
+// 初始化用户状态（恢复登录状态）
+const userStore = useUserStore()
+userStore.init()
 
 // 注册 Vue Router
 app.use(router)

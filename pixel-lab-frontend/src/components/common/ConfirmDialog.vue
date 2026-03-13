@@ -16,18 +16,33 @@
     @close="handleCancel"
   >
     <div class="confirm-content">
-      <el-icon v-if="type" :size="48" :class="`type-${type}`">
+      <el-icon
+        v-if="type"
+        :size="48"
+        :class="`type-${type}`"
+      >
         <Warning v-if="type === 'warning'" />
         <CircleCheck v-else-if="type === 'success'" />
         <CircleClose v-else-if="type === 'error'" />
         <InfoFilled v-else />
       </el-icon>
-      <p class="message">{{ message }}</p>
+      <p class="message">
+        {{ message }}
+      </p>
     </div>
     
     <template #footer>
-      <el-button @click="handleCancel" v-if="showCancel">{{ cancelText }}</el-button>
-      <el-button type="primary" @click="handleConfirm" :loading="loading">
+      <el-button
+        v-if="showCancel"
+        @click="handleCancel"
+      >
+        {{ cancelText }}
+      </el-button>
+      <el-button
+        type="primary"
+        :loading="loading"
+        @click="handleConfirm"
+      >
         {{ confirmText }}
       </el-button>
     </template>
@@ -38,6 +53,7 @@
 import { ref } from 'vue'
 import { Warning, CircleCheck, CircleClose, InfoFilled } from '@element-plus/icons-vue'
 
+// eslint-disable-next-line no-unused-vars
 const props = defineProps({
   // 弹窗标题
   title: {

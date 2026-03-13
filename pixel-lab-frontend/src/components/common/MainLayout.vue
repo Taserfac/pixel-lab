@@ -11,14 +11,20 @@
     <SideMenu />
     
     <!-- 主内容区 -->
-    <div class="main-content" :class="{ collapsed: menuStore.collapsed }">
+    <div
+      class="main-content"
+      :class="{ collapsed: menuStore.collapsed }"
+    >
       <!-- 顶部导航栏 -->
       <HeaderBar />
       
       <!-- 页面内容 -->
       <main class="page-content">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
+          <transition
+            name="fade"
+            mode="out-in"
+          >
             <component :is="Component" />
           </transition>
         </router-view>
@@ -33,25 +39,6 @@ import HeaderBar from './HeaderBar.vue'
 import { useMenuStore } from '@/store/menu'
 
 const menuStore = useMenuStore()
-</script>
-
-<script>
-// 菜单状态 store（内联定义，避免循环依赖）
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
-
-export const useMenuStore = defineStore('menu', () => {
-  const collapsed = ref(false)
-  
-  const toggleCollapse = () => {
-    collapsed.value = !collapsed.value
-  }
-  
-  return {
-    collapsed,
-    toggleCollapse
-  }
-})
 </script>
 
 <style scoped>

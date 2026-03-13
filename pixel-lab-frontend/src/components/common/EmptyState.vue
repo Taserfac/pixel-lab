@@ -6,24 +6,52 @@
 -->
 
 <template>
-  <div class="empty-state" :class="{ 'has-action': showAction }">
+  <div
+    class="empty-state"
+    :class="{ 'has-action': showAction }"
+  >
     <!-- 图片 -->
     <div class="image-wrapper">
-      <img v-if="image" :src="image" :alt="description" class="image">
-      <el-icon v-else :size="imageSize" class="default-icon">
+      <img
+        v-if="image"
+        :src="image"
+        :alt="description"
+        class="image"
+      >
+      <el-icon
+        v-else
+        :size="imageSize"
+        class="default-icon"
+      >
         <Box />
       </el-icon>
     </div>
     
     <!-- 标题 -->
-    <h3 v-if="title" class="title">{{ title }}</h3>
+    <h3
+      v-if="title"
+      class="title"
+    >
+      {{ title }}
+    </h3>
     
     <!-- 描述 -->
-    <p v-if="description" class="description">{{ description }}</p>
+    <p
+      v-if="description"
+      class="description"
+    >
+      {{ description }}
+    </p>
     
     <!-- 操作按钮 -->
-    <div v-if="showAction" class="action">
-      <el-button type="primary" @click="handleAction">
+    <div
+      v-if="showAction"
+      class="action"
+    >
+      <el-button
+        type="primary"
+        @click="handleAction"
+      >
         {{ actionText }}
       </el-button>
     </div>
@@ -33,6 +61,7 @@
 <script setup>
 import { Box } from '@element-plus/icons-vue'
 
+// eslint-disable-next-line no-unused-vars
 const props = defineProps({
   // 自定义图片地址
   image: {

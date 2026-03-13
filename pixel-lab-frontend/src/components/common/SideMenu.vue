@@ -7,10 +7,13 @@
 -->
 
 <template>
-  <aside class="side-menu" :class="{ collapsed: menuStore.collapsed }">
+  <aside
+    class="side-menu"
+    :class="{ collapsed: menuStore.collapsed }"
+  >
     <!-- Logo -->
     <div class="logo">
-      <img src="/logo.svg" alt="Pixel Lab" v-if="!menuStore.collapsed">
+      <span v-if="!menuStore.collapsed">Pixel Lab Pro</span>
       <span v-else>PL</span>
     </div>
     
@@ -30,12 +33,17 @@
         <el-icon>
           <component :is="route.meta.icon" />
         </el-icon>
-        <template #title>{{ route.meta.title }}</template>
+        <template #title>
+          {{ route.meta.title }}
+        </template>
       </el-menu-item>
     </el-menu>
     
     <!-- 折叠按钮 -->
-    <div class="collapse-btn" @click="menuStore.toggleCollapse">
+    <div
+      class="collapse-btn"
+      @click="menuStore.toggleCollapse"
+    >
       <el-icon>
         <Fold v-if="!menuStore.collapsed" />
         <Expand v-else />
@@ -48,7 +56,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Fold, Expand } from '@element-plus/icons-vue'
-import { useMenuStore } from './MainLayout.vue'
+import { useMenuStore } from '@/store/menu'
 import router from '@/router'
 
 const route = useRoute()

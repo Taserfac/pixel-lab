@@ -28,22 +28,44 @@
     :show-file-list="showFileList"
   >
     <!-- 拖拽上传区域 -->
-    <template v-if="drag" #default>
-      <el-icon :size="48" class="upload-icon">
+    <template
+      v-if="drag"
+      #default
+    >
+      <el-icon
+        :size="48"
+        class="upload-icon"
+      >
         <Upload />
       </el-icon>
       <div class="el-upload__text">
         拖拽文件到此处，或<em>点击上传</em>
       </div>
-      <div class="upload-tip" v-if="tip">{{ tip }}</div>
+      <div
+        v-if="tip"
+        class="upload-tip"
+      >
+        {{ tip }}
+      </div>
     </template>
     
     <!-- 按钮上传 -->
-    <template v-else #default>
-      <el-button type="primary" :icon="Upload">
+    <template
+      v-else
+      #default
+    >
+      <el-button
+        type="primary"
+        :icon="Upload"
+      >
         {{ buttonText }}
       </el-button>
-      <div class="upload-tip" v-if="tip">{{ tip }}</div>
+      <div
+        v-if="tip"
+        class="upload-tip"
+      >
+        {{ tip }}
+      </div>
     </template>
   </el-upload>
 </template>

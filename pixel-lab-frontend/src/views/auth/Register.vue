@@ -30,7 +30,9 @@
             size="large"
           >
             <template #prefix>
-              <el-icon :size="16"><User /></el-icon>
+              <el-icon :size="16">
+                <User />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
@@ -45,13 +47,21 @@
             @input="checkPassword"
           >
             <template #prefix>
-              <el-icon :size="16"><Lock /></el-icon>
+              <el-icon :size="16">
+                <Lock />
+              </el-icon>
             </template>
           </el-input>
           <!-- 密码强度提示 -->
-          <div class="password-strength" v-if="form.password">
+          <div
+            v-if="form.password"
+            class="password-strength"
+          >
             <span>密码强度：</span>
-            <el-tag :type="passwordStrength.type" size="small">
+            <el-tag
+              :type="passwordStrength.type"
+              size="small"
+            >
               {{ passwordStrength.text }}
             </el-tag>
           </div>
@@ -66,7 +76,9 @@
             show-password
           >
             <template #prefix>
-              <el-icon :size="16"><Lock /></el-icon>
+              <el-icon :size="16">
+                <Lock />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
@@ -86,14 +98,19 @@
       
       <!-- 登录链接 -->
       <div class="login-link">
-        已有账号？<el-link type="primary" @click="goLogin">立即登录</el-link>
+        已有账号？<el-link
+          type="primary"
+          @click="goLogin"
+        >
+          立即登录
+        </el-link>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'

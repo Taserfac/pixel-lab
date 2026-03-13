@@ -31,7 +31,9 @@
             size="large"
           >
             <template #prefix>
-              <el-icon :size="16"><User /></el-icon>
+              <el-icon :size="16">
+                <User />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
@@ -45,14 +47,23 @@
             show-password
           >
             <template #prefix>
-              <el-icon :size="16"><Lock /></el-icon>
+              <el-icon :size="16">
+                <Lock />
+              </el-icon>
             </template>
           </el-input>
         </el-form-item>
         
         <div class="form-options">
-          <el-checkbox v-model="rememberMe">记住密码</el-checkbox>
-          <el-link type="primary" :underline="false">忘记密码？</el-link>
+          <el-checkbox v-model="rememberMe">
+            记住密码
+          </el-checkbox>
+          <el-link
+            type="primary"
+            :underline="false"
+          >
+            忘记密码？
+          </el-link>
         </div>
         
         <el-form-item>
@@ -70,7 +81,12 @@
       
       <!-- 注册链接 -->
       <div class="register-link">
-        还没有账号？<el-link type="primary" @click="goRegister">立即注册</el-link>
+        还没有账号？<el-link
+          type="primary"
+          @click="goRegister"
+        >
+          立即注册
+        </el-link>
       </div>
     </div>
   </div>

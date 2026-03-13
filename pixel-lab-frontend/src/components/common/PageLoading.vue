@@ -6,12 +6,20 @@
 -->
 
 <template>
-  <div class="page-loading" v-if="visible">
+  <div
+    v-if="visible"
+    class="page-loading"
+  >
     <div class="loading-content">
-      <el-icon class="loading-icon" :size="48">
+      <el-icon
+        class="loading-icon"
+        :size="48"
+      >
         <Loading />
       </el-icon>
-      <p class="loading-text">{{ text }}</p>
+      <p class="loading-text">
+        {{ text }}
+      </p>
     </div>
   </div>
 </template>

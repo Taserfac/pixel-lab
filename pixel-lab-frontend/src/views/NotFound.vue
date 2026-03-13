@@ -6,10 +6,21 @@
 <template>
   <div class="not-found-page">
     <div class="content">
-      <h1 class="code">404</h1>
-      <h2 class="title">页面未找到</h2>
-      <p class="description">抱歉，您访问的页面不存在或已被移除</p>
-      <el-button type="primary" @click="goHome">返回首页</el-button>
+      <h1 class="code">
+        404
+      </h1>
+      <h2 class="title">
+        页面未找到
+      </h2>
+      <p class="description">
+        抱歉，您访问的页面不存在或已被移除
+      </p>
+      <el-button
+        type="primary"
+        @click="goHome"
+      >
+        返回首页
+      </el-button>
     </div>
   </div>
 </template>

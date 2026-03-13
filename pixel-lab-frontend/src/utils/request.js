@@ -11,6 +11,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import router from '@/router'
+import * as storage from './storage'
 
 // 创建 axios 实例
 const request = axios.create({
@@ -24,8 +25,11 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 从 localStorage 获取 token
-    const token = localStorage.getItem('token')
+    // 从 storage 获取 token
+    const token = storage.getItem('token', '')
+    
+    // 调试：打印 token
+    console.log('[Request] Token:', token ? '存在' : '不存在', 'URL:', config.url)
 
     // 如果有 token，添加到请求头
     if (token) {

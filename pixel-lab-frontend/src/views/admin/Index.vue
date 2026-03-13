@@ -9,7 +9,9 @@
       <template #header>
         <div class="card-header">
           <span>后台管理</span>
-          <el-tag type="danger">管理员</el-tag>
+          <el-tag type="danger">
+            管理员
+          </el-tag>
         </div>
       </template>
       <EmptyState

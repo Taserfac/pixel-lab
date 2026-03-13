@@ -11,8 +11,8 @@ const { error } = require('../utils/result')
 
 // 白名单（无需登录的接口）
 const whiteList = [
-  '/api/auth/login',
-  '/api/auth/register'
+  '/auth/login',
+  '/auth/register'
 ]
 
 /**

@@ -46,7 +46,7 @@ export const checkPasswordStrength = (password) => {
   // 包含大写字母
   if (/[A-Z]/.test(password)) level++
   // 包含特殊字符
-  if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) level++
+  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) level++
   
   const msgs = ['密码强度太弱', '密码强度较弱', '密码强度中等', '密码强度较强', '密码强度很强']
   

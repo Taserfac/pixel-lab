@@ -10,8 +10,12 @@
   <header class="header-bar">
     <!-- 面包屑 -->
     <el-breadcrumb separator="/">
-      <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-      <el-breadcrumb-item v-if="route.meta.title">{{ route.meta.title }}</el-breadcrumb-item>
+      <el-breadcrumb-item :to="{ path: '/' }">
+        首页
+      </el-breadcrumb-item>
+      <el-breadcrumb-item v-if="route.meta.title">
+        {{ route.meta.title }}
+      </el-breadcrumb-item>
     </el-breadcrumb>
     
     <!-- 右侧操作区 -->
@@ -20,14 +24,17 @@
       <el-button
         circle
         :icon="themeStore.theme === 'light' ? Moon : Sunny"
-        @click="themeStore.toggleTheme"
         title="切换主题"
+        @click="themeStore.toggleTheme"
       />
       
       <!-- 用户信息 -->
       <el-dropdown @command="handleCommand">
         <div class="user-info">
-          <el-avatar :size="32" :src="userStore.userInfo?.avatar">
+          <el-avatar
+            :size="32"
+            :src="userStore.userInfo?.avatar"
+          >
             {{ userStore.userInfo?.nickname?.charAt(0) || 'U' }}
           </el-avatar>
           <span class="username">{{ userStore.userInfo?.nickname || userStore.userInfo?.username }}</span>
@@ -42,7 +49,10 @@
             <el-dropdown-item command="settings">
               <el-icon><Setting /></el-icon>设置
             </el-dropdown-item>
-            <el-dropdown-item divided command="logout">
+            <el-dropdown-item
+              divided
+              command="logout"
+            >
               <el-icon><SwitchButton /></el-icon>退出登录
             </el-dropdown-item>
           </el-dropdown-menu>
@@ -67,15 +77,15 @@ const themeStore = useThemeStore()
 // 处理下拉菜单命令
 const handleCommand = (command) => {
   switch (command) {
-    case 'profile':
-      router.push('/personal')
-      break
-    case 'settings':
-      ElMessage.info('设置功能开发中...')
-      break
-    case 'logout':
-      handleLogout()
-      break
+  case 'profile':
+    router.push('/personal')
+    break
+  case 'settings':
+    ElMessage.info('设置功能开发中...')
+    break
+  case 'logout':
+    handleLogout()
+    break
   }
 }
 
