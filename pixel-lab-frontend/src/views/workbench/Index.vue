@@ -1184,7 +1184,7 @@ onMounted(() => {
   height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
-  padding: var(--space-4);
+  padding: var(--space-6);
   overflow: hidden;
 }
 
@@ -1198,26 +1198,32 @@ onMounted(() => {
 
 .import-box {
   text-align: center;
-  padding: 60px;
-  border: 2px dashed var(--border);
-  border-radius: var(--radius-xl);
+  padding: 60px 80px;
+  background: var(--background-soft);
+  border: 4px solid var(--border);
+  box-shadow: 12px 12px 0px 0px var(--border);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all var(--transition-fast);
 }
 
 .import-box:hover {
-  border-color: var(--primary);
-  background: var(--background-soft);
+  transform: translate(-4px, -4px);
+  box-shadow: 16px 16px 0px 0px var(--border);
 }
 
 .import-box h3 {
   margin: var(--space-4) 0 var(--space-2);
-  font-size: 20px;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .import-box p {
   color: var(--foreground-muted);
   margin-bottom: var(--space-6);
+  font-size: 16px;
 }
 
 .import-buttons {
@@ -1238,48 +1244,57 @@ onMounted(() => {
 .main-content {
   flex: 1;
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-6);
   min-height: 0;
   overflow: hidden;
 }
 
 /* 左侧工具栏 */
 .toolbar {
-  width: 260px;
+  width: 300px;
   flex-shrink: 0;
   background: var(--background-soft);
-  border-radius: var(--radius-lg);
+  border: 4px solid var(--border);
+  box-shadow: 8px 8px 0px 0px var(--border);
   overflow-y: auto;
   max-height: 100%;
 }
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
 }
 
 .filter-item {
   text-align: center;
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  border: 3px solid var(--border);
+  background: var(--background-soft);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
 .filter-item:hover {
-  background: var(--background-muted);
+  background: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px 0px var(--border);
 }
 
 .filter-item.active {
-  background: var(--primary-light);
+  background: var(--primary);
+  box-shadow: 4px 4px 0px 0px var(--border);
+}
+
+.filter-item.active span {
+  color: white;
 }
 
 .filter-preview {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto var(--space-1);
-  border-radius: var(--radius-sm);
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--space-2);
+  border: 3px solid var(--border);
   overflow: hidden;
 }
 
@@ -1290,33 +1305,45 @@ onMounted(() => {
 }
 
 .filter-item span {
-  font-size: 12px;
-  color: var(--foreground-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground);
 }
 
 .adjust-item {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 3px solid var(--border);
+  background: var(--background-muted);
 }
 
 .adjust-item label {
   display: block;
   font-size: 14px;
-  margin-bottom: var(--space-2);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground);
+  margin-bottom: var(--space-3);
 }
 
 .transform-buttons {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .transform-buttons .el-button {
   width: 100% !important;
   margin-left: 0 !important;
+  padding: 14px 16px !important;
+  font-size: 14px !important;
 }
 
 .transform-buttons .el-icon {
-  margin-right: 4px;
+  margin-right: 8px;
 }
 
 .flip-h {
@@ -1330,8 +1357,8 @@ onMounted(() => {
 
 .pixel-buttons {
   display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .pixel-buttons .el-button {
@@ -1344,7 +1371,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   background: var(--background-soft);
-  border-radius: var(--radius-lg);
+  border: 4px solid var(--border);
+  box-shadow: 8px 8px 0px 0px var(--border);
   min-width: 0;
   overflow: hidden;
 }
@@ -1354,31 +1382,32 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-3);
+  padding: var(--space-6);
 }
 
 .editor-canvas {
   max-width: 100%;
   max-height: 100%;
-  box-shadow: var(--shadow-lg);
-  border-radius: var(--radius-md);
+  border: 4px solid var(--border);
+  box-shadow: 6px 6px 0px 0px var(--border);
 }
 
 /* 底部操作栏 */
 .action-bar {
   display: flex;
   justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-5);
   background: var(--background-soft);
-  border-radius: var(--radius-lg);
-  margin-top: var(--space-3);
+  border: 4px solid var(--border);
+  box-shadow: 6px 6px 0px 0px var(--border);
+  margin-top: var(--space-5);
   flex-shrink: 0;
 }
 
 .left-actions,
 .right-actions {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 /* 图片选择器 */
@@ -1389,24 +1418,25 @@ onMounted(() => {
 
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-4);
 }
 
 .image-item {
   cursor: pointer;
-  border-radius: var(--radius-md);
   overflow: hidden;
-  border: 2px solid transparent;
-  transition: all 0.2s;
+  border: 4px solid var(--border);
+  transition: all var(--transition-fast);
 }
 
 .image-item:hover {
-  border-color: var(--primary-light);
+  transform: translate(-4px, -4px);
+  box-shadow: 6px 6px 0px 0px var(--border);
 }
 
 .image-item.selected {
   border-color: var(--primary);
+  box-shadow: 6px 6px 0px 0px var(--primary);
 }
 
 .image-item img {
@@ -1416,12 +1446,16 @@ onMounted(() => {
 }
 
 .image-name {
-  padding: var(--space-2);
-  font-size: 12px;
+  padding: var(--space-3);
+  font-size: 14px;
+  font-weight: 700;
   text-align: center;
-  background: var(--background-soft);
+  background: var(--background-muted);
+  border-top: 4px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 </style>

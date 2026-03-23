@@ -1,60 +1,66 @@
 /**
  * 【文件路径】src/assets/css/variables.css
- * 【文件功能说明】全局 CSS 变量定义文件
- * - 定义亮色主题和暗色主题的 CSS 变量
- * - 包含颜色、字体、间距、阴影等设计令牌
- * - 通过切换 data-theme 属性实现主题切换
+ * 【功能说明】Neo-Brutalism 新野兽主义设计系统
  */
 
 /* ============================================
-   亮色主题（默认）
+   Neo-Brutalism 设计系统
    ============================================ */
 :root {
-  /* 主色调 */
-  --primary: #6366f1;
-  --primary-light: #818cf8;
-  --primary-dark: #4f46e5;
-  --primary-foreground: #ffffff;
+  /* 主色调 - 大胆鲜艳 */
+  --primary: #ff6b6b;
+  --primary-hover: #ff5252;
+  --primary-foreground: #000000;
+
+  /* 强调色 */
+  --secondary: #4ecdc4;
+  --accent: #ffe66d;
+  --accent-pink: #ff85a2;
+  --accent-purple: #a855f7;
+  --accent-blue: #3b82f6;
 
   /* 背景色 */
-  --background: #ffffff;
-  --background-soft: #f8fafc;
-  --background-muted: #f1f5f9;
+  --background: #fffef0;
+  --background-soft: #ffffff;
+  --background-muted: #f5f5dc;
+  --background-elevated: #ffffff;
 
   /* 文字色 */
-  --foreground: #0f172a;
-  --foreground-muted: #64748b;
-  --foreground-subtle: #94a3b8;
+  --foreground: #000000;
+  --foreground-muted: #333333;
+  --foreground-subtle: #666666;
 
   /* 边框色 */
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
+  --border: #000000;
+  --border-light: #000000;
 
   /* 功能色 */
-  --success: #10b981;
+  --success: #22c55e;
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #3b82f6;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* 阴影 - 新野兽主义偏移阴影 */
+  --shadow-sm: 2px 2px 0px 0px #000000;
+  --shadow: 4px 4px 0px 0px #000000;
+  --shadow-md: 6px 6px 0px 0px #000000;
+  --shadow-lg: 8px 8px 0px 0px #000000;
+  --shadow-hover: 6px 6px 0px 0px #000000;
+  --shadow-active: 2px 2px 0px 0px #000000;
 
-  /* 圆角 */
-  --radius-sm: 0.375rem;
-  --radius: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-full: 9999px;
+  /* 圆角 - 新野兽主义无圆角 */
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-full: 0px;
 
   /* 字体 */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Space Grotesk', 'DM Sans', -apple-system, sans-serif;
+  --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
 
-  /* 间距（基于 4px） */
+  /* 间距 */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -65,39 +71,31 @@
   --space-10: 2.5rem;
   --space-12: 3rem;
 
-  /* 过渡时间 */
-  --transition-fast: 150ms;
-  --transition-base: 200ms;
-  --transition-slow: 300ms;
+  /* 过渡 */
+  --transition-fast: 100ms;
+  --transition-base: 150ms;
+  --transition-slow: 200ms;
 }
 
-/* ============================================
-   暗色主题
-   ============================================ */
+/* 暗色版本 */
 [data-theme='dark'] {
-  /* 主色调 */
-  --primary: #818cf8;
-  --primary-light: #a5b4fc;
-  --primary-dark: #6366f1;
-  --primary-foreground: #ffffff;
+  --background: #1a1a2e;
+  --background-soft: #16213e;
+  --background-muted: #0f0f23;
+  --background-elevated: #1a1a2e;
 
-  /* 背景色 */
-  --background: #0f172a;
-  --background-soft: #1e293b;
-  --background-muted: #334155;
+  --foreground: #ffffff;
+  --foreground-muted: #cccccc;
+  --foreground-subtle: #999999;
 
-  /* 文字色 */
-  --foreground: #f8fafc;
-  --foreground-muted: #94a3b8;
-  --foreground-subtle: #64748b;
+  --border: #ffffff;
 
-  /* 边框色 */
-  --border: #334155;
-  --border-light: #1e293b;
+  --primary: #ff6b6b;
+  --secondary: #4ecdc4;
+  --accent: #ffe66d;
 
-  /* 阴影（暗色模式下更柔和） */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-sm: 2px 2px 0px 0px #ffffff;
+  --shadow: 4px 4px 0px 0px #ffffff;
+  --shadow-md: 6px 6px 0px 0px #ffffff;
+  --shadow-lg: 8px 8px 0px 0px #ffffff;
 }

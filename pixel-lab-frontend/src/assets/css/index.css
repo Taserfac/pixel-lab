@@ -1,12 +1,11 @@
 /**
  * 【文件路径】src/assets/css/index.css
- * 【文件功能说明】全局样式入口文件
- * - 导入 CSS 变量
- * - 定义全局基础样式
- * - 覆盖 Element Plus 默认样式
+ * 【功能说明】全局样式 - Neo-Brutalism 新野兽主义风格
  */
 
 @import './variables.css';
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 /* ============================================
    基础样式重置
@@ -23,175 +22,282 @@ html {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  scroll-behavior: smooth;
 }
 
 body {
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--foreground);
   background-color: var(--background);
-  transition: background-color var(--transition-base), color var(--transition-base);
+  background-image: 
+    linear-gradient(90deg, transparent 79px, #e0e0e0 79px, #e0e0e0 81px, transparent 81px),
+    linear-gradient(#e0e0e0 1px, transparent 1px);
+  background-size: 100% 30px;
+}
+
+::selection {
+  background: var(--primary);
+  color: white;
 }
 
 /* ============================================
-   Element Plus 主题覆盖
+   Element Plus 主题覆盖 - 新野兽主义
    ============================================ */
 
+/* 按钮 - 粗边框 + 偏移阴影 */
 .el-button {
-  border-radius: var(--radius);
-  transition: all var(--transition-fast);
+  border-radius: 0 !important;
+  border: 3px solid var(--border) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all var(--transition-fast) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.el-button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md) !important;
+}
+
+.el-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .el-button--primary {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background: var(--primary) !important;
+  border-color: var(--border) !important;
+  color: var(--primary-foreground) !important;
 }
 
-.el-button--primary:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary-light);
+.el-button--default {
+  background: var(--background-soft) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground) !important;
 }
 
+.el-button--success {
+  background: var(--success) !important;
+  border-color: var(--border) !important;
+  color: white !important;
+}
+
+/* 输入框 */
 .el-input__wrapper {
-  border-radius: var(--radius);
+  border-radius: 0 !important;
+  background: var(--background-soft) !important;
+  box-shadow: var(--shadow) !important;
+  border: 3px solid var(--border) !important;
 }
 
-/* 修复输入框样式 */
-.el-input {
-  --el-input-height: 40px;
+.el-input__wrapper:hover {
+  box-shadow: var(--shadow-md) !important;
 }
 
-.el-input__inner {
-  height: 40px;
-  line-height: 40px;
+.el-input__wrapper.is-focus {
+  box-shadow: var(--shadow-active) !important;
+  transform: translate(2px, 2px);
 }
 
+/* 卡片 - 粗边框 */
 .el-card {
-  border-radius: var(--radius-lg);
-  border-color: var(--border);
-  background-color: var(--background);
+  border-radius: 0 !important;
+  border: 4px solid var(--border) !important;
+  background-color: var(--background-soft) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
+/* 菜单 */
 .el-menu {
-  border-right: none;
-  background-color: transparent;
+  border-right: none !important;
+  background-color: transparent !important;
 }
 
 .el-menu-item {
-  border-radius: var(--radius);
-  margin: 0.25rem 0.5rem;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  border: 3px solid transparent !important;
+  font-weight: 600;
 }
 
 .el-menu-item.is-active {
-  background-color: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--primary) !important;
+  color: white !important;
+  border-color: var(--border) !important;
 }
 
 .el-menu-item:hover {
-  background-color: var(--background-muted);
+  background: var(--accent) !important;
+  color: var(--foreground) !important;
 }
 
-[data-theme='dark'] .el-menu-item:hover {
-  background-color: var(--background-muted);
+/* 折叠面板 */
+.el-collapse {
+  border: none !important;
+}
+
+.el-collapse-item__header {
+  background: transparent !important;
+  border: none !important;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  height: 48px;
+}
+
+.el-collapse-item__wrap {
+  background: transparent !important;
+  border: none !important;
+}
+
+.el-collapse-item__content {
+  padding-bottom: 16px;
+}
+
+/* 滑块 - 新野兽主义风格 */
+.el-slider__runway {
+  background: var(--background-muted) !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+  border: 3px solid var(--border) !important;
+}
+
+.el-slider__bar {
+  background: var(--primary) !important;
+  height: 12px !important;
+  border-radius: 0 !important;
+}
+
+.el-slider__button {
+  width: 24px !important;
+  height: 24px !important;
+  border: 3px solid var(--border) !important;
+  background: var(--accent) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* 对话框 */
+.el-dialog {
+  border-radius: 0 !important;
+  border: 4px solid var(--border) !important;
+  background: var(--background-soft) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.el-dialog__header {
+  padding: 20px 24px !important;
+  border-bottom: 4px solid var(--border);
+}
+
+.el-dialog__title {
+  font-weight: 700;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.el-dialog__body {
+  padding: 24px !important;
+}
+
+/* 消息提示 */
+.el-message {
+  border-radius: 0 !important;
+  background: var(--accent) !important;
+  border: 3px solid var(--border) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.el-message--success {
+  background: var(--success) !important;
+}
+
+.el-message--error {
+  background: var(--error) !important;
+  color: white !important;
+}
+
+/* ============================================
+   新野兽主义特效
+   ============================================ */
+
+/* 浮动元素 */
+.brutalist-card {
+  background: var(--background-soft);
+  border: 4px solid var(--border);
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-fast);
+}
+
+.brutalist-card:hover {
+  transform: translate(-4px, -4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* 条纹背景 */
+.striped-bg {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 0, 0, 0.03) 10px,
+    rgba(0, 0, 0, 0.03) 20px
+  );
+}
+
+/* 点阵背景 */
+.dotted-bg {
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 霓虹边框 */
+.neon-border {
+  animation: neon-pulse 2s infinite;
+}
+
+@keyframes neon-pulse {
+  0%, 100% { border-color: var(--primary); }
+  50% { border-color: var(--accent); }
 }
 
 /* ============================================
    通用工具类
    ============================================ */
-.flex {
-  display: flex;
-}
-
-.flex-col {
-  flex-direction: column;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-center {
-  justify-content: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.gap-2 {
-  gap: var(--space-2);
-}
-
-.gap-4 {
-  gap: var(--space-4);
-}
-
-.gap-6 {
-  gap: var(--space-6);
-}
-
-.text-center {
-  text-align: center;
-}
-
-.w-full {
-  width: 100%;
-}
-
-.h-full {
-  height: 100%;
-}
-
-.min-h-screen {
-  min-height: 100vh;
-}
-
-.p-4 {
-  padding: var(--space-4);
-}
-
-.p-6 {
-  padding: var(--space-6);
-}
-
-.m-4 {
-  margin: var(--space-4);
-}
-
-.rounded {
-  border-radius: var(--radius);
-}
-
-.rounded-lg {
-  border-radius: var(--radius-lg);
-}
-
-.shadow {
-  box-shadow: var(--shadow);
-}
-
-.shadow-md {
-  box-shadow: var(--shadow-md);
-}
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: var(--space-2); }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-screen { min-height: 100vh; }
+.p-4 { padding: var(--space-4); }
+.p-6 { padding: var(--space-6); }
+.m-4 { margin: var(--space-4); }
+.rounded { border-radius: var(--radius); }
+.rounded-lg { border-radius: var(--radius-lg); }
 
 /* ============================================
    动画
    ============================================ */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-@keyframes slideInUp {
+@keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
@@ -199,10 +305,19 @@ body {
   }
 }
 
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 .animate-fade-in {
   animation: fadeIn var(--transition-slow) ease-out;
 }
 
-.animate-slide-in-up {
-  animation: slideInUp var(--transition-slow) ease-out;
+.animate-slide-up {
+  animation: slideUp var(--transition-slow) ease-out;
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
 }

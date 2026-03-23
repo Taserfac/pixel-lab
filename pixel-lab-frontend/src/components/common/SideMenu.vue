@@ -1,9 +1,6 @@
 <!--
   【文件路径】src/components/common/SideMenu.vue
-  【文件功能说明】侧边栏菜单组件
-  - 显示导航菜单
-  - 支持折叠/展开
-  - 菜单与路由联动
+  【功能说明】侧边栏菜单 - Neo-Brutalism 新野兽主义风格
 -->
 
 <template>
@@ -13,41 +10,44 @@
   >
     <!-- Logo -->
     <div class="logo">
-      <span v-if="!menuStore.collapsed">Pixel Lab Pro</span>
-      <span v-else>PL</span>
+      <div class="logo-icon">
+        <span class="pixel-text">PX</span>
+      </div>
+      <span
+        v-if="!menuStore.collapsed"
+        class="logo-text"
+      >Pixel Lab</span>
     </div>
     
     <!-- 菜单 -->
-    <el-menu
-      :default-active="activeRoute"
-      :collapse="menuStore.collapsed"
-      :collapse-transition="false"
-      router
-      class="menu"
-    >
-      <el-menu-item
+    <nav class="menu">
+      <router-link
         v-for="route in menuRoutes"
         :key="route.path"
-        :index="route.path"
+        :to="route.path"
+        class="menu-item"
+        :class="{ active: activeRoute === route.path }"
       >
-        <el-icon>
+        <span class="menu-icon">
           <component :is="route.meta.icon" />
-        </el-icon>
-        <template #title>
-          {{ route.meta.title }}
-        </template>
-      </el-menu-item>
-    </el-menu>
+        </span>
+        <span
+          v-if="!menuStore.collapsed"
+          class="menu-text"
+        >{{ route.meta.title }}</span>
+      </router-link>
+    </nav>
     
-    <!-- 折叠按钮 -->
-    <div
-      class="collapse-btn"
-      @click="menuStore.toggleCollapse"
-    >
-      <el-icon>
-        <Fold v-if="!menuStore.collapsed" />
-        <Expand v-else />
-      </el-icon>
+    <!-- 底部折叠按钮 -->
+    <div class="menu-footer">
+      <button
+        class="collapse-btn"
+        @click="menuStore.toggleCollapse"
+      >
+        <span class="btn-text">
+          {{ menuStore.collapsed ? '→' : '←' }}
+        </span>
+      </button>
     </div>
   </aside>
 </template>
@@ -55,17 +55,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Fold, Expand } from '@element-plus/icons-vue'
 import { useMenuStore } from '@/store/menu'
 import router from '@/router'
 
 const route = useRoute()
 const menuStore = useMenuStore()
 
-// 当前激活的路由
 const activeRoute = computed(() => route.path)
 
-// 菜单路由（过滤掉需要管理员权限的路由，如果不是管理员）
 const menuRoutes = computed(() => {
   const routes = router.getRoutes()
   const mainRoute = routes.find(r => r.path === '/')
@@ -73,9 +70,7 @@ const menuRoutes = computed(() => {
   if (!mainRoute || !mainRoute.children) return []
   
   return mainRoute.children.filter(r => {
-    // 过滤掉没有标题的路由
     if (!r.meta?.title) return false
-    // 过滤掉需要管理员权限的路由（如果不是管理员）
     if (r.meta?.admin) return false
     return true
   })
@@ -88,63 +83,167 @@ const menuRoutes = computed(() => {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 240px;
-  background-color: var(--background-soft);
-  border-right: 1px solid var(--border);
+  width: 260px;
+  background: var(--background-soft);
+  border-right: 4px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease;
+  transition: width var(--transition-base);
   z-index: 100;
 }
 
 .side-menu.collapsed {
-  width: 64px;
+  width: 80px;
 }
 
+/* Logo */
 .logo {
-  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 4px solid var(--border);
+  background: var(--primary);
+}
+
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--accent);
+  border: 4px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pixel-text {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.logo-text {
+  font-family: var(--font-mono);
   font-size: 20px;
-  font-weight: bold;
-  color: var(--primary);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: white;
+  white-space: nowrap;
+  text-shadow: 2px 2px 0px var(--border);
 }
 
-.logo img {
-  height: 32px;
-}
-
+/* 菜单 */
 .menu {
   flex: 1;
-  border-right: none;
-  background-color: transparent;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 3px solid var(--border);
+  background: var(--background-soft);
+  color: var(--foreground);
+  text-decoration: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--accent);
+  transform: translate(-4px, -4px);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
+
+.menu-item.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 4px 4px 0px 0px var(--border);
+}
+
+.menu-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.menu-text {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* 底部 */
+.menu-footer {
+  padding: 16px;
+  border-top: 4px solid var(--border);
 }
 
 .collapse-btn {
-  height: 48px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 12px;
+  border: 3px solid var(--border);
+  background: var(--secondary);
   cursor: pointer;
-  border-top: 1px solid var(--border);
-  color: var(--foreground-muted);
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
+  font-weight: 700;
 }
 
 .collapse-btn:hover {
-  background-color: var(--background-muted);
-  color: var(--primary);
+  background: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0px 0px var(--border);
 }
 
-@media (max-width: 768px) {
-  .side-menu {
-    transform: translateX(-100%);
-  }
-  
-  .side-menu.collapsed {
-    transform: translateX(-100%);
-  }
+.btn-text {
+  font-size: 20px;
+  font-family: var(--font-mono);
+}
+
+/* 收起状态 */
+.collapsed .logo {
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.collapsed .logo-text {
+  display: none;
+}
+
+.collapsed .menu {
+  padding: 16px 8px;
+}
+
+.collapsed .menu-item {
+  justify-content: center;
+  padding: 16px 8px;
+}
+
+.collapsed .menu-text {
+  display: none;
+}
+
+.collapsed .menu-footer {
+  padding: 16px 8px;
 }
 </style>

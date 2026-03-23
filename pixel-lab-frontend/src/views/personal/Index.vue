@@ -293,11 +293,15 @@ onMounted(() => {
 
 <style scoped>
 .personal-page {
-  padding: var(--space-4);
+  padding: var(--space-6);
 }
 
 .user-card {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.user-card :deep(.el-card__body) {
+  padding: var(--space-6);
 }
 
 .user-info {
@@ -306,41 +310,58 @@ onMounted(() => {
   gap: var(--space-6);
 }
 
-.user-info .info h2 {
+.user-info :deep(.el-avatar) {
+  border: 4px solid var(--border);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
 
+.user-info .info h2 {
   margin: 0 0 var(--space-2) 0;
-  font-size: 24px;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .user-info .info .username {
   color: var(--foreground-muted);
   margin-bottom: var(--space-4);
+  font-size: 14px;
 }
 
 .stats {
   display: flex;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: var(--space-4);
+  background: var(--accent);
+  border: 3px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
 }
 
 .stat-item .number {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--primary);
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--foreground);
 }
 
 .stat-item .label {
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--foreground-muted);
 }
 
 .action-bar {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .card-header {
@@ -349,16 +370,30 @@ onMounted(() => {
   align-items: center;
 }
 
+.card-header span {
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
 }
 
 .image-item {
-  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--background-elevated);
+  background: var(--background-soft);
+  border: 4px solid var(--border);
+  box-shadow: 6px 6px 0px 0px var(--border);
+  transition: all var(--transition-fast);
+}
+
+.image-item:hover {
+  transform: translate(-4px, -4px);
+  box-shadow: 10px 10px 0px 0px var(--border);
 }
 
 .image-wrapper {
@@ -371,7 +406,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s;
+  transition: transform var(--transition-base);
 }
 
 .image-wrapper:hover img {
@@ -381,12 +416,12 @@ onMounted(() => {
 .image-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity var(--transition-fast);
 }
 
 .image-wrapper:hover .image-overlay {
@@ -398,17 +433,32 @@ onMounted(() => {
   gap: var(--space-2);
 }
 
+.image-overlay .actions :deep(.el-button) {
+  background: var(--accent) !important;
+  border: 3px solid var(--border) !important;
+  box-shadow: 4px 4px 0px 0px var(--border) !important;
+}
+
+.image-overlay .actions :deep(.el-button:hover) {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border) !important;
+}
+
 .image-info {
-  padding: var(--space-3);
+  padding: var(--space-4);
+  border-top: 4px solid var(--border);
 }
 
 .image-info .name {
   margin: 0;
   font-size: 14px;
+  font-weight: 700;
   color: var(--foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .image-info .date {

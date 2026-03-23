@@ -1,8 +1,6 @@
 <!--
   【文件路径】src/components/common/MainLayout.vue
-  【文件功能说明】主布局组件
-  - 包含侧边栏菜单、顶部导航栏、主内容区
-  - 所有业务页面的外层容器
+  【功能说明】主布局组件 - Neo-Brutalism 风格
 -->
 
 <template>
@@ -52,12 +50,12 @@ const menuStore = useMenuStore()
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin-left: 240px;
-  transition: margin-left 0.3s ease;
+  margin-left: 260px;
+  transition: margin-left var(--transition-base);
 }
 
 .main-content.collapsed {
-  margin-left: 64px;
+  margin-left: 80px;
 }
 
 .page-content {

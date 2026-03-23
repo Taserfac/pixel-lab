@@ -105,13 +105,29 @@ const handleLogout = () => {
 
 <style scoped>
 .header-bar {
-  height: 60px;
+  height: 70px;
   padding: 0 var(--space-6);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: var(--background);
-  border-bottom: 1px solid var(--border);
+  background-color: var(--background-soft);
+  border-bottom: 4px solid var(--border);
+}
+
+.header-bar :deep(.el-breadcrumb) {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.header-bar :deep(.el-breadcrumb__inner) {
+  color: var(--foreground);
+}
+
+.header-bar :deep(.el-breadcrumb__separator) {
+  color: var(--primary);
+  font-weight: 700;
 }
 
 .actions {
@@ -120,23 +136,45 @@ const handleLogout = () => {
   gap: var(--space-4);
 }
 
+.actions .el-button.is-circle {
+  background: var(--secondary);
+  border: 3px solid var(--border) !important;
+  box-shadow: 4px 4px 0px 0px var(--border);
+  color: var(--foreground);
+}
+
+.actions .el-button.is-circle:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
+
 .user-info {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius);
-  transition: background-color 0.2s;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  border: 3px solid var(--border);
+  box-shadow: 4px 4px 0px 0px var(--border);
+  transition: all var(--transition-fast);
 }
 
 .user-info:hover {
-  background-color: var(--background-muted);
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0px 0px var(--border);
+}
+
+.user-info :deep(.el-avatar) {
+  border: 2px solid var(--border);
 }
 
 .username {
   font-size: 14px;
+  font-weight: 700;
   color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 @media (max-width: 768px) {
