@@ -9,9 +9,11 @@ const router = express.Router()
 
 // 认证路由
 const authRouter = require('./auth')
+const imageRouter = require('./image')
 
 // 挂载路由
 router.use('/auth', authRouter)
+router.use('/images', imageRouter)
 
 // 健康检查
 router.get('/health', (req, res) => {

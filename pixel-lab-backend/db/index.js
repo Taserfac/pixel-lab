@@ -20,7 +20,7 @@ const pool = mysql.createPool(config.db)
  */
 const query = async (sql, params = []) => {
   try {
-    const [rows] = await pool.execute(sql, params)
+    const [rows] = await pool.query(sql, params)
     return rows
   } catch (error) {
     console.error('[DB Error]', error)
@@ -36,7 +36,7 @@ const query = async (sql, params = []) => {
  */
 const insert = async (sql, params = []) => {
   try {
-    const [result] = await pool.execute(sql, params)
+    const [result] = await pool.query(sql, params)
     return result.insertId
   } catch (error) {
     console.error('[DB Error]', error)
@@ -52,7 +52,7 @@ const insert = async (sql, params = []) => {
  */
 const update = async (sql, params = []) => {
   try {
-    const [result] = await pool.execute(sql, params)
+    const [result] = await pool.query(sql, params)
     return result.affectedRows
   } catch (error) {
     console.error('[DB Error]', error)
@@ -68,7 +68,7 @@ const update = async (sql, params = []) => {
  */
 const remove = async (sql, params = []) => {
   try {
-    const [result] = await pool.execute(sql, params)
+    const [result] = await pool.query(sql, params)
     return result.affectedRows
   } catch (error) {
     console.error('[DB Error]', error)
@@ -101,7 +101,7 @@ const transaction = async (callback) => {
  */
 const testConnection = async () => {
   try {
-    const [rows] = await pool.execute('SELECT 1')
+    const [rows] = await pool.query('SELECT 1')
     console.log('[DB] 数据库连接成功')
     return true
   } catch (error) {

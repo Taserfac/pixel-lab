@@ -48,8 +48,8 @@ request.interceptors.response.use(
   (response) => {
     const { data } = response
 
-    // 如果响应成功，直接返回数据
-    if (data.code === 200) {
+    // 如果响应成功，直接返回数据 (200-299 都是成功)
+    if (data.code >= 200 && data.code < 300) {
       return data.data
     }
 
@@ -125,6 +125,16 @@ export const put = (url, data = {}) => {
  */
 export const del = (url, params = {}) => {
   return request.delete(url, { params })
+}
+
+/**
+ * PATCH 请求
+ * @param {string} url - 请求地址
+ * @param {object} data - 请求体数据
+ * @returns {Promise}
+ */
+export const patch = (url, data = {}) => {
+  return request.patch(url, data)
 }
 
 export default request
