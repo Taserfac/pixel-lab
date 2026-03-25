@@ -80,22 +80,22 @@
 /* 暗色版本 */
 [data-theme='dark'] {
   --background: #1a1a2e;
-  --background-soft: #16213e;
+  --background-soft: #242442;
   --background-muted: #0f0f23;
-  --background-elevated: #1a1a2e;
+  --background-elevated: #2a2a4a;
 
   --foreground: #ffffff;
-  --foreground-muted: #cccccc;
-  --foreground-subtle: #999999;
+  --foreground-muted: #b0b0c0;
+  --foreground-subtle: #8080a0;
 
-  --border: #ffffff;
+  --border: #3a3a5a;
 
   --primary: #ff6b6b;
   --secondary: #4ecdc4;
   --accent: #ffe66d;
 
-  --shadow-sm: 2px 2px 0px 0px #ffffff;
-  --shadow: 4px 4px 0px 0px #ffffff;
-  --shadow-md: 6px 6px 0px 0px #ffffff;
-  --shadow-lg: 8px 8px 0px 0px #ffffff;
+  --shadow-sm: 2px 2px 0px 0px rgba(58, 58, 90, 0.5);
+  --shadow: 4px 4px 0px 0px rgba(58, 58, 90, 0.5);
+  --shadow-md: 6px 6px 0px 0px rgba(58, 58, 90, 0.5);
+  --shadow-lg: 8px 8px 0px 0px rgba(58, 58, 90, 0.5);
 }
