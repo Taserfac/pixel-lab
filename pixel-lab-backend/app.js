@@ -40,8 +40,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 // 路由配置
 // ============================================
 
-// API 路由（认证中间件放在 /api 下）
-app.use('/api', authMiddleware, routes)
+// API 路由（不在全局使用认证中间件，由各路由自行决定）
+app.use('/api', routes)
 
 // ============================================
 // 错误处理
