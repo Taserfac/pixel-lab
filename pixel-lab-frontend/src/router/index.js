@@ -31,8 +31,15 @@ const routes = [
   {
     path: '/',
     component: () => import('@/components/common/MainLayout.vue'),
-    redirect: '/workbench',
+    redirect: '/dashboard',
     children: [
+      // 数据统计（首页）
+      {
+        path: 'dashboard',
+        name: 'Dashboard',
+        component: () => import('@/views/dashboard/Index.vue'),
+        meta: { title: '首页', icon: 'HomeFilled' }
+      },
       // 图像处理工作台
       {
         path: 'workbench',
@@ -63,8 +70,8 @@ const routes = [
       },
       // 数据统计
       {
-        path: 'dashboard',
-        name: 'Dashboard',
+        path: 'stats',
+        name: 'Stats',
         component: () => import('@/views/dashboard/Index.vue'),
         meta: { title: '数据统计', icon: 'TrendCharts' }
       },
