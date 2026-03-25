@@ -7,10 +7,10 @@ const express = require('express')
 const router = express.Router()
 const imageController = require('../controller/image')
 const { authMiddleware } = require('../middleware/auth')
-const upload = require('../middleware/upload')
+const { uploadWithValidation } = require('../middleware/upload')
 
-// 上传图片
-router.post('/upload', authMiddleware, upload.single('image'), imageController.upload)
+// 上传图片（使用增强版校验）
+router.post('/upload', authMiddleware, uploadWithValidation('image'), imageController.upload)
 
 // 获取用户图片列表
 router.get('/', authMiddleware, imageController.getUserImages)
