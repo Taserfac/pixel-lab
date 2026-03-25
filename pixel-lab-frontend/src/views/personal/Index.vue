@@ -3,6 +3,7 @@
   【功能说明】个人中心页面
   - 用户信息展示
   - 我的图片库
+  - 我的收藏/点赞
   - 上传图片
 -->
 
@@ -28,6 +29,14 @@
               <span class="number">{{ stats.publicImages }}</span>
               <span class="label">公开</span>
             </div>
+            <div class="stat-item">
+              <span class="number">{{ stats.likes }}</span>
+              <span class="label">点赞</span>
+            </div>
+            <div class="stat-item">
+              <span class="number">{{ stats.collections }}</span>
+              <span class="label">收藏</span>
+            </div>
           </div>
         </div>
       </div>
@@ -48,76 +57,152 @@
       />
     </div>
 
-    <!-- 图片列表 -->
-    <el-card v-loading="loading">
-      <template #header>
-        <div class="card-header">
-          <span>我的图片</span>
-          <el-radio-group v-model="filterType" size="small">
-            <el-radio-button label="all">全部</el-radio-button>
-            <el-radio-button label="public">公开</el-radio-button>
-            <el-radio-button label="private">私有</el-radio-button>
-          </el-radio-group>
-        </div>
-      </template>
+    <!-- Tab 切换 -->
+    <el-tabs v-model="activeTab" class="content-tabs" @tab-change="handleTabChange">
+      <el-tab-pane label="我的图片" name="images">
+        <el-card v-loading="loading">
+          <template #header>
+            <div class="card-header">
+              <span>我的图片</span>
+              <el-radio-group v-model="filterType" size="small">
+                <el-radio-button label="all">全部</el-radio-button>
+                <el-radio-button label="public">公开</el-radio-button>
+                <el-radio-button label="private">私有</el-radio-button>
+              </el-radio-group>
+            </div>
+          </template>
 
-      <div v-if="filteredImages.length > 0" class="image-grid">
-        <div
-          v-for="image in filteredImages"
-          :key="image.id"
-          class="image-item"
-        >
-          <div class="image-wrapper">
-            <img :src="image.url" :alt="image.original_name" />
-            <div class="image-overlay">
-              <div class="actions">
-                <el-button
-                  circle
-                  size="small"
-                  @click="viewImage(image)"
-                >
-                  <el-icon><View /></el-icon>
-                </el-button>
-                <el-button
-                  circle
-                  size="small"
-                  :type="image.is_public ? 'success' : 'info'"
-                  @click="toggleVisibility(image)"
-                >
-                  <el-icon>
-                    <Unlock v-if="image.is_public" />
-                    <Lock v-else />
-                  </el-icon>
-                </el-button>
-                <el-button
-                  circle
-                  size="small"
-                  type="danger"
-                  @click="confirmDelete(image)"
-                >
-                  <el-icon><Delete /></el-icon>
-                </el-button>
+          <div v-if="filteredImages.length > 0" class="image-grid">
+            <div
+              v-for="image in filteredImages"
+              :key="image.id"
+              class="image-item"
+            >
+              <div class="image-wrapper">
+                <img :src="image.url" :alt="image.original_name" loading="lazy" />
+                <div class="image-overlay">
+                  <div class="actions">
+                    <el-button
+                      circle
+                      size="small"
+                      @click="viewImage(image)"
+                    >
+                      <el-icon><View /></el-icon>
+                    </el-button>
+                    <el-button
+                      circle
+                      size="small"
+                      :type="image.is_public ? 'success' : 'info'"
+                      @click="toggleVisibility(image)"
+                    >
+                      <el-icon>
+                        <Unlock v-if="image.is_public" />
+                        <Lock v-else />
+                      </el-icon>
+                    </el-button>
+                    <el-button
+                      circle
+                      size="small"
+                      type="danger"
+                      @click="confirmDelete(image)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              <div class="image-info">
+                <p class="name" :title="image.original_name">
+                  {{ image.original_name }}
+                </p>
+                <p class="date">{{ formatDate(image.created_at) }}</p>
               </div>
             </div>
           </div>
-          <div class="image-info">
-            <p class="name" :title="image.original_name">
-              {{ image.original_name }}
-            </p>
-            <p class="date">{{ formatDate(image.created_at) }}</p>
-          </div>
-        </div>
-      </div>
 
-      <EmptyState
-        v-else
-        title="暂无图片"
-        description="点击上方「上传图片」按钮添加你的第一张图片"
-        :show-action="true"
-        action-text="上传图片"
-        @action="handleUpload"
-      />
-    </el-card>
+          <EmptyState
+            v-else
+            title="暂无图片"
+            description="点击上方「上传图片」按钮添加你的第一张图片"
+            :show-action="true"
+            action-text="上传图片"
+            @action="handleUpload"
+          />
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="我的收藏" name="collections">
+        <el-card v-loading="loadingCollections">
+          <template #header>
+            <span>我的收藏 ({{ collectionsTotal }})</span>
+          </template>
+
+          <div v-if="collections.length > 0" class="image-grid">
+            <div
+              v-for="image in collections"
+              :key="image.id"
+              class="image-item"
+              @click="goToCommunity(image.id)"
+            >
+              <div class="image-wrapper">
+                <img :src="image.url" :alt="image.title || image.original_name" loading="lazy" />
+              </div>
+              <div class="image-info">
+                <p class="name" :title="image.title || image.original_name">
+                  {{ image.title || image.original_name }}
+                </p>
+                <p class="author">by {{ image.author_name || '匿名' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <EmptyState
+            v-else
+            title="暂无收藏"
+            description="去社区广场发现喜欢的作品吧"
+            :show-action="true"
+            action-text="逛逛社区"
+            @action="goToCommunity()"
+          />
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="我的点赞" name="likes">
+        <el-card v-loading="loadingLikes">
+          <template #header>
+            <span>我的点赞 ({{ likesTotal }})</span>
+          </template>
+
+          <div v-if="likes.length > 0" class="image-grid">
+            <div
+              v-for="image in likes"
+              :key="image.id"
+              class="image-item"
+              @click="goToCommunity(image.id)"
+            >
+              <div class="image-wrapper">
+                <img :src="image.url" :alt="image.title || image.original_name" loading="lazy" />
+              </div>
+              <div class="image-info">
+                <p class="name" :title="image.title || image.original_name">
+                  {{ image.title || image.original_name }}
+                </p>
+                <p class="author">by {{ image.author_name || '匿名' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <EmptyState
+            v-else
+            title="暂无点赞"
+            description="去社区广场发现喜欢的作品吧"
+            :show-action="true"
+            action-text="逛逛社区"
+            @action="goToCommunity()"
+          />
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 图片预览对话框 -->
     <el-dialog
@@ -142,12 +227,15 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload, View, Lock, Unlock, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility } from '@/api/image'
+import { getUserCollections, getUserLikes } from '@/api/community'
 import EmptyState from '@/components/common/EmptyState.vue'
 
+const router = useRouter()
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo || {})
 
@@ -157,13 +245,28 @@ const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726
 // 统计数据
 const stats = ref({
   totalImages: 0,
-  publicImages: 0
+  publicImages: 0,
+  likes: 0,
+  collections: 0
 })
+
+// Tab
+const activeTab = ref('images')
 
 // 图片列表
 const images = ref([])
 const loading = ref(false)
 const filterType = ref('all')
+
+// 收藏列表
+const collections = ref([])
+const collectionsTotal = ref(0)
+const loadingCollections = ref(false)
+
+// 点赞列表
+const likes = ref([])
+const likesTotal = ref(0)
+const loadingLikes = ref(false)
 
 // 文件输入
 const fileInput = ref(null)
@@ -183,6 +286,15 @@ const filteredImages = computed(() => {
   return images.value
 })
 
+// Tab 切换
+const handleTabChange = (tab) => {
+  if (tab === 'collections') {
+    fetchCollections()
+  } else if (tab === 'likes') {
+    fetchLikes()
+  }
+}
+
 // 获取图片列表
 const fetchImages = async () => {
   loading.value = true
@@ -195,6 +307,36 @@ const fetchImages = async () => {
     console.error('获取图片列表失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 获取收藏列表
+const fetchCollections = async () => {
+  loadingCollections.value = true
+  try {
+    const res = await getUserCollections({ pageSize: 50 })
+    collections.value = res.list || []
+    collectionsTotal.value = res.total || 0
+    stats.value.collections = res.total || 0
+  } catch (error) {
+    console.error('获取收藏列表失败:', error)
+  } finally {
+    loadingCollections.value = false
+  }
+}
+
+// 获取点赞列表
+const fetchLikes = async () => {
+  loadingLikes.value = true
+  try {
+    const res = await getUserLikes({ pageSize: 50 })
+    likes.value = res.list || []
+    likesTotal.value = res.total || 0
+    stats.value.likes = res.total || 0
+  } catch (error) {
+    console.error('获取点赞列表失败:', error)
+  } finally {
+    loadingLikes.value = false
   }
 }
 
@@ -213,9 +355,9 @@ const onFileSelected = async (e) => {
     return
   }
   
-  // 检查文件大小（10MB）
-  if (file.size > 10 * 1024 * 1024) {
-    ElMessage.error('图片大小不能超过10MB')
+  // 检查文件大小（5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过5MB')
     return
   }
   
@@ -280,6 +422,15 @@ const confirmDelete = (image) => {
   }).catch(() => {})
 }
 
+// 跳转到社区
+const goToCommunity = (imageId) => {
+  if (imageId) {
+    router.push({ path: '/community', query: { id: imageId } })
+  } else {
+    router.push('/community')
+  }
+}
+
 // 格式化日期
 const formatDate = (dateStr) => {
   const date = new Date(dateStr)
@@ -288,6 +439,9 @@ const formatDate = (dateStr) => {
 
 onMounted(() => {
   fetchImages()
+  // 预加载统计数据
+  fetchCollections()
+  fetchLikes()
 })
 </script>
 
@@ -332,28 +486,28 @@ onMounted(() => {
 
 .stats {
   display: flex;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   background: var(--accent);
   border: 3px solid var(--border);
   box-shadow: 4px 4px 0px 0px var(--border);
 }
 
 .stat-item .number {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   font-family: var(--font-mono);
   color: var(--foreground);
 }
 
 .stat-item .label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -361,6 +515,10 @@ onMounted(() => {
 }
 
 .action-bar {
+  margin-bottom: var(--space-5);
+}
+
+.content-tabs {
   margin-bottom: var(--space-5);
 }
 
@@ -379,8 +537,8 @@ onMounted(() => {
 
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-5);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
 }
 
 .image-item {
@@ -389,6 +547,7 @@ onMounted(() => {
   border: 4px solid var(--border);
   box-shadow: 6px 6px 0px 0px var(--border);
   transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .image-item:hover {
@@ -445,13 +604,13 @@ onMounted(() => {
 }
 
 .image-info {
-  padding: var(--space-4);
+  padding: var(--space-3);
   border-top: 4px solid var(--border);
 }
 
 .image-info .name {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--foreground);
   overflow: hidden;
@@ -461,9 +620,27 @@ onMounted(() => {
   letter-spacing: 0.03em;
 }
 
-.image-info .date {
+.image-info .date,
+.image-info .author {
   margin: var(--space-1) 0 0 0;
   font-size: 12px;
   color: var(--foreground-muted);
+}
+
+@media (max-width: 768px) {
+  .user-info {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .stats {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-3);
+  }
 }
 </style>

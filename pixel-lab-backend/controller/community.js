@@ -11,12 +11,14 @@ const { success, error } = require('../utils/result')
  */
 async function getPublicImages(req, res) {
   const { page = 1, pageSize = 20, keyword = '', sortBy = 'latest' } = req.query
+  const userId = req.user?.id
 
   const result = await communityService.getPublicImages({
     page: parseInt(page),
     pageSize: parseInt(pageSize),
     keyword,
-    sortBy
+    sortBy,
+    userId
   })
 
   success(res, result)
@@ -139,6 +141,21 @@ async function getUserCollections(req, res) {
   success(res, result)
 }
 
+/**
+ * 获取用户点赞列表
+ */
+async function getUserLikes(req, res) {
+  const userId = req.user.id
+  const { page = 1, pageSize = 20 } = req.query
+
+  const result = await communityService.getUserLikes(userId, {
+    page: parseInt(page),
+    pageSize: parseInt(pageSize)
+  })
+
+  success(res, result)
+}
+
 module.exports = {
   getPublicImages,
   getImageDetail,
@@ -147,5 +164,6 @@ module.exports = {
   getComments,
   addComment,
   deleteComment,
-  getUserCollections
+  getUserCollections,
+  getUserLikes
 }

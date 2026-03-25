@@ -36,8 +36,15 @@ module.exports = {
   // 文件上传配置
   upload: {
     path: process.env.UPLOAD_PATH || './uploads',
-    maxSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB
-    allowedTypes: (process.env.ALLOWED_TYPES || 'image/jpeg,image/png,image/gif,image/webp').split(',')
+    maxSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB
+    allowedTypes: (process.env.ALLOWED_TYPES || 'image/jpeg,image/png,image/gif,image/webp').split(','),
+    // 图片处理配置
+    image: {
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 85,
+      thumbnailSize: 300
+    }
   },
 
   // CORS 配置

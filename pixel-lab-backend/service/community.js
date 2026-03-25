@@ -8,7 +8,7 @@ const db = require('../db')
 /**
  * 获取公开作品列表
  */
-async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy = 'latest' }) {
+async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy = 'latest', userId = null }) {
   const offset = (page - 1) * pageSize
   let whereClause = 'WHERE i.is_public = 1 AND i.status = 1'
   const params = []
@@ -41,6 +41,38 @@ async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy =
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  // 如果用户已登录，查询每个作品的点赞和收藏状态
+  if (userId && rows && rows.length > 0) {
+    const imageIds = rows.map(r => r.id)
+    const placeholders = imageIds.map(() => '?').join(',')
+
+    // 查询点赞状态
+    const likes = await db.query(
+      `SELECT image_id FROM likes WHERE user_id = ? AND image_id IN (${placeholders})`,
+      [userId, ...imageIds]
+    )
+    const likedImageIds = new Set(likes ? likes.map(l => l.image_id) : [])
+
+    // 查询收藏状态
+    const collections = await db.query(
+      `SELECT image_id FROM collections WHERE user_id = ? AND image_id IN (${placeholders})`,
+      [userId, ...imageIds]
+    )
+    const collectedImageIds = new Set(collections ? collections.map(c => c.image_id) : [])
+
+    // 添加状态到每个作品
+    rows.forEach(row => {
+      row.isLiked = likedImageIds.has(row.id)
+      row.isCollected = collectedImageIds.has(row.id)
+    })
+  } else if (rows) {
+    // 未登录时，默认都是 false
+    rows.forEach(row => {
+      row.isLiked = false
+      row.isCollected = false
+    })
+  }
 
   return {
     list: rows,
@@ -233,6 +265,38 @@ async function getUserCollections(userId, { page = 1, pageSize = 20 }) {
   }
 }
 
+/**
+ * 获取用户点赞列表
+ */
+async function getUserLikes(userId, { page = 1, pageSize = 20 }) {
+  const offset = (page - 1) * pageSize
+
+  const countResult = await db.query(
+    'SELECT COUNT(*) as total FROM likes WHERE user_id = ?',
+    [userId]
+  )
+  const total = countResult[0]?.total || 0
+
+  const rows = await db.query(
+    `SELECT i.*, u.nickname as author_name, l.created_at as liked_at
+     FROM likes l
+     LEFT JOIN image i ON l.image_id = i.id
+     LEFT JOIN user u ON i.user_id = u.id
+     WHERE l.user_id = ?
+     ORDER BY l.created_at DESC
+     LIMIT ? OFFSET ?`,
+    [userId, pageSize, offset]
+  )
+
+  return {
+    list: rows || [],
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize)
+  }
+}
+
 module.exports = {
   getPublicImages,
   getImageDetail,
@@ -241,5 +305,6 @@ module.exports = {
   getComments,
   addComment,
   deleteComment,
-  getUserCollections
+  getUserCollections,
+  getUserLikes
 }

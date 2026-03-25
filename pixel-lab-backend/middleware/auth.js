@@ -47,6 +47,24 @@ const authMiddleware = (req, res, next) => {
 }
 
 /**
+ * 可选认证中间件
+ * 有 token 则解析用户信息，没有 token 也继续执行
+ */
+const optionalAuthMiddleware = (req, res, next) => {
+  const authHeader = req.headers.authorization
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7)
+    const decoded = verifyToken(token)
+    if (decoded) {
+      req.user = decoded
+    }
+  }
+  
+  next()
+}
+
+/**
  * 管理员权限校验中间件
  */
 const adminMiddleware = (req, res, next) => {
@@ -63,5 +81,6 @@ const adminMiddleware = (req, res, next) => {
 
 module.exports = {
   authMiddleware,
+  optionalAuthMiddleware,
   adminMiddleware
 }

@@ -6,14 +6,14 @@
 const express = require('express')
 const router = express.Router()
 const communityController = require('../controller/community')
-const { authMiddleware } = require('../middleware/auth')
+const { authMiddleware, optionalAuthMiddleware } = require('../middleware/auth')
 
-// 公开接口
+// 公开接口（可选认证，登录用户可获取点赞/收藏状态）
 // 获取公开作品列表
-router.get('/images', communityController.getPublicImages)
+router.get('/images', optionalAuthMiddleware, communityController.getPublicImages)
 
 // 获取作品详情
-router.get('/images/:id', communityController.getImageDetail)
+router.get('/images/:id', optionalAuthMiddleware, communityController.getImageDetail)
 
 // 获取评论列表
 router.get('/images/:imageId/comments', communityController.getComments)
@@ -33,5 +33,8 @@ router.delete('/comments/:id', authMiddleware, communityController.deleteComment
 
 // 获取用户收藏列表
 router.get('/collections', authMiddleware, communityController.getUserCollections)
+
+// 获取用户点赞列表
+router.get('/likes', authMiddleware, communityController.getUserLikes)
 
 module.exports = router

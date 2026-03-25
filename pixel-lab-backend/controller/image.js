@@ -6,6 +6,43 @@
 const imageService = require('../service/image')
 const { success, error } = require('../utils/result')
 const path = require('path')
+const sharp = require('sharp')
+const config = require('../config')
+
+/**
+ * 处理图片压缩
+ */
+async function processImage(filePath) {
+  const { maxWidth, maxHeight, quality } = config.upload.image
+  
+  try {
+    const image = sharp(filePath)
+    const metadata = await image.metadata()
+    
+    // 只有图片超过最大尺寸才压缩
+    if (metadata.width > maxWidth || metadata.height > maxHeight) {
+      await image
+        .resize(maxWidth, maxHeight, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({ quality, mozjpeg: true })
+        .toFile(filePath + '.tmp')
+      
+      // 替换原文件
+      const fs = require('fs')
+      fs.unlinkSync(filePath)
+      fs.renameSync(filePath + '.tmp', filePath)
+      
+      return fs.statSync(filePath).size
+    }
+    
+    return metadata.size
+  } catch (err) {
+    console.error('图片处理失败:', err)
+    return null
+  }
+}
 
 /**
  * 上传图片
@@ -21,19 +58,32 @@ const upload = async (req, res) => {
     const userId = req.user.id
     const baseUrl = `${req.protocol}://${req.get('host')}`
     
+    // 压缩图片
+    const processedSize = await processImage(file.path)
+    const finalSize = processedSize || file.size
+    
+    // 获取图片尺寸
+    let width = null, height = null
+    try {
+      const metadata = await sharp(file.path).metadata()
+      width = metadata.width
+      height = metadata.height
+    } catch (e) {
+      // 忽略错误
+    }
+    
     // 生成图片URL
     const url = `${baseUrl}/uploads/${file.filename}`
     
-    // 获取图片尺寸（需要安装 sharp 库，先简化）
     const imageData = {
       userId,
       filename: file.filename,
       originalName: file.originalname,
       url,
-      thumbnailUrl: url, // 暂时用原图作为缩略图
-      width: null,
-      height: null,
-      size: file.size,
+      thumbnailUrl: url,
+      width,
+      height,
+      size: finalSize,
       format: path.extname(file.originalname).slice(1)
     }
     
@@ -43,7 +93,9 @@ const upload = async (req, res) => {
       id: imageId,
       url,
       originalName: file.originalname,
-      size: file.size
+      size: finalSize,
+      width,
+      height
     }, '上传成功', 201)
   } catch (err) {
     console.error('上传图片失败:', err)
