@@ -1,6 +1,9 @@
 <template>
   <div class="canvas-area">
-    <div ref="wrapperRef" class="canvas-wrapper">
+    <div
+      ref="wrapperRef"
+      class="canvas-wrapper"
+    >
       <canvas
         ref="canvasRef"
         class="editor-canvas"

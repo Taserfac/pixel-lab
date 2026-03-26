@@ -7,13 +7,22 @@
           <span class="title-line">创造你的</span>
           <span class="title-highlight">像素艺术</span>
         </h1>
-        <p class="hero-desc">上传图片，一键转换像素风格。探索无限创意可能。</p>
+        <p class="hero-desc">
+          上传图片，一键转换像素风格。探索无限创意可能。
+        </p>
         <div class="hero-actions">
-          <el-button type="primary" size="large" @click="$router.push('/workbench')">
+          <el-button
+            type="primary"
+            size="large"
+            @click="$router.push('/workbench')"
+          >
             <el-icon><EditPen /></el-icon>
             开始创作
           </el-button>
-          <el-button size="large" @click="$router.push('/community')">
+          <el-button
+            size="large"
+            @click="$router.push('/community')"
+          >
             <el-icon><ChatDotRound /></el-icon>
             探索社区
           </el-button>
@@ -21,34 +30,54 @@
       </div>
       <div class="hero-visual">
         <div class="pixel-showcase">
-          <div class="pixel-block" v-for="i in 16" :key="i" :style="{ animationDelay: `${i * 0.1}s` }"></div>
+          <div
+            v-for="i in 16"
+            :key="i"
+            class="pixel-block"
+            :style="{ animationDelay: `${i * 0.1}s` }"
+          />
         </div>
       </div>
     </section>
 
     <!-- 快捷操作卡片 -->
     <section class="quick-actions">
-      <div class="action-card" @click="$router.push('/workbench')">
+      <div
+        class="action-card"
+        @click="$router.push('/workbench')"
+      >
         <div class="action-icon workbench">
-          <el-icon :size="28"><Picture /></el-icon>
+          <el-icon :size="28">
+            <Picture />
+          </el-icon>
         </div>
         <div class="action-info">
           <h3>工作台</h3>
           <p>图片处理与像素化</p>
         </div>
       </div>
-      <div class="action-card" @click="$router.push('/draw')">
+      <div
+        class="action-card"
+        @click="$router.push('/draw')"
+      >
         <div class="action-icon draw">
-          <el-icon :size="28"><EditPen /></el-icon>
+          <el-icon :size="28">
+            <EditPen />
+          </el-icon>
         </div>
         <div class="action-info">
           <h3>手绘板</h3>
           <p>自由创作像素画</p>
         </div>
       </div>
-      <div class="action-card" @click="$router.push('/community')">
+      <div
+        class="action-card"
+        @click="$router.push('/community')"
+      >
         <div class="action-icon community">
-          <el-icon :size="28"><ChatDotRound /></el-icon>
+          <el-icon :size="28">
+            <ChatDotRound />
+          </el-icon>
         </div>
         <div class="action-info">
           <h3>社区</h3>
@@ -61,13 +90,26 @@
     <section class="my-works-card">
       <div class="section-header">
         <h2>我的作品</h2>
-        <el-button text @click="$router.push('/personal')">
+        <el-button
+          text
+          @click="$router.push('/personal')"
+        >
           查看全部 <el-icon><ArrowRight /></el-icon>
         </el-button>
       </div>
-      <div class="works-grid" v-if="recentWorks.length > 0">
-        <div class="work-item" v-for="work in recentWorks" :key="work.id">
-          <img :src="work.url" :alt="work.name" />
+      <div
+        v-if="recentWorks.length > 0"
+        class="works-grid"
+      >
+        <div
+          v-for="work in recentWorks"
+          :key="work.id"
+          class="work-item"
+        >
+          <img
+            :src="work.url"
+            :alt="work.name"
+          >
           <div class="work-overlay">
             <span>{{ work.name }}</span>
           </div>
@@ -101,17 +143,32 @@
     <section class="community-card">
       <div class="section-header">
         <h2>社区动态</h2>
-        <el-button text @click="$router.push('/community')">
+        <el-button
+          text
+          @click="$router.push('/community')"
+        >
           更多 <el-icon><ArrowRight /></el-icon>
         </el-button>
       </div>
       <div class="activity-list">
-        <div class="activity-item" v-for="activity in communityActivities" :key="activity.id">
-          <el-avatar :size="36" :src="activity.avatar">{{ activity.user.charAt(0) }}</el-avatar>
+        <div
+          v-for="activity in communityActivities"
+          :key="activity.id"
+          class="activity-item"
+        >
+          <el-avatar
+            :size="36"
+            :src="activity.avatar"
+          >
+            {{ activity.user.charAt(0) }}
+          </el-avatar>
           <div class="activity-content">
-            <p><strong>{{ activity.user }}</strong> 发布了新作品</p>
+            <p><strong>{{ activity.user }}</strong> 发布了 <em>{{ activity.title }}</em></p>
             <span class="activity-time">{{ activity.time }}</span>
           </div>
+        </div>
+        <div v-if="communityActivities.length === 0" class="no-activity">
+          暂无社区动态
         </div>
       </div>
     </section>
@@ -123,6 +180,8 @@ import { ref, onMounted } from 'vue'
 import { Picture, EditPen, ChatDotRound, ArrowRight } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { getUserImages } from '@/api/image'
+import { getUserStats } from '@/api/auth'
+import { getActivities } from '@/api/community'
 
 const recentWorks = ref([])
 const userStats = ref({
@@ -130,18 +189,39 @@ const userStats = ref({
   likes: 0,
   views: 0
 })
+const communityActivities = ref([])
 
-const communityActivities = ref([
-  { id: 1, user: 'PixelMaster', avatar: '', time: '5分钟前' },
-  { id: 2, user: 'ArtLover', avatar: '', time: '1小时前' },
-  { id: 3, user: 'CreativeKing', avatar: '', time: '2小时前' }
-])
+// 格式化时间
+const formatTime = (time) => {
+  if (!time) return ''
+  const date = new Date(time)
+  const now = new Date()
+  const diff = now - date
+  if (diff < 60000) return '刚刚'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
+  return date.toLocaleDateString()
+}
 
 onMounted(async () => {
   try {
-    const res = await getUserImages()
-    recentWorks.value = (res.list || []).slice(0, 4)
-    userStats.value.works = res.total || 0
+    // 并行请求
+    const [imagesRes, statsRes, activitiesRes] = await Promise.all([
+      getUserImages(),
+      getUserStats().catch(() => ({ works: 0, likes: 0, views: 0 })),
+      getActivities({ limit: 5 }).catch(() => [])
+    ])
+
+    recentWorks.value = (imagesRes.list || []).slice(0, 4)
+    userStats.value = statsRes
+    communityActivities.value = (activitiesRes || []).map(item => ({
+      id: item.id,
+      user: item.author_name || '匿名用户',
+      avatar: item.author_avatar || '',
+      title: item.title || item.original_name || '无标题作品',
+      time: formatTime(item.created_at)
+    }))
   } catch (error) {
     console.error('获取数据失败:', error)
   }
@@ -413,6 +493,13 @@ onMounted(async () => {
 .activity-time {
   font-size: 11px;
   color: var(--foreground-muted);
+}
+
+.no-activity {
+  text-align: center;
+  padding: 24px;
+  color: var(--foreground-muted);
+  font-size: 13px;
 }
 
 /* 响应式 */

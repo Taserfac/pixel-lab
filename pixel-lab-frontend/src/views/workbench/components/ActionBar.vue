@@ -1,11 +1,17 @@
 <template>
   <div class="action-bar">
     <div class="left-actions">
-      <el-button :disabled="!canUndo" @click="$emit('undo')">
+      <el-button
+        :disabled="!canUndo"
+        @click="$emit('undo')"
+      >
         <el-icon><Back /></el-icon>
         撤销
       </el-button>
-      <el-button :disabled="!canRedo" @click="$emit('redo')">
+      <el-button
+        :disabled="!canRedo"
+        @click="$emit('redo')"
+      >
         <el-icon><Right /></el-icon>
         重做
       </el-button>
@@ -19,11 +25,17 @@
         <el-icon><FolderOpened /></el-icon>
         换一张
       </el-button>
-      <el-button type="primary" @click="$emit('save')">
+      <el-button
+        type="primary"
+        @click="$emit('save')"
+      >
         <el-icon><Upload /></el-icon>
         保存到个人中心
       </el-button>
-      <el-button type="success" @click="$emit('download')">
+      <el-button
+        type="success"
+        @click="$emit('download')"
+      >
         <el-icon><Download /></el-icon>
         下载
       </el-button>

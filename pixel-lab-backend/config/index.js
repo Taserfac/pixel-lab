@@ -37,7 +37,7 @@ module.exports = {
   upload: {
     path: process.env.UPLOAD_PATH || './uploads',
     maxSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB
-    allowedTypes: (process.env.ALLOWED_TYPES || 'image/jpeg,image/png,image/gif,image/webp').split(','),
+    allowedTypes: (process.env.ALLOWED_TYPES || 'image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif').split(','),
     // 图片处理配置
     image: {
       maxWidth: 1920,
@@ -50,7 +50,7 @@ module.exports = {
   // CORS 配置
   cors: {
     origin: process.env.CORS_ORIGIN || '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
   }
 }

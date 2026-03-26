@@ -5,8 +5,14 @@
     width="800px"
     @update:model-value="$emit('update:visible', $event)"
   >
-    <div v-loading="loading" class="image-selector">
-      <div v-if="images.length > 0" class="image-grid">
+    <div
+      v-loading="loading"
+      class="image-selector"
+    >
+      <div
+        v-if="images.length > 0"
+        class="image-grid"
+      >
         <div
           v-for="image in images"
           :key="image.id"
@@ -14,7 +20,10 @@
           :class="{ selected: selectedId === image.id }"
           @click="selectedId = image.id"
         >
-          <img :src="image.url" :alt="image.original_name">
+          <img
+            :src="image.url"
+            :alt="image.original_name"
+          >
           <div class="image-name">
             {{ image.original_name }}
           </div>
@@ -30,7 +39,11 @@
       <el-button @click="$emit('update:visible', false)">
         取消
       </el-button>
-      <el-button type="primary" :disabled="!selectedId" @click="confirm">
+      <el-button
+        type="primary"
+        :disabled="!selectedId"
+        @click="confirm"
+      >
         确定
       </el-button>
     </template>

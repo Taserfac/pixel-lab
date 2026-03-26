@@ -12,12 +12,35 @@ const config = require('../config')
 /**
  * 处理图片压缩
  */
-async function processImage(filePath) {
+async function processImage(filePath, originalName) {
   const { maxWidth, maxHeight, quality } = config.upload.image
   
   try {
     const image = sharp(filePath)
     const metadata = await image.metadata()
+    
+    // HEIC/HEIF 格式转换为 JPEG
+    const ext = path.extname(originalName).toLowerCase()
+    const isHeic = ext === '.heic' || ext === '.heif' || metadata.format === 'heic' || metadata.format === 'heif'
+    
+    if (isHeic) {
+      // 转换 HEIC 为 JPEG
+      const newPath = filePath.replace(/\.(heic|heif)$/i, '.jpg')
+      await image
+        .resize(maxWidth, maxHeight, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({ quality, mozjpeg: true })
+        .toFile(newPath)
+      
+      // 删除原文件，重命名新文件
+      const fs = require('fs')
+      fs.unlinkSync(filePath)
+      fs.renameSync(newPath, filePath)
+      
+      return fs.statSync(filePath).size
+    }
     
     // 只有图片超过最大尺寸才压缩
     if (metadata.width > maxWidth || metadata.height > maxHeight) {
@@ -59,7 +82,7 @@ const upload = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}`
     
     // 压缩图片
-    const processedSize = await processImage(file.path)
+    const processedSize = await processImage(file.path, file.originalname)
     const finalSize = processedSize || file.size
     
     // 获取图片尺寸

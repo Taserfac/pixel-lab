@@ -9,11 +9,22 @@
 
 <template>
   <div class="login-page">
-    <div class="login-box">
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+      <div class="glow-orb glow-orb-1" />
+      <div class="glow-orb glow-orb-2" />
+    </div>
+
+    <div class="login-card">
       <!-- Logo -->
       <div class="logo">
-        <h1>Pixel Lab Pro</h1>
-        <p>数字图像创作与管理平台</p>
+        <div class="logo-icon">
+          <span class="pixel-text">PX</span>
+        </div>
+        <div class="logo-text">
+          <h1>Pixel Lab</h1>
+          <p>数字图像创作与管理平台</p>
+        </div>
       </div>
       
       <!-- 登录表单 -->
@@ -187,34 +198,116 @@ const goRegister = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  background: var(--background);
   padding: var(--space-4);
+  position: relative;
+  overflow: hidden;
 }
 
-.login-box {
+/* 背景装饰 */
+.bg-decoration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+}
+
+.glow-orb-1 {
+  width: 400px;
+  height: 400px;
+  background: var(--primary);
+  top: -100px;
+  right: -100px;
+  animation: float 8s ease-in-out infinite;
+}
+
+.glow-orb-2 {
+  width: 300px;
+  height: 300px;
+  background: var(--secondary);
+  bottom: -50px;
+  left: -50px;
+  animation: float 10s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, 30px); }
+}
+
+/* 登录卡片 */
+.login-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   padding: var(--space-10);
-  background-color: var(--background);
+  background: var(--background-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
+  position: relative;
+  z-index: 1;
+}
+
+/* 发光边框效果 */
+.login-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--primary-muted), transparent 50%, var(--secondary-muted));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .logo {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   margin-bottom: var(--space-8);
 }
 
-.logo h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--primary);
-  margin-bottom: var(--space-2);
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--primary);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 30px var(--primary-glow);
+  flex-shrink: 0;
 }
 
-.logo p {
-  font-size: 14px;
+.pixel-text {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--background);
+}
+
+.logo-text h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.logo-text p {
+  font-size: 13px;
   color: var(--foreground-muted);
+  margin: 4px 0 0 0;
 }
 
 .login-form {
@@ -225,16 +318,24 @@ const goRegister = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.form-options :deep(.el-checkbox__label) {
+  color: var(--foreground-muted);
+  font-size: 13px;
 }
 
 .login-btn {
   width: 100%;
+  height: 44px;
+  font-weight: 500;
+  font-size: 15px;
 }
 
 .register-link {
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--foreground-muted);
 }
 
@@ -251,5 +352,16 @@ const goRegister = () => {
 :deep(.el-input__prefix-inner svg) {
   width: 16px;
   height: 16px;
+}
+
+/* 响应式 */
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--space-6);
+  }
+
+  .logo-text h1 {
+    font-size: 20px;
+  }
 }
 </style>

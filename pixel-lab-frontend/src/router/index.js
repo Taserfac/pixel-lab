@@ -68,11 +68,18 @@ const routes = [
         component: () => import('@/views/personal/Index.vue'),
         meta: { title: '个人中心', icon: 'User' }
       },
+      // 设置
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/settings/Index.vue'),
+        meta: { title: '设置', icon: 'Setting', hideInMenu: true }
+      },
       // 数据统计
       {
         path: 'stats',
         name: 'Stats',
-        component: () => import('@/views/dashboard/Index.vue'),
+        component: () => import('@/views/stats/Index.vue'),
         meta: { title: '数据统计', icon: 'TrendCharts' }
       },
       // 后台管理（仅管理员）

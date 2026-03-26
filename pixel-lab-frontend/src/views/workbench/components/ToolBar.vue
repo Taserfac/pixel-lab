@@ -2,7 +2,10 @@
   <div class="toolbar">
     <el-collapse v-model="activeCollapse">
       <!-- 滤镜 -->
-      <el-collapse-item title="滤镜效果" name="filters">
+      <el-collapse-item
+        title="滤镜效果"
+        name="filters"
+      >
         <div class="filter-grid">
           <div
             v-for="filter in filters"
@@ -11,8 +14,14 @@
             :class="{ active: currentFilter === filter.value }"
             @click="$emit('apply-filter', filter.value)"
           >
-            <div class="filter-preview" :style="getPreviewStyle(filter.value)">
-              <img :src="thumbnailUrl" alt="">
+            <div
+              class="filter-preview"
+              :style="getPreviewStyle(filter.value)"
+            >
+              <img
+                :src="thumbnailUrl"
+                alt=""
+              >
             </div>
             <span>{{ filter.label }}</span>
           </div>
@@ -20,7 +29,10 @@
       </el-collapse-item>
 
       <!-- 参数调整 -->
-      <el-collapse-item title="参数调整" name="adjust">
+      <el-collapse-item
+        title="参数调整"
+        name="adjust"
+      >
         <div class="adjust-item">
           <label>亮度</label>
           <el-slider
@@ -53,15 +65,39 @@
         </div>
       </el-collapse-item>
 
+      <!-- 裁剪 -->
+      <el-collapse-item
+        title="裁剪"
+        name="crop"
+      >
+        <div class="crop-buttons">
+          <el-button
+            type="primary"
+            @click="$emit('crop')"
+          >
+            <el-icon><Crop /></el-icon>
+            裁剪图片
+          </el-button>
+          <p class="crop-hint">
+            支持自由裁剪和固定比例裁剪
+          </p>
+        </div>
+      </el-collapse-item>
+
       <!-- 几何变换 -->
-      <el-collapse-item title="几何变换" name="transform">
+      <el-collapse-item
+        title="几何变换"
+        name="transform"
+      >
         <div class="transform-buttons">
           <el-button @click="$emit('rotate', 90)">
             <el-icon><RefreshRight /></el-icon>
             旋转90°
           </el-button>
           <el-button @click="$emit('flip', 'horizontal')">
-            <el-icon class="flip-h"><Sort /></el-icon>
+            <el-icon class="flip-h">
+              <Sort />
+            </el-icon>
             水平翻转
           </el-button>
           <el-button @click="$emit('flip', 'vertical')">
@@ -72,7 +108,10 @@
       </el-collapse-item>
 
       <!-- 像素画 -->
-      <el-collapse-item title="像素画" name="pixel">
+      <el-collapse-item
+        title="像素画"
+        name="pixel"
+      >
         <div class="pixel-controls">
           <div class="adjust-item">
             <label>像素块大小: {{ pixelSize }}px</label>
@@ -95,10 +134,17 @@
             />
           </div>
           <div class="pixel-buttons">
-            <el-button type="primary" size="small" @click="$emit('apply-pixel')">
+            <el-button
+              type="primary"
+              size="small"
+              @click="$emit('apply-pixel')"
+            >
               应用
             </el-button>
-            <el-button size="small" @click="$emit('reset-pixel')">
+            <el-button
+              size="small"
+              @click="$emit('reset-pixel')"
+            >
               重置
             </el-button>
           </div>
@@ -110,7 +156,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { RefreshRight, Sort } from '@element-plus/icons-vue'
+import { RefreshRight, Sort, Crop } from '@element-plus/icons-vue'
 
 const props = defineProps({
   filters: { type: Array, required: true },
@@ -126,13 +172,14 @@ const emit = defineEmits([
   'update-adjustment',
   'rotate',
   'flip',
+  'crop',
   'apply-pixel',
   'reset-pixel',
   'update:pixelSize',
   'update:colorCount'
 ])
 
-const activeCollapse = ref(['filters', 'adjust', 'transform', 'pixel'])
+const activeCollapse = ref(['filters', 'adjust', 'crop', 'transform', 'pixel'])
 
 const updateAdjustment = (key, value) => {
   emit('update-adjustment', { key, value })
@@ -271,6 +318,25 @@ const getPreviewStyle = (filterValue) => {
 
 .flip-h {
   transform: rotate(90deg);
+}
+
+.crop-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.crop-buttons .el-button {
+  width: 100% !important;
+  padding: 14px 16px !important;
+  font-size: 14px !important;
+}
+
+.crop-hint {
+  font-size: 12px;
+  color: var(--foreground-muted);
+  text-align: center;
+  margin: 0;
 }
 
 .pixel-controls {

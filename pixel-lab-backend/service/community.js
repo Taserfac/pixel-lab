@@ -297,6 +297,24 @@ async function getUserLikes(userId, { page = 1, pageSize = 20 }) {
   }
 }
 
+/**
+ * 获取社区动态（最近公开的作品）
+ */
+async function getRecentActivities({ limit = 10 }) {
+  const rows = await db.query(
+    `SELECT i.id, i.title, i.original_name, i.url, i.created_at,
+            u.id as author_id, u.nickname as author_name, u.avatar as author_avatar
+     FROM image i
+     LEFT JOIN user u ON i.user_id = u.id
+     WHERE i.is_public = 1 AND i.status = 1
+     ORDER BY i.created_at DESC
+     LIMIT ?`,
+    [limit]
+  )
+
+  return rows || []
+}
+
 module.exports = {
   getPublicImages,
   getImageDetail,
@@ -306,5 +324,6 @@ module.exports = {
   addComment,
   deleteComment,
   getUserCollections,
-  getUserLikes
+  getUserLikes,
+  getRecentActivities
 }

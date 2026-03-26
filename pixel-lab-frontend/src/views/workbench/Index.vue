@@ -23,10 +23,11 @@
             @update-adjustment="updateAdjustment"
             @rotate="rotateImage"
             @flip="flipImage"
+            @crop="openCropDialog"
             @apply-pixel="applyPixelate"
             @reset-pixel="resetPixelate"
-            @update:pixelSize="pixelSize = $event"
-            @update:colorCount="colorCount = $event"
+            @update:pixel-size="pixelSize = $event"
+            @update:color-count="colorCount = $event"
           />
 
           <!-- 中间画布区域 -->
@@ -58,6 +59,13 @@
       :loading="loadingImages"
       @confirm="confirmSelectImage"
     />
+
+    <!-- 裁剪对话框 -->
+    <CropDialog
+      v-model="cropDialogVisible"
+      :image-src="originalImage?.src || ''"
+      @confirm="handleCropConfirm"
+    />
   </div>
 </template>
 
@@ -69,6 +77,7 @@ import ToolBar from './components/ToolBar.vue'
 import CanvasArea from './components/CanvasArea.vue'
 import ActionBar from './components/ActionBar.vue'
 import ImageSelector from './components/ImageSelector.vue'
+import CropDialog from './components/CropDialog.vue'
 import { getUserImages, uploadImage } from '@/api/image'
 import { useHistory } from './composables/useHistory'
 
@@ -84,6 +93,9 @@ const thumbnailUrl = ref('')
 const imageSelectorVisible = ref(false)
 const loadingImages = ref(false)
 const myImages = ref([])
+
+// 裁剪对话框
+const cropDialogVisible = ref(false)
 
 // 滤镜选项
 const filters = [
@@ -191,6 +203,21 @@ const loadImage = async (url, name) => {
     }
     img.src = url
   })
+}
+
+// ========== 裁剪 ==========
+const openCropDialog = () => {
+  if (!originalImage.value) {
+    ElMessage.warning('请先选择或上传图片')
+    return
+  }
+  cropDialogVisible.value = true
+}
+
+const handleCropConfirm = async ({ url, blob }) => {
+  // 用裁剪后的图片替换当前图片
+  await loadImage(url, `cropped_${currentImage.value?.name || 'image.png'}`)
+  ElMessage.success('裁剪成功')
 }
 
 // ========== 画布操作 ==========

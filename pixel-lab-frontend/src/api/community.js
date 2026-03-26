@@ -44,3 +44,8 @@ export function getUserCollections(params) {
 export function getUserLikes(params) {
   return request.get('/api/community/likes', { params })
 }
+
+// 获取社区动态
+export function getActivities(params) {
+  return request.get('/api/community/activities', { params })
+}

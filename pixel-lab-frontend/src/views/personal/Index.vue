@@ -13,13 +13,18 @@
     <el-card class="user-card">
       <div class="user-info">
         <div class="avatar">
-          <el-avatar :size="80" :src="userInfo.avatar || defaultAvatar">
+          <el-avatar
+            :size="80"
+            :src="userInfo.avatar || defaultAvatar"
+          >
             {{ userInfo.username?.charAt(0).toUpperCase() }}
           </el-avatar>
         </div>
         <div class="info">
           <h2>{{ userInfo.nickname || userInfo.username }}</h2>
-          <p class="username">@{{ userInfo.username }}</p>
+          <p class="username">
+            @{{ userInfo.username }}
+          </p>
           <div class="stats">
             <div class="stat-item">
               <span class="number">{{ stats.totalImages }}</span>
@@ -44,7 +49,10 @@
 
     <!-- 操作栏 -->
     <div class="action-bar">
-      <el-button type="primary" @click="handleUpload">
+      <el-button
+        type="primary"
+        @click="handleUpload"
+      >
         <el-icon><Upload /></el-icon>
         上传图片
       </el-button>
@@ -54,32 +62,55 @@
         accept="image/*"
         style="display: none"
         @change="onFileSelected"
-      />
+      >
     </div>
 
     <!-- Tab 切换 -->
-    <el-tabs v-model="activeTab" class="content-tabs" @tab-change="handleTabChange">
-      <el-tab-pane label="我的图片" name="images">
+    <el-tabs
+      v-model="activeTab"
+      class="content-tabs"
+      @tab-change="handleTabChange"
+    >
+      <el-tab-pane
+        label="我的图片"
+        name="images"
+      >
         <el-card v-loading="loading">
           <template #header>
             <div class="card-header">
               <span>我的图片</span>
-              <el-radio-group v-model="filterType" size="small">
-                <el-radio-button label="all">全部</el-radio-button>
-                <el-radio-button label="public">公开</el-radio-button>
-                <el-radio-button label="private">私有</el-radio-button>
+              <el-radio-group
+                v-model="filterType"
+                size="small"
+              >
+                <el-radio-button label="all">
+                  全部
+                </el-radio-button>
+                <el-radio-button label="public">
+                  公开
+                </el-radio-button>
+                <el-radio-button label="private">
+                  私有
+                </el-radio-button>
               </el-radio-group>
             </div>
           </template>
 
-          <div v-if="filteredImages.length > 0" class="image-grid">
+          <div
+            v-if="filteredImages.length > 0"
+            class="image-grid"
+          >
             <div
               v-for="image in filteredImages"
               :key="image.id"
               class="image-item"
             >
               <div class="image-wrapper">
-                <img :src="image.url" :alt="image.original_name" loading="lazy" />
+                <img
+                  :src="image.url"
+                  :alt="image.original_name"
+                  loading="lazy"
+                >
                 <div class="image-overlay">
                   <div class="actions">
                     <el-button
@@ -112,10 +143,15 @@
                 </div>
               </div>
               <div class="image-info">
-                <p class="name" :title="image.original_name">
+                <p
+                  class="name"
+                  :title="image.original_name"
+                >
                   {{ image.original_name }}
                 </p>
-                <p class="date">{{ formatDate(image.created_at) }}</p>
+                <p class="date">
+                  {{ formatDate(image.created_at) }}
+                </p>
               </div>
             </div>
           </div>
@@ -131,13 +167,19 @@
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="我的收藏" name="collections">
+      <el-tab-pane
+        label="我的收藏"
+        name="collections"
+      >
         <el-card v-loading="loadingCollections">
           <template #header>
             <span>我的收藏 ({{ collectionsTotal }})</span>
           </template>
 
-          <div v-if="collections.length > 0" class="image-grid">
+          <div
+            v-if="collections.length > 0"
+            class="image-grid"
+          >
             <div
               v-for="image in collections"
               :key="image.id"
@@ -145,13 +187,22 @@
               @click="goToCommunity(image.id)"
             >
               <div class="image-wrapper">
-                <img :src="image.url" :alt="image.title || image.original_name" loading="lazy" />
+                <img
+                  :src="image.url"
+                  :alt="image.title || image.original_name"
+                  loading="lazy"
+                >
               </div>
               <div class="image-info">
-                <p class="name" :title="image.title || image.original_name">
+                <p
+                  class="name"
+                  :title="image.title || image.original_name"
+                >
                   {{ image.title || image.original_name }}
                 </p>
-                <p class="author">by {{ image.author_name || '匿名' }}</p>
+                <p class="author">
+                  by {{ image.author_name || '匿名' }}
+                </p>
               </div>
             </div>
           </div>
@@ -167,13 +218,19 @@
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="我的点赞" name="likes">
+      <el-tab-pane
+        label="我的点赞"
+        name="likes"
+      >
         <el-card v-loading="loadingLikes">
           <template #header>
             <span>我的点赞 ({{ likesTotal }})</span>
           </template>
 
-          <div v-if="likes.length > 0" class="image-grid">
+          <div
+            v-if="likes.length > 0"
+            class="image-grid"
+          >
             <div
               v-for="image in likes"
               :key="image.id"
@@ -181,13 +238,22 @@
               @click="goToCommunity(image.id)"
             >
               <div class="image-wrapper">
-                <img :src="image.url" :alt="image.title || image.original_name" loading="lazy" />
+                <img
+                  :src="image.url"
+                  :alt="image.title || image.original_name"
+                  loading="lazy"
+                >
               </div>
               <div class="image-info">
-                <p class="name" :title="image.title || image.original_name">
+                <p
+                  class="name"
+                  :title="image.title || image.original_name"
+                >
                   {{ image.title || image.original_name }}
                 </p>
-                <p class="author">by {{ image.author_name || '匿名' }}</p>
+                <p class="author">
+                  by {{ image.author_name || '匿名' }}
+                </p>
               </div>
             </div>
           </div>
@@ -214,10 +280,15 @@
       <img
         :src="previewImage?.url"
         style="width: 100%; max-height: 60vh; object-fit: contain"
-      />
+      >
       <template #footer>
-        <el-button @click="previewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="openInWorkbench">
+        <el-button @click="previewVisible = false">
+          关闭
+        </el-button>
+        <el-button
+          type="primary"
+          @click="openInWorkbench"
+        >
           在工作台打开
         </el-button>
       </template>
@@ -381,10 +452,19 @@ const viewImage = (image) => {
 }
 
 // 在工作台打开
-const openInWorkbench = () => {
-  // TODO: 跳转到工作台并加载图片
-  ElMessage.info('功能开发中...')
-  previewVisible.value = false
+const openInWorkbench = (image) => {
+  try {
+    if (image && image.url) {
+      // 在工作台中加载图片逻辑可在 future 继续增强
+      localStorage.setItem('last-open-image', image.url)
+    }
+    router.push('/workbench')
+  } catch (error) {
+    console.error('跳转工作台失败', error)
+    ElMessage.error('跳转工作台失败')
+  } finally {
+    previewVisible.value = false
+  }
 }
 
 // 切换可见性

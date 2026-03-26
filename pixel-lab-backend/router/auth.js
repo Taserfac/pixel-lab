@@ -7,6 +7,7 @@
 const express = require('express')
 const router = express.Router()
 const authController = require('../controller/auth')
+const profileController = require('../controller/profile')
 const { authMiddleware } = require('../middleware/auth')
 const validate = require('../middleware/validate')
 const { schemas } = require('../utils/validate')
@@ -31,5 +32,26 @@ router.post('/login', validate(schemas.login), authController.login)
  * @access  Private
  */
 router.get('/userinfo', authMiddleware, authController.getUserInfo)
+
+/**
+ * @route   GET /api/auth/stats
+ * @desc    获取用户统计数据
+ * @access  Private
+ */
+router.get('/stats', authMiddleware, authController.getUserStats)
+
+/**
+ * @route   PATCH /api/auth/profile
+ * @desc    更新用户资料
+ * @access  Private
+ */
+router.patch('/profile', authMiddleware, profileController.updateProfile)
+
+/**
+ * @route   PATCH /api/auth/password
+ * @desc    修改密码
+ * @access  Private
+ */
+router.patch('/password', authMiddleware, profileController.changePassword)
 
 module.exports = router

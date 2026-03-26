@@ -11,11 +11,13 @@ const router = express.Router()
 const authRouter = require('./auth')
 const imageRouter = require('./image')
 const communityRouter = require('./community')
+const adminRouter = require('./admin')
 
 // 挂载路由
 router.use('/auth', authRouter)
 router.use('/images', imageRouter)
 router.use('/community', communityRouter)
+router.use('/admin', adminRouter)
 
 // 健康检查
 router.get('/health', (req, res) => {

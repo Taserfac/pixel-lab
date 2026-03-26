@@ -37,6 +37,20 @@
           </el-input>
         </el-form-item>
 
+        <el-form-item prop="nickname">
+          <el-input
+            v-model="form.nickname"
+            placeholder="请输入昵称（显示名称）"
+            size="large"
+          >
+            <template #prefix>
+              <el-icon :size="16">
+                <Avatar />
+              </el-icon>
+            </template>
+          </el-input>
+        </el-form-item>
+
         <el-form-item prop="password">
           <el-input
             v-model="form.password"
@@ -113,7 +127,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, Avatar } from '@element-plus/icons-vue'
 import { register } from '@/api/auth'
 import { checkPasswordStrength } from '@/utils/validate'
 
@@ -127,6 +141,7 @@ const loading = ref(false)
 // 表单数据
 const form = ref({
   username: '',
+  nickname: '',
   password: '',
   confirmPassword: ''
 })
@@ -168,6 +183,10 @@ const rules = {
     { min: 4, max: 20, message: '长度在 4 到 20 个字符', trigger: 'blur' },
     { pattern: /^[a-zA-Z0-9_]+$/, message: '只能包含字母、数字、下划线', trigger: 'blur' }
   ],
+  nickname: [
+    { required: true, message: '请输入昵称', trigger: 'blur' },
+    { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, max: 20, message: '长度在 6 到 20 个字符', trigger: 'blur' }
@@ -188,6 +207,7 @@ const handleRegister = async () => {
   try {
     await register({
       username: form.value.username,
+      nickname: form.value.nickname,
       password: form.value.password
     })
     

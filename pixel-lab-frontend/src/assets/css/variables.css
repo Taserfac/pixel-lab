@@ -1,101 +1,116 @@
 /**
  * 【文件路径】src/assets/css/variables.css
- * 【功能说明】Neo-Brutalism 新野兽主义设计系统
+ * 【功能说明】Dark Mode + Bento Grid 设计系统
  */
 
 /* ============================================
-   Neo-Brutalism 设计系统
+   Dark Mode + Bento Grid 设计系统
    ============================================ */
 :root {
-  /* 主色调 - 大胆鲜艳 */
-  --primary: #ff6b6b;
-  --primary-hover: #ff5252;
-  --primary-foreground: #000000;
-
-  /* 强调色 */
-  --secondary: #4ecdc4;
-  --accent: #ffe66d;
-  --accent-pink: #ff85a2;
-  --accent-purple: #a855f7;
-  --accent-blue: #3b82f6;
-
-  /* 背景色 */
-  --background: #fffef0;
-  --background-soft: #ffffff;
-  --background-muted: #f5f5dc;
-  --background-elevated: #ffffff;
-
+  /* 深色背景层次 */
+  --background: #0A0A0A;
+  --background-soft: #111111;
+  --background-muted: #1A1A1A;
+  --background-elevated: #1E1E1E;
+  --background-card: #141414;
+  
   /* 文字色 */
-  --foreground: #000000;
-  --foreground-muted: #333333;
+  --foreground: #FFFFFF;
+  --foreground-muted: #A0A0A0;
   --foreground-subtle: #666666;
-
-  /* 边框色 */
-  --border: #000000;
-  --border-light: #000000;
-
+  
+  /* 像素艺术强调色 */
+  --primary: #00FF88;
+  --primary-hover: #00CC6A;
+  --primary-muted: rgba(0, 255, 136, 0.15);
+  --primary-glow: rgba(0, 255, 136, 0.4);
+  
+  /* 辅助色 */
+  --secondary: #00D4FF;
+  --secondary-muted: rgba(0, 212, 255, 0.15);
+  
   /* 功能色 */
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --info: #3b82f6;
-
-  /* 阴影 - 新野兽主义偏移阴影 */
-  --shadow-sm: 2px 2px 0px 0px #000000;
-  --shadow: 4px 4px 0px 0px #000000;
-  --shadow-md: 6px 6px 0px 0px #000000;
-  --shadow-lg: 8px 8px 0px 0px #000000;
-  --shadow-hover: 6px 6px 0px 0px #000000;
-  --shadow-active: 2px 2px 0px 0px #000000;
-
-  /* 圆角 - 新野兽主义无圆角 */
-  --radius-sm: 0px;
-  --radius: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-full: 0px;
-
+  --success: #00FF88;
+  --warning: #FFB800;
+  --error: #FF4757;
+  --info: #00D4FF;
+  
+  /* 边框 - 微妙发光 */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.2);
+  --border-glow: rgba(0, 255, 136, 0.3);
+  
+  /* 阴影系统 - 精细层次 */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+  
+  /* 发光阴影 */
+  --glow-sm: 0 0 20px rgba(0, 255, 136, 0.1);
+  --glow: 0 0 40px rgba(0, 255, 136, 0.15);
+  --glow-md: 0 0 60px rgba(0, 255, 136, 0.2);
+  
+  /* 圆角 - Bento Grid 柔和边角 */
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  
   /* 字体 */
-  --font-sans: 'Space Grotesk', 'DM Sans', -apple-system, sans-serif;
-  --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
-
-  /* 间距 */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  
+  /* Bento Grid 间距系统 - 8px 基准 */
+  --grid-unit: 8px;
+  --space-1: calc(var(--grid-unit) * 0.5);  /* 4px */
+  --space-2: var(--grid-unit);               /* 8px */
+  --space-3: calc(var(--grid-unit) * 1.5);  /* 12px */
+  --space-4: calc(var(--grid-unit) * 2);    /* 16px */
+  --space-5: calc(var(--grid-unit) * 2.5);  /* 20px */
+  --space-6: calc(var(--grid-unit) * 3);    /* 24px */
+  --space-8: calc(var(--grid-unit) * 4);    /* 32px */
+  --space-10: calc(var(--grid-unit) * 5);   /* 40px */
+  --space-12: calc(var(--grid-unit) * 6);   /* 48px */
+  --space-16: calc(var(--grid-unit) * 8);   /* 64px */
+  
   /* 过渡 */
-  --transition-fast: 100ms;
-  --transition-base: 150ms;
-  --transition-slow: 200ms;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* 动画曲线 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* 暗色版本 */
-[data-theme='dark'] {
-  --background: #1a1a2e;
-  --background-soft: #242442;
-  --background-muted: #0f0f23;
-  --background-elevated: #2a2a4a;
-
-  --foreground: #ffffff;
-  --foreground-muted: #b0b0c0;
-  --foreground-subtle: #8080a0;
-
-  --border: #3a3a5a;
-
-  --primary: #ff6b6b;
-  --secondary: #4ecdc4;
-  --accent: #ffe66d;
-
-  --shadow-sm: 2px 2px 0px 0px rgba(58, 58, 90, 0.5);
-  --shadow: 4px 4px 0px 0px rgba(58, 58, 90, 0.5);
-  --shadow-md: 6px 6px 0px 0px rgba(58, 58, 90, 0.5);
-  --shadow-lg: 8px 8px 0px 0px rgba(58, 58, 90, 0.5);
+/* 浅色模式（可选） */
+[data-theme='light'] {
+  --background: #FAFAFA;
+  --background-soft: #FFFFFF;
+  --background-muted: #F0F0F0;
+  --background-elevated: #FFFFFF;
+  --background-card: #FFFFFF;
+  
+  --foreground: #0A0A0A;
+  --foreground-muted: #666666;
+  --foreground-subtle: #999999;
+  
+  --border: rgba(0, 0, 0, 0.08);
+  --border-light: rgba(0, 0, 0, 0.12);
+  --border-hover: rgba(0, 0, 0, 0.2);
+  --border-glow: rgba(0, 255, 136, 0.4);
+  
+  --primary: #00CC6A;
+  --primary-hover: #00AA55;
+  --primary-muted: rgba(0, 204, 106, 0.1);
+  --primary-glow: rgba(0, 204, 106, 0.3);
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
 }

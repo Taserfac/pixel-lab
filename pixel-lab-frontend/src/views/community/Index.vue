@@ -27,7 +27,10 @@
     </div>
 
     <!-- 作品列表 -->
-    <div v-loading="loading" class="works-grid">
+    <div
+      v-loading="loading"
+      class="works-grid"
+    >
       <div
         v-for="work in works"
         :key="work.id"
@@ -47,7 +50,10 @@
         </div>
         <div class="work-info">
           <div class="author">
-            <el-avatar :size="24" :src="work.author_avatar">
+            <el-avatar
+              :size="24"
+              :src="work.author_avatar"
+            >
               {{ work.author_name?.charAt(0) || '?' }}
             </el-avatar>
             <span class="author-name">{{ work.author_name || '匿名' }}</span>
@@ -68,8 +74,16 @@
     />
 
     <!-- 加载更多 -->
-    <div v-if="hasMore" class="load-more">
-      <el-button @click="loadMore" :loading="loadingMore">加载更多</el-button>
+    <div
+      v-if="hasMore"
+      class="load-more"
+    >
+      <el-button
+        :loading="loadingMore"
+        @click="loadMore"
+      >
+        加载更多
+      </el-button>
     </div>
 
     <!-- 作品详情弹窗 -->
@@ -79,13 +93,22 @@
       width="800px"
       class="detail-dialog"
     >
-      <div v-if="currentWork" class="detail-content">
+      <div
+        v-if="currentWork"
+        class="detail-content"
+      >
         <div class="detail-image">
-          <img :src="currentWork.url" alt="">
+          <img
+            :src="currentWork.url"
+            alt=""
+          >
         </div>
         <div class="detail-side">
           <div class="detail-author">
-            <el-avatar :size="40" :src="currentWork.author_avatar">
+            <el-avatar
+              :size="40"
+              :src="currentWork.author_avatar"
+            >
               {{ currentWork.author_name?.charAt(0) || '?' }}
             </el-avatar>
             <div class="author-info">
@@ -94,7 +117,10 @@
             </div>
           </div>
 
-          <div v-if="currentWork.description" class="detail-desc">
+          <div
+            v-if="currentWork.description"
+            class="detail-desc"
+          >
             {{ currentWork.description }}
           </div>
 
@@ -134,14 +160,25 @@
                 maxlength="500"
                 show-word-limit
               />
-              <el-button type="primary" :disabled="!commentContent.trim()" @click="submitComment">
+              <el-button
+                type="primary"
+                :disabled="!commentContent.trim()"
+                @click="submitComment"
+              >
                 发表
               </el-button>
             </div>
 
             <div class="comments-list">
-              <div v-for="comment in comments" :key="comment.id" class="comment-item">
-                <el-avatar :size="32" :src="comment.avatar">
+              <div
+                v-for="comment in comments"
+                :key="comment.id"
+                class="comment-item"
+              >
+                <el-avatar
+                  :size="32"
+                  :src="comment.avatar"
+                >
                   {{ comment.nickname?.charAt(0) || '?' }}
                 </el-avatar>
                 <div class="comment-content">
@@ -149,7 +186,9 @@
                     <span class="comment-author">{{ comment.nickname || '匿名' }}</span>
                     <span class="comment-time">{{ formatTime(comment.created_at) }}</span>
                   </div>
-                  <p class="comment-text">{{ comment.content }}</p>
+                  <p class="comment-text">
+                    {{ comment.content }}
+                  </p>
                 </div>
               </div>
 
@@ -363,24 +402,41 @@ onMounted(() => loadWorks())
   gap: var(--space-2);
 }
 
+/* Bento Grid 作品列表 */
 .works-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--space-6);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
 }
 
 .work-card {
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 6px 6px 0px 0px var(--border);
+  background: var(--background-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
+  position: relative;
+}
+
+.work-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .work-card:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 10px 10px 0px 0px var(--border);
+  border-color: var(--border-hover);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md), var(--glow-sm);
 }
 
 .work-image {
@@ -394,11 +450,15 @@ onMounted(() => loadWorks())
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity 0.3s ease;
+  transition: transform var(--transition-slow);
+}
+
+.work-card:hover .work-image img {
+  transform: scale(1.05);
 }
 
 .work-image img[loading="lazy"] {
-  background: linear-gradient(90deg, var(--background-muted) 25%, var(--background-soft) 50%, var(--background-muted) 75%);
+  background: linear-gradient(90deg, var(--background-muted) 25%, var(--background-elevated) 50%, var(--background-muted) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -413,20 +473,20 @@ onMounted(() => loadWorks())
   bottom: 0;
   left: 0;
   right: 0;
-  padding: var(--space-3);
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-  transform: translateY(100%);
-  transition: transform var(--transition-fast);
+  padding: var(--space-4);
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .work-card:hover .work-overlay {
-  transform: translateY(0);
+  opacity: 1;
 }
 
 .work-title {
   color: white;
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 13px;
 }
 
 .work-info {
@@ -443,8 +503,9 @@ onMounted(() => loadWorks())
 }
 
 .author-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
+  color: var(--foreground);
 }
 
 .stats {
@@ -465,6 +526,7 @@ onMounted(() => loadWorks())
   margin-top: var(--space-8);
 }
 
+/* 详情弹窗 */
 .detail-content {
   display: flex;
   gap: var(--space-6);
@@ -477,7 +539,7 @@ onMounted(() => loadWorks())
 
 .detail-image img {
   width: 100%;
-  border: 4px solid var(--border);
+  border-radius: var(--radius);
 }
 
 .detail-side {
@@ -499,7 +561,7 @@ onMounted(() => loadWorks())
 }
 
 .author-info .name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .author-info .time {
@@ -508,16 +570,18 @@ onMounted(() => loadWorks())
 }
 
 .detail-desc {
-  padding: var(--space-3);
+  padding: var(--space-4);
   background: var(--background-muted);
-  border: 3px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .detail-stats {
   display: flex;
   gap: var(--space-4);
   color: var(--foreground-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .detail-stats span {
@@ -531,41 +595,29 @@ onMounted(() => loadWorks())
   gap: var(--space-3);
 }
 
-.detail-actions :deep(.el-button) {
-  border: 3px solid var(--border) !important;
-  background: var(--background-soft) !important;
-  color: var(--foreground) !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-}
-
-.detail-actions :deep(.el-button:hover) {
-  transform: translate(-2px, -2px);
-  box-shadow: 4px 4px 0px 0px var(--border);
-}
-
 .detail-actions :deep(.el-button.liked) {
-  background: #ff6b6b !important;
-  border-color: #ff4757 !important;
+  background: var(--error) !important;
+  border-color: var(--error) !important;
   color: white !important;
-  box-shadow: 4px 4px 0px 0px #ff4757 !important;
+  box-shadow: 0 0 20px rgba(255, 71, 87, 0.3) !important;
 }
 
 .detail-actions :deep(.el-button.collected) {
-  background: #ffd93d !important;
-  border-color: #f9ca24 !important;
-  color: #333 !important;
-  box-shadow: 4px 4px 0px 0px #f9ca24 !important;
+  background: var(--warning) !important;
+  border-color: var(--warning) !important;
+  color: var(--background) !important;
+  box-shadow: 0 0 20px rgba(255, 184, 0, 0.3) !important;
 }
 
 .comments-section {
   margin-top: var(--space-4);
   padding-top: var(--space-4);
-  border-top: 3px solid var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .comments-section h4 {
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-weight: 500;
 }
 
 .comment-input {
@@ -587,9 +639,9 @@ onMounted(() => loadWorks())
   display: flex;
   gap: var(--space-3);
   padding: var(--space-3);
-  border: 3px solid var(--border);
   margin-bottom: var(--space-3);
-  background: var(--background-soft);
+  background: var(--background-muted);
+  border-radius: var(--radius);
 }
 
 .comment-content {
@@ -603,8 +655,8 @@ onMounted(() => loadWorks())
 }
 
 .comment-author {
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 13px;
 }
 
 .comment-time {
@@ -613,14 +665,15 @@ onMounted(() => loadWorks())
 }
 
 .comment-text {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
+  color: var(--foreground-muted);
 }
 
 @media (max-width: 768px) {
   .works-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
   .detail-content {
     flex-direction: column;

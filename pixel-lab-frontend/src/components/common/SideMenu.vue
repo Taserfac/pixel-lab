@@ -24,7 +24,7 @@
       <router-link
         v-for="route in menuRoutes"
         :key="route.path"
-        :to="route.path"
+        :to="route.path.startsWith('/') ? route.path : '/' + route.path"
         class="menu-item"
         :class="{ active: activeRoute === route.path }"
       >
@@ -56,10 +56,12 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMenuStore } from '@/store/menu'
+import { useUserStore } from '@/store/user'
 import router from '@/router'
 
 const route = useRoute()
 const menuStore = useMenuStore()
+const userStore = useUserStore()
 
 const activeRoute = computed(() => route.path)
 
@@ -71,7 +73,9 @@ const menuRoutes = computed(() => {
   
   return mainRoute.children.filter(r => {
     if (!r.meta?.title) return false
-    if (r.meta?.admin) return false
+    if (r.meta?.hideInMenu) return false
+    // 管理员菜单只对管理员显示
+    if (r.meta?.admin && !userStore.isAdmin) return false
     return true
   })
 })

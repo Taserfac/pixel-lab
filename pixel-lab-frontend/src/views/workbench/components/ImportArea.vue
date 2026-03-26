@@ -1,13 +1,19 @@
 <template>
   <div class="import-area">
-    <div class="import-box" @click="$emit('select')">
+    <div
+      class="import-box"
+      @click="$emit('select')"
+    >
       <el-icon :size="64">
         <Upload />
       </el-icon>
       <h3>导入图片开始编辑</h3>
       <p>从个人中心选择图片，或上传新图片</p>
       <div class="import-buttons">
-        <el-button type="primary" @click.stop="$emit('select')">
+        <el-button
+          type="primary"
+          @click.stop="$emit('select')"
+        >
           从个人中心选择
         </el-button>
         <el-button @click.stop="triggerUpload">

@@ -14,9 +14,10 @@ const { success, error } = require('../utils/result')
  * POST /api/auth/register
  * @param {string} username - 用户名
  * @param {string} password - 密码
+ * @param {string} nickname - 昵称（可选）
  */
 const register = async (req, res) => {
-  const { username, password } = req.body
+  const { username, password, nickname } = req.body
 
   // 检查用户名是否已存在
   const existingUser = await userService.findByUsername(username)
@@ -30,7 +31,8 @@ const register = async (req, res) => {
   // 创建用户
   const userId = await userService.create({
     username,
-    password: hashedPassword
+    password: hashedPassword,
+    nickname: nickname || username
   })
 
   success(res, { id: userId }, '注册成功', 201)
@@ -98,8 +100,20 @@ const getUserInfo = async (req, res) => {
   success(res, user)
 }
 
+/**
+ * 获取用户统计数据
+ * GET /api/auth/stats
+ * 需要登录
+ */
+const getUserStats = async (req, res) => {
+  const userId = req.user.id
+  const stats = await userService.getStats(userId)
+  success(res, stats)
+}
+
 module.exports = {
   register,
   login,
-  getUserInfo
+  getUserInfo,
+  getUserStats
 }

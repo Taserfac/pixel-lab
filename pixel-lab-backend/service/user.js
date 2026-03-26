@@ -65,9 +65,53 @@ const update = async (id, userData) => {
   return await db.update(sql, values)
 }
 
+/**
+ * 获取用户统计数据
+ * @param {number} userId - 用户ID
+ * @returns {Promise<object>} 统计数据
+ */
+const getStats = async (userId) => {
+  // 作品数
+  const worksResult = await db.query(
+    'SELECT COUNT(*) as count FROM `image` WHERE `user_id` = ? AND `status` = 1',
+    [userId]
+  )
+  const works = worksResult[0]?.count || 0
+
+  // 获赞数（用户所有作品的点赞总数）
+  const likesResult = await db.query(
+    `SELECT COALESCE(SUM(i.like_count), 0) as total 
+     FROM \`image\` i 
+     WHERE i.user_id = ? AND i.status = 1`,
+    [userId]
+  )
+  const likes = likesResult[0]?.total || 0
+
+  // 浏览量（用户所有作品的浏览总数）
+  const viewsResult = await db.query(
+    `SELECT COALESCE(SUM(i.view_count), 0) as total 
+     FROM \`image\` i 
+     WHERE i.user_id = ? AND i.status = 1`,
+    [userId]
+  )
+  const views = viewsResult[0]?.total || 0
+
+  // 收藏数（用户所有作品的收藏总数）
+  const collectsResult = await db.query(
+    `SELECT COALESCE(SUM(i.collect_count), 0) as total 
+     FROM \`image\` i 
+     WHERE i.user_id = ? AND i.status = 1`,
+    [userId]
+  )
+  const collects = collectsResult[0]?.total || 0
+
+  return { works, likes, views, collects }
+}
+
 module.exports = {
   findByUsername,
   findById,
   create,
-  update
+  update,
+  getStats
 }

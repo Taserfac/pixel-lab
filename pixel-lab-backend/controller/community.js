@@ -156,6 +156,19 @@ async function getUserLikes(req, res) {
   success(res, result)
 }
 
+/**
+ * 获取社区动态
+ */
+async function getActivities(req, res) {
+  const { limit = 10 } = req.query
+
+  const activities = await communityService.getRecentActivities({
+    limit: parseInt(limit)
+  })
+
+  success(res, activities)
+}
+
 module.exports = {
   getPublicImages,
   getImageDetail,
@@ -165,5 +178,6 @@ module.exports = {
   addComment,
   deleteComment,
   getUserCollections,
-  getUserLikes
+  getUserLikes,
+  getActivities
 }

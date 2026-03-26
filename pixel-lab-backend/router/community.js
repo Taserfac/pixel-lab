@@ -18,6 +18,9 @@ router.get('/images/:id', optionalAuthMiddleware, communityController.getImageDe
 // 获取评论列表
 router.get('/images/:imageId/comments', communityController.getComments)
 
+// 获取社区动态（公开）
+router.get('/activities', communityController.getActivities)
+
 // 需要登录的接口
 // 点赞/取消点赞
 router.post('/like', authMiddleware, communityController.toggleLike)
