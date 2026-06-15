@@ -12,12 +12,14 @@ const authRouter = require('./auth')
 const imageRouter = require('./image')
 const communityRouter = require('./community')
 const adminRouter = require('./admin')
+const aiRouter = require('./ai')
 
 // 挂载路由
 router.use('/auth', authRouter)
 router.use('/images', imageRouter)
 router.use('/community', communityRouter)
 router.use('/admin', adminRouter)
+router.use('/ai', aiRouter)
 
 // 健康检查
 router.get('/health', (req, res) => {

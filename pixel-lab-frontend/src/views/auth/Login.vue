@@ -3,7 +3,7 @@
   【文件功能说明】登录页面
   - 账号密码登录表单
   - 表单校验
-  - 记住密码功能
+  - 记住账号功能
   - 登录成功后跳转首页
 -->
 
@@ -67,7 +67,7 @@
         
         <div class="form-options">
           <el-checkbox v-model="rememberMe">
-            记住密码
+            记住账号
           </el-checkbox>
           <el-link
             type="primary"
@@ -119,7 +119,7 @@ const userStore = useUserStore()
 const formRef = ref(null)
 // 加载状态
 const loading = ref(false)
-// 记住密码
+// 记住账号
 const rememberMe = ref(false)
 
 // 表单数据
@@ -140,16 +140,15 @@ const rules = {
   ]
 }
 
-// 页面加载时，读取记住的账号密码
+// 页面加载时，读取记住的账号
 onMounted(() => {
   const savedUsername = storage.getItem('remember_username', '')
-  const savedPassword = storage.getItem('remember_password', '')
   
   if (savedUsername) {
     form.value.username = savedUsername
-    form.value.password = savedPassword
     rememberMe.value = true
   }
+  storage.removeItem('remember_password')
 })
 
 // 登录
@@ -168,13 +167,11 @@ const handleLogin = async () => {
     // 保存登录状态
     userStore.login(data)
     
-    // 记住密码
+    // 记住账号
     if (rememberMe.value) {
       storage.setItem('remember_username', form.value.username)
-      storage.setItem('remember_password', form.value.password)
     } else {
       storage.removeItem('remember_username')
-      storage.removeItem('remember_password')
     }
     
     ElMessage.success('登录成功')

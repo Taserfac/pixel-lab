@@ -8,3 +8,27 @@
 
 # 日志文件
 *.log
+
+# Local Java backend runtime
+.tools/
+.m2repo/
+
+# Deployment build output
+deploy/build/
+
+# ComfyUI local runtime / embedded repo
+comfyui/
+
+# Java build output
+pixel-lab-java-backend/target/
+
+# Node dependencies and frontend build output
+node_modules/
+pixel-lab-frontend/node_modules/
+pixel-lab-frontend/dist/
+
+# Environment files
+.env
+.env.local
+pixel-lab-backend/.env
+pixel-lab-frontend/.env.local

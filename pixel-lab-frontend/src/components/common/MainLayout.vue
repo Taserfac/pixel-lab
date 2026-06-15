@@ -21,7 +21,10 @@
       <div class="top-actions">
         <el-button
           circle
-          :icon="themeStore.theme === 'light' ? Moon : Sunny"
+          class="theme-toggle"
+          :icon="isDarkTheme ? Sunny : Moon"
+          :title="themeToggleLabel"
+          :aria-label="themeToggleLabel"
           @click="themeStore.toggleTheme"
         />
         <el-dropdown @command="handleCommand">
@@ -92,6 +95,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Moon, Sunny, User, Setting, SwitchButton } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
+import { logout as logoutApi } from '@/api/auth'
 import router from '@/router'
 
 const route = useRoute()
@@ -101,6 +105,8 @@ const themeStore = useThemeStore()
 const searchQuery = ref('')
 
 const activeRoute = computed(() => route.path)
+const isDarkTheme = computed(() => themeStore.theme === 'dark')
+const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
 
 const menuRoutes = computed(() => {
   const routes = router.getRoutes()
@@ -134,7 +140,8 @@ const handleCommand = (command) => {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
+    }).then(async () => {
+      await logoutApi().catch(() => {})
       userStore.logout()
       routerInstance.push('/login')
       ElMessage.success('已退出登录')

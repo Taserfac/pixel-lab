@@ -116,7 +116,7 @@ const router = createRouter({
 // 白名单（无需登录）
 const whiteList = ['/login', '/register']
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   
   // 设置页面标题
@@ -131,6 +131,10 @@ router.beforeEach((to, from, next) => {
     }
     next()
     return
+  }
+
+  if (!userStore.isLoggedIn && !userStore.sessionChecked) {
+    await userStore.fetchUserInfo().catch(() => {})
   }
   
   // 需要登录的路由

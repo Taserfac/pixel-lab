@@ -1,7 +1,7 @@
 /**
  * 【文件路径】src/store/user.js
  * 【文件功能说明】用户状态管理 Store
- * - 管理用户信息、token、登录状态
+ * - 管理用户信息、Session 登录状态
  * - 提供登录、登出、获取用户信息等方法
  * - 数据持久化到 localStorage
  */
@@ -17,24 +17,21 @@ export const useUserStore = defineStore('user', () => {
   // 用户信息
   const userInfo = ref(storage.getItem('userInfo', null))
   
-  // Token
-  const token = ref(storage.getItem('token', ''))
+  // 保留 token 字段用于兼容旧代码，但新后端使用 HttpSession + JSESSIONID
+  const token = ref('')
+  const sessionChecked = ref(false)
   
   // 登录状态
-  const isLoggedIn = computed(() => !!token.value)
+  const isLoggedIn = computed(() => !!userInfo.value)
   
   // 是否管理员
   const isAdmin = computed(() => userInfo.value?.role === 'admin')
   
   // ==================== Actions ====================
   
-  /**
-   * 设置 token
-   * @param {string} newToken
-   */
   const setToken = (newToken) => {
-    token.value = newToken
-    storage.setItem('token', newToken)
+    token.value = newToken || ''
+    storage.removeItem('token')
   }
   
   /**
@@ -51,8 +48,9 @@ export const useUserStore = defineStore('user', () => {
    * @param {object} data - 登录接口返回的数据
    */
   const login = (data) => {
-    setToken(data.token)
+    setToken('')
     setUserInfo(data.user)
+    sessionChecked.value = true
   }
   
   /**
@@ -63,6 +61,7 @@ export const useUserStore = defineStore('user', () => {
     userInfo.value = null
     storage.removeItem('token')
     storage.removeItem('userInfo')
+    sessionChecked.value = true
   }
   
   /**
@@ -73,6 +72,7 @@ export const useUserStore = defineStore('user', () => {
     try {
       const data = await getUserInfo()
       setUserInfo(data)
+      sessionChecked.value = true
       return data
     } catch (error) {
       // 获取失败，清除登录状态
@@ -94,21 +94,18 @@ export const useUserStore = defineStore('user', () => {
    * 初始化（页面刷新时调用）
    */
   const init = () => {
-    const savedToken = storage.getItem('token', '')
     const savedUserInfo = storage.getItem('userInfo', null)
-    
-    if (savedToken) {
-      token.value = savedToken
-    }
     if (savedUserInfo) {
       userInfo.value = savedUserInfo
     }
+    storage.removeItem('token')
   }
   
   return {
     // State
     userInfo,
     token,
+    sessionChecked,
     isLoggedIn,
     isAdmin,
     

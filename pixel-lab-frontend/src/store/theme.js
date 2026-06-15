@@ -14,7 +14,7 @@ export const useThemeStore = defineStore('theme', () => {
   // ==================== State ====================
   
   // 当前主题：'light' | 'dark'
-  const theme = ref(storage.getItem('theme', 'light'))
+  const theme = ref(storage.getItem('theme', 'dark'))
   
   // 是否跟随系统
   const followSystem = ref(storage.getItem('followSystem', false))
@@ -26,9 +26,10 @@ export const useThemeStore = defineStore('theme', () => {
    * @param {'light' | 'dark'} newTheme
    */
   const setTheme = (newTheme) => {
-    theme.value = newTheme
-    storage.setItem('theme', newTheme)
-    applyTheme(newTheme)
+    const normalizedTheme = newTheme === 'light' ? 'light' : 'dark'
+    theme.value = normalizedTheme
+    storage.setItem('theme', normalizedTheme)
+    applyTheme(normalizedTheme)
   }
   
   /**
@@ -45,12 +46,13 @@ export const useThemeStore = defineStore('theme', () => {
    */
   const applyTheme = (themeValue) => {
     const html = document.documentElement
+    const normalizedTheme = themeValue === 'light' ? 'light' : 'dark'
     
-    if (themeValue === 'dark') {
-      html.setAttribute('data-theme', 'dark')
+    html.setAttribute('data-theme', normalizedTheme)
+
+    if (normalizedTheme === 'dark') {
       html.classList.add('dark')
     } else {
-      html.removeAttribute('data-theme')
       html.classList.remove('dark')
     }
   }
@@ -80,7 +82,7 @@ export const useThemeStore = defineStore('theme', () => {
    * 初始化主题
    */
   const init = () => {
-    const savedTheme = storage.getItem('theme', 'light')
+    const savedTheme = storage.getItem('theme', 'dark')
     const savedFollowSystem = storage.getItem('followSystem', false)
     
     theme.value = savedTheme

@@ -16,6 +16,14 @@ export const login = (data) => {
 }
 
 /**
+ * 用户退出登录
+ * @returns {Promise}
+ */
+export const logout = () => {
+  return post('/api/auth/logout')
+}
+
+/**
  * 用户注册
  * @param {object} data - { username, password }
  * @returns {Promise}

@@ -2,7 +2,7 @@
  * 【文件路径】src/utils/request.js
  * 【文件功能说明】Axios 请求封装
  * - 统一配置基础地址、超时时间
- * - 请求拦截器：自动添加 token、处理请求参数
+ * - 请求拦截器：统一携带 Cookie 会话
  * - 响应拦截器：统一处理响应数据、错误处理
  * - 封装 get、post、put、delete 方法
  */
@@ -11,12 +11,12 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import router from '@/router'
-import * as storage from './storage'
 
 // 创建 axios 实例
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -25,17 +25,6 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 从 storage 获取 token
-    const token = storage.getItem('token', '')
-    
-    // 调试：打印 token
-    console.log('[Request] Token:', token ? '存在' : '不存在', 'URL:', config.url)
-
-    // 如果有 token，添加到请求头
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
     return config
   },
   (error) => {
@@ -62,9 +51,10 @@ request.interceptors.response.use(
 
     if (response) {
       const { status, data } = response
+      const serverMessage = data?.msg
 
       if (status === 401) {
-        // token 过期或无效，清除用户信息并跳转到登录页
+        // Session 失效，清除本地用户信息并跳转到登录页
         ElMessage.error('登录已过期，请重新登录')
         const userStore = useUserStore()
         userStore.logout()
@@ -73,10 +63,10 @@ request.interceptors.response.use(
         ElMessage.error('没有权限访问该资源')
       } else if (status === 404) {
         ElMessage.error('请求的资源不存在')
-      } else if (status === 500) {
+      } else if (status === 500 && !serverMessage) {
         ElMessage.error('服务器内部错误')
       } else {
-        ElMessage.error(data?.msg || `请求失败 (${status})`)
+        ElMessage.error(serverMessage || `请求失败 (${status})`)
       }
     } else {
       // 网络错误

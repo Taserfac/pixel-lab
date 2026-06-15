@@ -29,6 +29,7 @@ import * as echarts from 'echarts'
 
 // 用户 Store
 import { useUserStore } from './store/user'
+import { useThemeStore } from './store/theme'
 
 const app = createApp(App)
 
@@ -38,6 +39,9 @@ app.use(createPinia())
 // 初始化用户状态（恢复登录状态）
 const userStore = useUserStore()
 userStore.init()
+
+const themeStore = useThemeStore()
+themeStore.init()
 
 // 注册 Vue Router
 app.use(router)

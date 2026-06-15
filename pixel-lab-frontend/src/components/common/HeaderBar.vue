@@ -23,8 +23,9 @@
       <!-- 主题切换 -->
       <el-button
         circle
-        :icon="themeStore.theme === 'light' ? Moon : Sunny"
-        title="切换主题"
+        :icon="isDarkTheme ? Sunny : Moon"
+        :title="themeToggleLabel"
+        :aria-label="themeToggleLabel"
         @click="themeStore.toggleTheme"
       />
       
@@ -63,16 +64,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Moon, Sunny, ArrowDown, User, Setting, SwitchButton } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
+import { logout as logoutApi } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const isDarkTheme = computed(() => themeStore.theme === 'dark')
+const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
 
 // 处理下拉菜单命令
 const handleCommand = (command) => {
@@ -95,7 +100,8 @@ const handleLogout = () => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
+  }).then(async () => {
+    await logoutApi().catch(() => {})
     userStore.logout()
     router.push('/login')
     ElMessage.success('已退出登录')
