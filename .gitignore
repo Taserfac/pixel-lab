@@ -32,3 +32,7 @@ pixel-lab-frontend/dist/
 .env.local
 pixel-lab-backend/.env
 pixel-lab-frontend/.env.local
+
+# 不可用的启动文件
+start-fullstack-new.bat
+stop-fullstack-new.bat
