@@ -623,6 +623,37 @@ const canvasShellStyle = computed(() => {
   }
 })
 
+const refreshCanvasOffset = () => {
+  nextTick(() => {
+    fabricCanvas?.calcOffset()
+  })
+}
+
+const syncFabricCanvasLayout = () => {
+  if (!fabricCanvas) return
+
+  const width = `${canvasWidth.value}px`
+  const height = `${canvasHeight.value}px`
+  const wrapper = fabricCanvas.wrapperEl
+  const canvasElements = [
+    fabricCanvas.lowerCanvasEl,
+    fabricCanvas.upperCanvasEl,
+    canvasRef.value
+  ].filter(Boolean)
+
+  if (wrapper) {
+    wrapper.style.width = width
+    wrapper.style.height = height
+  }
+
+  canvasElements.forEach((element) => {
+    element.style.width = width
+    element.style.height = height
+  })
+
+  fabricCanvas.calcOffset()
+}
+
 const initCanvas = async () => {
   if (!canvasRef.value || fabricCanvas) return
 
@@ -642,6 +673,7 @@ const initCanvas = async () => {
     pointerPosition.value = null
   })
 
+  syncFabricCanvasLayout()
   updateBrush()
   saveHistory('初始画布')
 }
@@ -805,7 +837,9 @@ const handlePathCreated = (event) => {
 
 const updatePointerPosition = (event) => {
   if (!fabricCanvas) return
-  const pointer = fabricCanvas.getPointer(event.e)
+  const pointer = fabricCanvas.getScenePoint
+    ? fabricCanvas.getScenePoint(event.e)
+    : fabricCanvas.getPointer(event.e)
   pointerPosition.value = {
     x: Math.round(pointer.x),
     y: Math.round(pointer.y)
@@ -875,6 +909,7 @@ const resizeCanvas = () => {
     width: canvasWidth.value,
     height: canvasHeight.value
   })
+  syncFabricCanvasLayout()
   fabricCanvas.requestRenderAll()
   selectedPreset.value = canvasPresets.some((item) => item.width === canvasWidth.value && item.height === canvasHeight.value)
     ? `${canvasWidth.value}x${canvasHeight.value}`
@@ -891,6 +926,7 @@ const applyBackground = () => {
 const setZoomLevel = (value) => {
   const nextZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(value)))
   zoomLevel.value = nextZoom
+  refreshCanvasOffset()
 }
 
 const zoomIn = () => {
@@ -993,6 +1029,7 @@ const stopCanvasPanning = (event) => {
   isPanning.value = false
   panStart = null
   updateBrush()
+  refreshCanvasOffset()
 }
 
 const handleGlobalPointerMove = (event) => {
@@ -1709,13 +1746,16 @@ onUnmounted(() => {
 
 .canvas-stage.pan-tool,
 .canvas-stage.pan-tool .canvas-shell canvas,
+.canvas-stage.pan-tool .canvas-shell :deep(canvas),
 .canvas-stage.space-pan,
-.canvas-stage.space-pan .canvas-shell canvas {
+.canvas-stage.space-pan .canvas-shell canvas,
+.canvas-stage.space-pan .canvas-shell :deep(canvas) {
   cursor: grab;
 }
 
 .canvas-stage.is-panning,
-.canvas-stage.is-panning .canvas-shell canvas {
+.canvas-stage.is-panning .canvas-shell canvas,
+.canvas-stage.is-panning .canvas-shell :deep(canvas) {
   cursor: grabbing;
   user-select: none;
 }
@@ -1756,10 +1796,35 @@ onUnmounted(() => {
   cursor: crosshair;
 }
 
+.canvas-shell :deep(.canvas-container) {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 2;
+}
+
+.canvas-shell :deep(.lower-canvas),
+.canvas-shell :deep(.upper-canvas) {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.canvas-shell :deep(.lower-canvas) {
+  z-index: 2;
+}
+
+.canvas-shell :deep(.upper-canvas) {
+  z-index: 3;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .canvas-grid-overlay {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.11) 1px, transparent 1px),

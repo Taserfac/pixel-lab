@@ -278,6 +278,12 @@ const handleCommand = (command) => {
   z-index: 100;
 }
 
+[data-theme='light'] .dock-nav {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg), 0 18px 48px rgba(0, 0, 0, 0.14);
+}
+
 .dock-item {
   display: flex;
   flex-direction: column;

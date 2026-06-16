@@ -111,36 +111,42 @@
                   :alt="image.original_name"
                   loading="lazy"
                 >
-                <div class="image-overlay">
-                  <div class="actions">
-                    <el-button
-                      circle
-                      size="small"
-                      @click="viewImage(image)"
-                    >
-                      <el-icon><View /></el-icon>
-                    </el-button>
-                    <el-button
-                      circle
-                      size="small"
-                      :type="image.is_public ? 'success' : 'info'"
-                      @click="toggleVisibility(image)"
-                    >
-                      <el-icon>
-                        <Unlock v-if="image.is_public" />
-                        <Lock v-else />
-                      </el-icon>
-                    </el-button>
-                    <el-button
-                      circle
-                      size="small"
-                      type="danger"
-                      @click="confirmDelete(image)"
-                    >
-                      <el-icon><Delete /></el-icon>
-                    </el-button>
-                  </div>
-                </div>
+                <el-dropdown
+                  class="image-actions-dropdown"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(command) => handleImageCommand(image, command)"
+                >
+                  <button
+                    class="image-menu-btn"
+                    type="button"
+                    aria-label="图片设置"
+                  >
+                    <el-icon><MoreFilled /></el-icon>
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="view">
+                        <el-icon><View /></el-icon>
+                        查看图片
+                      </el-dropdown-item>
+                      <el-dropdown-item command="visibility">
+                        <el-icon>
+                          <Lock v-if="image.is_public" />
+                          <Unlock v-else />
+                        </el-icon>
+                        {{ image.is_public ? '设为私有' : '设为公开' }}
+                      </el-dropdown-item>
+                      <el-dropdown-item
+                        command="delete"
+                        divided
+                      >
+                        <el-icon><Delete /></el-icon>
+                        删除图片
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
               <div class="image-info">
                 <p
@@ -300,7 +306,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Upload, View, Lock, Unlock, Delete } from '@element-plus/icons-vue'
+import { Upload, View, Lock, Unlock, Delete, MoreFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility } from '@/api/image'
 import { getUserCollections, getUserLikes } from '@/api/community'
@@ -449,6 +455,16 @@ const onFileSelected = async (e) => {
 const viewImage = (image) => {
   previewImage.value = image
   previewVisible.value = true
+}
+
+const handleImageCommand = (image, command) => {
+  if (command === 'view') {
+    viewImage(image)
+  } else if (command === 'visibility') {
+    toggleVisibility(image)
+  } else if (command === 'delete') {
+    confirmDelete(image)
+  }
 }
 
 // 在工作台打开
@@ -652,35 +668,39 @@ onMounted(() => {
   transform: scale(1.05);
 }
 
-.image-overlay {
+.image-actions-dropdown {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 3;
+}
+
+.image-menu-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--radius-full);
+  color: #ffffff;
+  background: rgba(10, 10, 10, 0.72);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
-.image-wrapper:hover .image-overlay {
-  opacity: 1;
-}
-
-.image-overlay .actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.image-overlay .actions :deep(.el-button) {
-  background: var(--accent) !important;
-  border: 3px solid var(--border) !important;
-  box-shadow: 4px 4px 0px 0px var(--border) !important;
-}
-
-.image-overlay .actions :deep(.el-button:hover) {
-  transform: translate(-2px, -2px);
-  box-shadow: 6px 6px 0px 0px var(--border) !important;
+.image-menu-btn:hover,
+.image-menu-btn:focus-visible {
+  color: var(--background);
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .image-info {

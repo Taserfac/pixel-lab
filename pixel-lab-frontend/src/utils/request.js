@@ -11,6 +11,7 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import router from '@/router'
+import * as storage from '@/utils/storage'
 
 // 创建 axios 实例
 const request = axios.create({
@@ -25,6 +26,10 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
+    const token = storage.getItem('token', '')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   (error) => {

@@ -17,8 +17,8 @@ export const useUserStore = defineStore('user', () => {
   // 用户信息
   const userInfo = ref(storage.getItem('userInfo', null))
   
-  // 保留 token 字段用于兼容旧代码，但新后端使用 HttpSession + JSESSIONID
-  const token = ref('')
+  // Node 后端使用 JWT，Java 后端仍可通过 Cookie 会话工作
+  const token = ref(storage.getItem('token', ''))
   const sessionChecked = ref(false)
   
   // 登录状态
@@ -31,7 +31,11 @@ export const useUserStore = defineStore('user', () => {
   
   const setToken = (newToken) => {
     token.value = newToken || ''
-    storage.removeItem('token')
+    if (token.value) {
+      storage.setItem('token', token.value)
+    } else {
+      storage.removeItem('token')
+    }
   }
   
   /**
@@ -48,7 +52,7 @@ export const useUserStore = defineStore('user', () => {
    * @param {object} data - 登录接口返回的数据
    */
   const login = (data) => {
-    setToken('')
+    setToken(data?.token || '')
     setUserInfo(data.user)
     sessionChecked.value = true
   }
@@ -98,7 +102,7 @@ export const useUserStore = defineStore('user', () => {
     if (savedUserInfo) {
       userInfo.value = savedUserInfo
     }
-    storage.removeItem('token')
+    token.value = storage.getItem('token', '')
   }
   
   return {
