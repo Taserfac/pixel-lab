@@ -1,41 +1,71 @@
 <template>
-  <div class="bento-layout">
-    <!-- 顶部导航栏 -->
+  <div class="community-layout">
     <header class="top-bar">
-      <div class="brand">
+      <router-link
+        to="/dashboard"
+        class="brand"
+        aria-label="Pixel Lab 首页"
+      >
         <div class="brand-icon">
           <span class="pixel-text">PX</span>
         </div>
         <span class="brand-name">Pixel Lab</span>
-      </div>
+      </router-link>
 
       <div class="search-bar">
         <el-input
           v-model="searchQuery"
-          placeholder="搜索作品、用户..."
+          placeholder="搜索作品、作者、标签"
           :prefix-icon="Search"
+          clearable
           @keyup.enter="handleSearch"
         />
       </div>
 
       <div class="top-actions">
         <el-button
-          circle
-          class="theme-toggle"
-          :icon="isDarkTheme ? Sunny : Moon"
+          type="primary"
+          class="upload-action"
+          :loading="uploading"
+          @click="triggerUpload"
+        >
+          <el-icon><Upload /></el-icon>
+          上传作品
+        </el-button>
+        <button
+          class="icon-action"
+          type="button"
+          title="消息通知"
+          aria-label="消息通知"
+          @click="handleNotifications"
+        >
+          <el-icon><Bell /></el-icon>
+        </button>
+        <button
+          class="icon-action"
+          type="button"
           :title="themeToggleLabel"
           :aria-label="themeToggleLabel"
           @click="themeStore.toggleTheme"
-        />
+        >
+          <el-icon>
+            <Sunny v-if="isDarkTheme" />
+            <Moon v-else />
+          </el-icon>
+        </button>
         <el-dropdown @command="handleCommand">
-          <div class="user-avatar">
+          <button
+            class="user-avatar"
+            type="button"
+            aria-label="用户菜单"
+          >
             <el-avatar
               :size="36"
               :src="userStore.userInfo?.avatar"
             >
               {{ userStore.userInfo?.nickname?.charAt(0) || 'U' }}
             </el-avatar>
-          </div>
+          </button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">
@@ -43,6 +73,12 @@
               </el-dropdown-item>
               <el-dropdown-item command="settings">
                 <el-icon><Setting /></el-icon>设置
+              </el-dropdown-item>
+              <el-dropdown-item
+                v-if="userStore.isAdmin"
+                command="admin"
+              >
+                <el-icon><Setting /></el-icon>后台管理
               </el-dropdown-item>
               <el-dropdown-item
                 divided
@@ -56,7 +92,14 @@
       </div>
     </header>
 
-    <!-- 主内容区 -->
+    <input
+      ref="fileInput"
+      class="visually-hidden"
+      type="file"
+      accept="image/*"
+      @change="onFileSelected"
+    >
+
     <main class="main-area">
       <router-view v-slot="{ Component }">
         <transition
@@ -68,90 +111,141 @@
       </router-view>
     </main>
 
-    <!-- 底部 Dock 导航栏 -->
-    <nav class="dock-nav">
+    <nav class="dock-nav" aria-label="底部导航">
       <router-link
-        v-for="route in menuRoutes"
-        :key="route.path"
-        :to="resolveMenuPath(route.path)"
+        v-for="item in navItems"
+        :key="item.path"
+        :to="item.path"
         class="dock-item"
-        :class="{ active: isMenuActive(route.path) }"
-        :style="{ '--dock-accent': getDockAccent(route.path) }"
+        :class="{ active: isMenuActive(item.path) }"
+        :style="{ '--dock-accent': item.accent }"
       >
         <span class="dock-icon">
           <el-icon :size="22">
-            <component :is="route.meta.icon" />
+            <component :is="item.icon" />
           </el-icon>
         </span>
-        <span class="dock-label">{{ route.meta.title }}</span>
+        <span class="dock-label">{{ item.label }}</span>
       </router-link>
+
+      <button
+        class="dock-item dock-upload"
+        type="button"
+        :disabled="uploading"
+        style="--dock-accent: var(--primary)"
+        @click="triggerUpload"
+      >
+        <span class="dock-icon">
+          <el-icon :size="22"><Upload /></el-icon>
+        </span>
+        <span class="dock-label">上传</span>
+      </button>
     </nav>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Moon, Sunny, User, Setting, SwitchButton } from '@element-plus/icons-vue'
+import {
+  Bell,
+  Compass,
+  HomeFilled,
+  Moon,
+  Search,
+  Setting,
+  Sunny,
+  SwitchButton,
+  Upload,
+  User
+} from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
 import { logout as logoutApi } from '@/api/auth'
-import router from '@/router'
+import { uploadImage } from '@/api/image'
 
 const route = useRoute()
-const routerInstance = useRouter()
+const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 const searchQuery = ref('')
+const fileInput = ref(null)
+const uploading = ref(false)
 
-const dockAccentMap = {
-  '/dashboard': '#00f08a',
-  '/workbench': '#28c8ff',
-  '/draw': '#a78bfa',
-  '/community': '#f59e0b',
-  '/personal': '#f472b6',
-  '/stats': '#22d3ee',
-  '/admin': '#ef4444'
-}
+const navItems = computed(() => {
+  const items = [
+    { path: '/dashboard', label: '首页', icon: HomeFilled, accent: '#16C784' },
+    { path: '/community', label: '社区', icon: Compass, accent: '#5B8DEF' },
+    { path: '/personal', label: '我的', icon: User, accent: '#FF8AB3' }
+  ]
 
-const resolveMenuPath = (path) => path.startsWith('/') ? path : `/${path}`
+  if (userStore.isAdmin) {
+    items.push({ path: '/admin', label: '管理', icon: Setting, accent: '#FF4757' })
+  }
 
-const isMenuActive = (path) => {
-  const menuPath = resolveMenuPath(path)
-  return route.path === menuPath || route.path.startsWith(`${menuPath}/`)
-}
+  return items
+})
 
-const getDockAccent = (path) => dockAccentMap[resolveMenuPath(path)] || 'var(--primary)'
 const isDarkTheme = computed(() => themeStore.theme === 'dark')
 const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
 
-const menuRoutes = computed(() => {
-  const routes = router.getRoutes()
-  const mainRoute = routes.find(r => r.path === '/')
-  if (!mainRoute || !mainRoute.children) return []
-  return mainRoute.children.filter(r => {
-    if (!r.meta?.title) return false
-    if (r.meta?.hideInMenu) return false
-    // 管理员菜单只对管理员显示
-    if (r.meta?.admin && !userStore.isAdmin) return false
-    return true
-  })
-})
+const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 
 const handleSearch = () => {
-  if (searchQuery.value.trim()) {
-    ElMessage.info(`搜索: ${searchQuery.value}`)
+  const keyword = searchQuery.value.trim()
+  if (!keyword) return
+  router.push({ path: '/community', query: { keyword } })
+}
+
+const handleNotifications = () => {
+  ElMessage.info('暂无新通知')
+}
+
+const triggerUpload = () => {
+  fileInput.value?.click()
+}
+
+const onFileSelected = async (event) => {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('请选择图片文件')
+    event.target.value = ''
+    return
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('图片大小不能超过 5MB')
+    event.target.value = ''
+    return
+  }
+
+  uploading.value = true
+  try {
+    await uploadImage(file)
+    ElMessage.success('上传成功')
+    router.push('/personal')
+  } catch (error) {
+    console.error('上传失败:', error)
+    ElMessage.error('上传失败')
+  } finally {
+    uploading.value = false
+    event.target.value = ''
   }
 }
 
 const handleCommand = (command) => {
   switch (command) {
   case 'profile':
-    routerInstance.push('/personal')
+    router.push('/personal')
     break
   case 'settings':
-    routerInstance.push('/settings')
+    router.push('/settings')
+    break
+  case 'admin':
+    router.push('/admin')
     break
   case 'logout':
     ElMessageBox.confirm('确定要退出登录吗？', '提示', {
@@ -161,7 +255,7 @@ const handleCommand = (command) => {
     }).then(async () => {
       await logoutApi().catch(() => {})
       userStore.logout()
-      routerInstance.push('/login')
+      router.push('/login')
       ElMessage.success('已退出登录')
     }).catch(() => {})
     break
@@ -170,234 +264,224 @@ const handleCommand = (command) => {
 </script>
 
 <style scoped>
-.bento-layout {
+.community-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--background);
-  position: relative;
-  z-index: 1;
+  background: var(--background);
+  color: var(--foreground);
 }
 
-/* 顶部导航栏 */
 .top-bar {
-  height: 64px;
-  padding: 0 var(--space-6);
-  display: flex;
+  height: 72px;
+  display: grid;
+  grid-template-columns: max-content minmax(240px, 520px) max-content;
   align-items: center;
-  justify-content: space-between;
-  background: var(--background-soft);
-  border-bottom: 1px solid var(--border);
+  gap: var(--space-6);
+  padding: 0 clamp(var(--space-4), 4vw, var(--space-10));
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(12px);
+  background: var(--background-float);
+  box-shadow: 0 1px 0 var(--border), 0 16px 32px rgba(17, 24, 39, 0.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+[data-theme='dark'] .top-bar {
+  box-shadow: 0 1px 0 var(--border), 0 16px 32px rgba(0, 0, 0, 0.18);
 }
 
 .brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 12px;
+  color: inherit;
+  text-decoration: none;
 }
 
 .brand-icon {
   width: 40px;
   height: 40px;
-  background: var(--primary);
-  border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px var(--primary-glow);
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  box-shadow: var(--glow-sm);
 }
 
 .pixel-text {
+  color: white;
   font-family: var(--font-mono);
   font-size: 14px;
-  font-weight: 700;
-  color: var(--background);
+  font-weight: 800;
 }
 
 .brand-name {
-  font-family: var(--font-sans);
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
   color: var(--foreground);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .search-bar {
-  flex: 1;
-  max-width: 400px;
-  margin: 0 var(--space-8);
+  width: 100%;
+  justify-self: center;
 }
 
 .search-bar :deep(.el-input__wrapper) {
-  background: var(--background-muted);
-  border-radius: var(--radius-full);
+  min-height: 42px;
+  padding: 0 var(--space-4);
+  background: var(--background-muted) !important;
 }
 
 .top-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-3);
 }
 
-.top-actions .el-button.is-circle {
-  background: var(--background-muted);
-  border: 1px solid var(--border) !important;
-  color: var(--foreground-muted);
-  transition: all var(--transition-fast);
+.upload-action {
+  min-width: 108px;
 }
 
-.top-actions .el-button.is-circle:hover {
-  border-color: var(--primary) !important;
-  color: var(--primary);
-  background: var(--primary-muted);
-}
-
+.icon-action,
 .user-avatar {
-  cursor: pointer;
-  padding: 3px;
-  background: var(--background-muted);
-  border: 1px solid var(--border);
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
   border-radius: var(--radius-full);
-  transition: all var(--transition-fast);
+  background: var(--background-elevated);
+  color: var(--foreground-muted);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
+.icon-action:hover,
 .user-avatar:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 16px var(--primary-glow);
+  color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
-/* 主内容区 */
 .main-area {
   flex: 1;
-  padding: var(--space-6);
-  padding-bottom: 100px;
-  overflow-y: auto;
+  width: 100%;
+  padding: clamp(var(--space-5), 4vw, var(--space-10));
+  padding-bottom: 112px;
 }
 
-/* 底部 Dock 导航栏 - 毛玻璃效果 */
 .dock-nav {
   position: fixed;
   bottom: var(--space-6);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: var(--space-1);
   padding: var(--space-2);
-  background: rgba(26, 26, 26, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 0, 0, 0.3);
   z-index: 100;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
 }
 
-[data-theme='light'] .dock-nav {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: var(--shadow-lg), 0 18px 48px rgba(0, 0, 0, 0.14);
+[data-theme='dark'] .dock-nav {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 32, 28, 0.72);
 }
 
 .dock-item {
   --dock-accent: var(--primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-3) var(--space-4);
   min-width: 64px;
+  min-height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
   position: relative;
-  z-index: 0;
-  isolation: isolate;
-  overflow: hidden;
-  text-decoration: none;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
   color: var(--foreground-muted);
-  border-radius: var(--radius);
-  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
   transition:
     color var(--transition-fast),
-    border-color var(--transition-fast),
     transform var(--transition-fast),
+    background var(--transition-fast),
     box-shadow var(--transition-fast);
-}
-
-.dock-item::before {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  z-index: -1;
-  border-radius: calc(var(--radius) - 2px);
-  background: var(--background-muted);
-  background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
-  opacity: 0;
-  transform: scale(0.9);
-  transition:
-    opacity var(--transition-fast),
-    transform var(--transition-fast),
-    background var(--transition-fast);
 }
 
 .dock-item:hover {
   color: var(--dock-accent);
-  transform: translateY(-2px);
-}
-
-.dock-item:hover::before {
-  opacity: 1;
-  transform: scale(1);
+  transform: translateY(-3px);
+  background: color-mix(in srgb, var(--dock-accent) 12%, transparent);
 }
 
 .dock-item:active {
-  color: var(--dock-accent);
-  transform: translateY(0) scale(0.94);
+  transform: translateY(0) scale(0.96);
 }
 
 .dock-item.active {
-  background: transparent;
   color: var(--dock-accent);
-  border-color: var(--border-glow);
-  border-color: color-mix(in srgb, var(--dock-accent) 58%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent),
-    0 8px 24px color-mix(in srgb, var(--dock-accent) 18%, transparent);
+  background: color-mix(in srgb, var(--dock-accent) 14%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent);
 }
 
-.dock-item.active::before {
-  opacity: 1;
-  transform: scale(1);
-  background: color-mix(in srgb, var(--dock-accent) 22%, transparent);
-}
-
-[data-theme='light'] .dock-item.active::before {
-  background: color-mix(in srgb, var(--dock-accent) 18%, white);
+[data-theme='dark'] .dock-item.active {
+  background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
 }
 
 .dock-item:focus-visible {
-  outline: 2px solid var(--dock-accent);
-  outline-offset: 3px;
+  outline: 3px solid color-mix(in srgb, var(--dock-accent) 24%, transparent);
+  outline-offset: 2px;
 }
 
-.dock-icon,
+.dock-upload {
+  min-width: 70px;
+  color: white;
+  background: var(--primary);
+  box-shadow: var(--glow-sm);
+}
+
+.dock-upload:hover {
+  color: white;
+  background: var(--primary-hover);
+}
+
+.dock-upload:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .dock-label {
-  position: relative;
-  z-index: 1;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.dock-item.active .dock-icon {
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--dock-accent) 72%, transparent));
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
-.dock-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-
-/* 过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -408,30 +492,61 @@ const handleCommand = (command) => {
   opacity: 0;
 }
 
-/* 响应式 */
-@media (max-width: 768px) {
-  .search-bar {
-    display: none;
+@media (max-width: 900px) {
+  .top-bar {
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    gap: var(--space-4);
   }
 
   .brand-name {
     display: none;
   }
 
+  .upload-action {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .top-bar {
+    grid-template-columns: max-content 1fr max-content;
+    padding: 0 var(--space-4);
+  }
+
+  .search-bar {
+    display: none;
+  }
+
+  .top-actions {
+    gap: var(--space-2);
+  }
+
+  .icon-action {
+    width: 38px;
+    height: 38px;
+  }
+
   .dock-nav {
     left: var(--space-4);
     right: var(--space-4);
+    bottom: var(--space-4);
     transform: none;
     justify-content: space-around;
   }
 
   .dock-item {
-    min-width: auto;
-    padding: var(--space-2);
+    min-width: 0;
+    flex: 1;
   }
+}
 
+@media (max-width: 420px) {
   .dock-label {
     display: none;
+  }
+
+  .dock-item {
+    min-height: 50px;
   }
 }
 </style>

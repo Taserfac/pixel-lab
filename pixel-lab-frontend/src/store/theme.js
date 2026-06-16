@@ -14,7 +14,7 @@ export const useThemeStore = defineStore('theme', () => {
   // ==================== State ====================
   
   // 当前主题：'light' | 'dark'
-  const theme = ref(storage.getItem('theme', 'dark'))
+  const theme = ref(storage.getItem('theme', 'light'))
   
   // 是否跟随系统
   const followSystem = ref(storage.getItem('followSystem', false))
@@ -82,7 +82,7 @@ export const useThemeStore = defineStore('theme', () => {
    * 初始化主题
    */
   const init = () => {
-    const savedTheme = storage.getItem('theme', 'dark')
+    const savedTheme = storage.getItem('theme', 'light')
     const savedFollowSystem = storage.getItem('followSystem', false)
     
     theme.value = savedTheme

@@ -31,39 +31,13 @@
       v-loading="loading"
       class="works-grid"
     >
-      <div
-        v-for="work in works"
+      <PostCard
+        v-for="(work, index) in works"
         :key="work.id"
-        class="work-card"
-        @click="openDetail(work)"
-      >
-        <div class="work-image">
-          <img
-            :src="work.url"
-            :alt="work.title || work.original_name"
-            loading="lazy"
-            decoding="async"
-          >
-          <div class="work-overlay">
-            <span class="work-title">{{ work.title || work.original_name }}</span>
-          </div>
-        </div>
-        <div class="work-info">
-          <div class="author">
-            <el-avatar
-              :size="24"
-              :src="work.author_avatar"
-            >
-              {{ work.author_name?.charAt(0) || '?' }}
-            </el-avatar>
-            <span class="author-name">{{ work.author_name || '匿名' }}</span>
-          </div>
-          <div class="stats">
-            <span><el-icon><View /></el-icon> {{ work.view_count || 0 }}</span>
-            <span>♡ {{ work.like_count || 0 }}</span>
-          </div>
-        </div>
-      </div>
+        :work="work"
+        :style="{ '--post-ratio': getCardRatio(index) }"
+        @select="openDetail"
+      />
     </div>
 
     <!-- 空状态 -->
@@ -207,10 +181,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, View, CollectionTag, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
+import PostCard from '@/components/community/PostCard.vue'
 import {
   getPublicImages,
   getImageDetail,
@@ -222,6 +198,7 @@ import {
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
+const route = useRoute()
 
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -231,6 +208,7 @@ const works = ref([])
 const page = ref(1)
 const pageSize = ref(12) // 减少每页数量，提升加载速度
 const total = ref(0)
+const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
 
 const hasMore = computed(() => works.value.length < total.value)
 
@@ -277,6 +255,8 @@ const loadMore = () => {
   page.value++
   loadWorks()
 }
+
+const getCardRatio = (index) => cardRatios[index % cardRatios.length]
 
 const openDetail = async (work) => {
   detailVisible.value = true
@@ -376,7 +356,32 @@ const formatTime = (time) => {
   return date.toLocaleDateString()
 }
 
-onMounted(() => loadWorks())
+watch(
+  () => route.query.keyword,
+  (value) => {
+    keyword.value = value ? String(value) : ''
+    loadWorks(true)
+  }
+)
+
+watch(
+  () => route.query.id,
+  (value) => {
+    if (value) openDetail({ id: value })
+  }
+)
+
+onMounted(async () => {
+  if (route.query.keyword) {
+    keyword.value = String(route.query.keyword)
+  }
+
+  await loadWorks(true)
+
+  if (route.query.id) {
+    openDetail({ id: route.query.id })
+  }
+})
 </script>
 
 <style scoped>
@@ -388,8 +393,14 @@ onMounted(() => loadWorks())
 
 .search-bar {
   display: flex;
+  align-items: center;
   gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  max-width: 900px;
+  margin-bottom: var(--space-8);
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .search-bar .el-input {
@@ -402,123 +413,10 @@ onMounted(() => loadWorks())
   gap: var(--space-2);
 }
 
-/* Bento Grid 作品列表 */
 .works-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-4);
-}
-
-.work-card {
-  background: var(--background-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  position: relative;
-}
-
-.work-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 50%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-.work-card:hover {
-  border-color: var(--border-hover);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md), var(--glow-sm);
-}
-
-.work-image {
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
-  background: var(--background-muted);
-}
-
-.work-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--transition-slow);
-}
-
-.work-card:hover .work-image img {
-  transform: scale(1.05);
-}
-
-.work-image img[loading="lazy"] {
-  background: linear-gradient(90deg, var(--background-muted) 25%, var(--background-elevated) 50%, var(--background-muted) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.work-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: var(--space-4);
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.work-card:hover .work-overlay {
-  opacity: 1;
-}
-
-.work-title {
-  color: white;
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.work-info {
-  padding: var(--space-4);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.author {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.author-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--foreground);
-}
-
-.stats {
-  display: flex;
-  gap: var(--space-3);
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.stats span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  min-height: 360px;
+  column-count: 4;
+  column-gap: var(--space-5);
 }
 
 .load-more {
@@ -671,15 +569,32 @@ onMounted(() => loadWorks())
 }
 
 @media (max-width: 768px) {
-  .works-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: var(--space-3);
+  .search-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
+
+  .search-bar .el-input {
+    max-width: none;
+  }
+
+  .works-grid {
+    column-count: 2;
+    column-gap: var(--space-3);
+  }
+
   .detail-content {
     flex-direction: column;
   }
+
   .detail-image {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .works-grid {
+    column-count: 1;
   }
 }
 </style>

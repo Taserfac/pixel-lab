@@ -1,116 +1,147 @@
 /**
  * 【文件路径】src/assets/css/variables.css
- * 【功能说明】Dark Mode + Bento Grid 设计系统
+ * 【功能说明】Pixel Lab 社区化设计系统变量
  */
 
 /* ============================================
-   Dark Mode + Bento Grid 设计系统
+   Community Feed Design System
    ============================================ */
 :root {
-  /* 深色背景层次 */
-  --background: #0A0A0A;
-  --background-soft: #111111;
-  --background-muted: #1A1A1A;
-  --background-elevated: #1E1E1E;
-  --background-card: #141414;
-  
+  /* 背景层级 */
+  --background: #F6F7F5;
+  --background-soft: rgba(255, 255, 255, 0.78);
+  --background-muted: #EEF1ED;
+  --background-elevated: #FFFFFF;
+  --background-card: #FFFFFF;
+  --background-float: rgba(255, 255, 255, 0.88);
+
   /* 文字色 */
-  --foreground: #FFFFFF;
-  --foreground-muted: #A0A0A0;
-  --foreground-subtle: #666666;
-  
-  /* 像素艺术强调色 */
-  --primary: #00FF88;
-  --primary-hover: #00CC6A;
-  --primary-muted: rgba(0, 255, 136, 0.15);
-  --primary-glow: rgba(0, 255, 136, 0.4);
-  
+  --foreground: #141A17;
+  --foreground-muted: #6F7772;
+  --foreground-subtle: #A4AAA6;
+
+  /* 品牌色 */
+  --primary: #16C784;
+  --primary-hover: #0FAA6E;
+  --primary-muted: rgba(22, 199, 132, 0.12);
+  --primary-glow: rgba(22, 199, 132, 0.22);
+
   /* 辅助色 */
-  --secondary: #00D4FF;
-  --secondary-muted: rgba(0, 212, 255, 0.15);
-  
+  --secondary: #5B8DEF;
+  --secondary-muted: rgba(91, 141, 239, 0.12);
+  --accent: #FFB454;
+  --accent-muted: rgba(255, 180, 84, 0.16);
+
   /* 功能色 */
-  --success: #00FF88;
-  --warning: #FFB800;
+  --success: #16C784;
+  --warning: #E9A23B;
   --error: #FF4757;
-  --info: #00D4FF;
-  
-  /* 边框 - 微妙发光 */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-light: rgba(255, 255, 255, 0.12);
-  --border-hover: rgba(255, 255, 255, 0.2);
-  --border-glow: rgba(0, 255, 136, 0.3);
-  
-  /* 阴影系统 - 精细层次 */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
-  
-  /* 发光阴影 */
-  --glow-sm: 0 0 20px rgba(0, 255, 136, 0.1);
-  --glow: 0 0 40px rgba(0, 255, 136, 0.15);
-  --glow-md: 0 0 60px rgba(0, 255, 136, 0.2);
-  
-  /* 圆角 - Bento Grid 柔和边角 */
-  --radius-sm: 6px;
+  --info: #5B8DEF;
+
+  /* 柔和分隔 */
+  --border: rgba(20, 26, 23, 0.06);
+  --border-light: rgba(20, 26, 23, 0.1);
+  --border-hover: rgba(22, 199, 132, 0.22);
+  --border-glow: rgba(22, 199, 132, 0.26);
+
+  /* 阴影层级 */
+  --shadow-sm: 0 6px 18px rgba(17, 24, 39, 0.06);
+  --shadow: 0 12px 32px rgba(17, 24, 39, 0.08);
+  --shadow-md: 0 18px 48px rgba(17, 24, 39, 0.12);
+  --shadow-lg: 0 28px 72px rgba(17, 24, 39, 0.16);
+
+  /* 品牌浮光 */
+  --glow-sm: 0 10px 26px rgba(22, 199, 132, 0.12);
+  --glow: 0 16px 42px rgba(22, 199, 132, 0.18);
+  --glow-md: 0 22px 58px rgba(22, 199, 132, 0.2);
+
+  /* 圆角体系 */
+  --radius-sm: 8px;
   --radius: 12px;
   --radius-md: 16px;
   --radius-lg: 20px;
-  --radius-xl: 24px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
-  
+
   /* 字体 */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
-  
-  /* Bento Grid 间距系统 - 8px 基准 */
+
+  /* 间距体系 - 8px 基准 */
   --grid-unit: 8px;
-  --space-1: calc(var(--grid-unit) * 0.5);  /* 4px */
-  --space-2: var(--grid-unit);               /* 8px */
-  --space-3: calc(var(--grid-unit) * 1.5);  /* 12px */
-  --space-4: calc(var(--grid-unit) * 2);    /* 16px */
-  --space-5: calc(var(--grid-unit) * 2.5);  /* 20px */
-  --space-6: calc(var(--grid-unit) * 3);    /* 24px */
-  --space-8: calc(var(--grid-unit) * 4);    /* 32px */
-  --space-10: calc(var(--grid-unit) * 5);   /* 40px */
-  --space-12: calc(var(--grid-unit) * 6);   /* 48px */
-  --space-16: calc(var(--grid-unit) * 8);   /* 64px */
-  
+  --space-1: calc(var(--grid-unit) * 0.5);
+  --space-2: var(--grid-unit);
+  --space-3: calc(var(--grid-unit) * 1.5);
+  --space-4: calc(var(--grid-unit) * 2);
+  --space-5: calc(var(--grid-unit) * 2.5);
+  --space-6: calc(var(--grid-unit) * 3);
+  --space-8: calc(var(--grid-unit) * 4);
+  --space-10: calc(var(--grid-unit) * 5);
+  --space-12: calc(var(--grid-unit) * 6);
+  --space-16: calc(var(--grid-unit) * 8);
+
   /* 过渡 */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-  
+
   /* 动画曲线 */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
-/* 浅色模式（可选） */
 [data-theme='light'] {
-  --background: #FAFAFA;
-  --background-soft: #FFFFFF;
-  --background-muted: #F0F0F0;
+  --background: #F6F7F5;
+  --background-soft: rgba(255, 255, 255, 0.78);
+  --background-muted: #EEF1ED;
   --background-elevated: #FFFFFF;
   --background-card: #FFFFFF;
-  
-  --foreground: #0A0A0A;
-  --foreground-muted: #666666;
-  --foreground-subtle: #999999;
-  
-  --border: rgba(0, 0, 0, 0.08);
-  --border-light: rgba(0, 0, 0, 0.12);
-  --border-hover: rgba(0, 0, 0, 0.2);
-  --border-glow: rgba(0, 255, 136, 0.4);
-  
-  --primary: #00CC6A;
-  --primary-hover: #00AA55;
-  --primary-muted: rgba(0, 204, 106, 0.1);
-  --primary-glow: rgba(0, 204, 106, 0.3);
-  
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
+  --background-float: rgba(255, 255, 255, 0.88);
+
+  --foreground: #141A17;
+  --foreground-muted: #6F7772;
+  --foreground-subtle: #A4AAA6;
+
+  --border: rgba(20, 26, 23, 0.06);
+  --border-light: rgba(20, 26, 23, 0.1);
+  --border-hover: rgba(22, 199, 132, 0.22);
+  --border-glow: rgba(22, 199, 132, 0.26);
+
+  --primary: #16C784;
+  --primary-hover: #0FAA6E;
+  --primary-muted: rgba(22, 199, 132, 0.12);
+  --primary-glow: rgba(22, 199, 132, 0.22);
+
+  --shadow-sm: 0 6px 18px rgba(17, 24, 39, 0.06);
+  --shadow: 0 12px 32px rgba(17, 24, 39, 0.08);
+  --shadow-md: 0 18px 48px rgba(17, 24, 39, 0.12);
+  --shadow-lg: 0 28px 72px rgba(17, 24, 39, 0.16);
+}
+
+[data-theme='dark'] {
+  --background: #111713;
+  --background-soft: rgba(24, 32, 28, 0.84);
+  --background-muted: #1E2924;
+  --background-elevated: #202B26;
+  --background-card: #18211D;
+  --background-float: rgba(24, 32, 28, 0.82);
+
+  --foreground: #F6F8F6;
+  --foreground-muted: #AEB8B2;
+  --foreground-subtle: #77827C;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(22, 199, 132, 0.28);
+  --border-glow: rgba(22, 199, 132, 0.34);
+
+  --primary: #19D48E;
+  --primary-hover: #23E09B;
+  --primary-muted: rgba(25, 212, 142, 0.14);
+  --primary-glow: rgba(25, 212, 142, 0.24);
+
+  --shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.18);
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 22px 54px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 34px 78px rgba(0, 0, 0, 0.38);
 }

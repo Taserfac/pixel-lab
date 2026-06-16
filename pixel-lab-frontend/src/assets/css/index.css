@@ -29,21 +29,14 @@ body {
   font-size: 14px;
   line-height: 1.6;
   color: var(--foreground);
-  background-color: var(--background);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(246, 247, 245, 0) 320px),
+    var(--background);
   min-height: 100vh;
 }
 
-/* 微妙的网格背景 */
 body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 ::selection {
@@ -81,37 +74,22 @@ body::before {
 /* Bento 卡片 */
 .bento-card {
   background: var(--background-card);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
-}
-
-.bento-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .bento-card:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--glow-sm);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-4px);
 }
 
 .bento-card--accent {
-  border-color: var(--border-glow);
-  box-shadow: var(--glow-sm);
+  box-shadow: var(--shadow), var(--glow-sm);
 }
 
 .bento-card--accent:hover {
@@ -133,48 +111,48 @@ body::before {
 
 /* 按钮 */
 .el-button {
-  border-radius: var(--radius) !important;
-  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-full) !important;
+  border: 0 !important;
   font-weight: 500;
+  font-size: 13px !important;
   transition: all var(--transition-fast) !important;
-  background: var(--background-muted) !important;
+  background: var(--background-elevated) !important;
   color: var(--foreground) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .el-button:hover {
-  border-color: var(--border-hover) !important;
-  background: var(--background-elevated) !important;
+  color: var(--primary) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow) !important;
 }
 
 .el-button--primary {
   background: var(--primary) !important;
-  border-color: var(--primary) !important;
-  color: var(--background) !important;
-  box-shadow: 0 0 20px var(--primary-glow) !important;
+  color: white !important;
+  box-shadow: var(--glow-sm) !important;
 }
 
 .el-button--primary:hover {
   background: var(--primary-hover) !important;
-  border-color: var(--primary-hover) !important;
-  box-shadow: 0 0 30px var(--primary-glow) !important;
+  color: white !important;
+  box-shadow: var(--glow) !important;
 }
 
 .el-button--default {
   background: var(--background-card) !important;
-  border-color: var(--border) !important;
   color: var(--foreground) !important;
 }
 
 .el-button--default:hover {
-  border-color: var(--primary) !important;
   color: var(--primary) !important;
 }
 
 /* 输入框 */
 .el-input__wrapper {
-  border-radius: var(--radius) !important;
+  border-radius: var(--radius-full) !important;
   background: var(--background-muted) !important;
-  border: 1px solid var(--border) !important;
+  border: 1px solid transparent !important;
   box-shadow: none !important;
   transition: all var(--transition-fast) !important;
 }
@@ -199,9 +177,9 @@ body::before {
 /* 卡片 */
 .el-card {
   border-radius: var(--radius-lg) !important;
-  border: 1px solid var(--border) !important;
+  border: 0 !important;
   background-color: var(--background-card) !important;
-  box-shadow: var(--shadow) !important;
+  box-shadow: var(--shadow-sm) !important;
   overflow: hidden;
 }
 
@@ -302,9 +280,10 @@ body::before {
 /* 对话框 */
 .el-dialog {
   border-radius: var(--radius-xl) !important;
-  border: 1px solid var(--border) !important;
+  border: 0 !important;
   background: var(--background-card) !important;
   box-shadow: var(--shadow-lg) !important;
+  overflow: hidden;
 }
 
 .el-dialog__header {
@@ -326,19 +305,21 @@ body::before {
 .el-message {
   border-radius: var(--radius) !important;
   background: var(--background-card) !important;
-  border: 1px solid var(--border) !important;
+  border: 0 !important;
   box-shadow: var(--shadow-md) !important;
 }
 
 /* 下拉菜单 */
 .el-dropdown-menu {
   background: var(--background-card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
+  border: 0 !important;
+  border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-md) !important;
+  padding: 6px !important;
 }
 
 .el-dropdown-menu__item {
+  border-radius: var(--radius) !important;
   color: var(--foreground) !important;
   background: transparent !important;
 }
@@ -346,15 +327,16 @@ body::before {
 .el-dropdown-menu__item:hover,
 .el-dropdown-menu__item:focus,
 .el-dropdown-menu__item.is-focused {
-  background: var(--primary) !important;
-  color: white !important;
+  background: var(--primary-muted) !important;
+  color: var(--primary) !important;
 }
 
 /* 下拉弹窗容器（渲染到 body 下） */
 .el-popper.is-light {
   background: var(--background-card) !important;
-  border: 2px solid var(--border) !important;
-  box-shadow: 4px 4px 0 var(--border) !important;
+  border: 0 !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
 .el-popper.is-light .el-dropdown-menu {

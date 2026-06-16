@@ -1,195 +1,183 @@
 <template>
-  <div class="dashboard-grid">
-    <!-- Hero 区域 -->
-    <section class="hero-card">
-      <div class="hero-content">
-        <h1 class="hero-title">
-          <span class="title-line">创造你的</span>
-          <span class="title-highlight">像素艺术</span>
-        </h1>
-        <p class="hero-desc">
-          上传图片，一键转换像素风格。探索无限创意可能。
-        </p>
+  <div class="home-page">
+    <section class="home-hero">
+      <div class="hero-copy">
+        <h1>发现优秀创作</h1>
+        <p>作品分享与灵感社区</p>
         <div class="hero-actions">
           <el-button
             type="primary"
             size="large"
-            @click="$router.push('/workbench')"
+            @click="router.push('/personal')"
           >
-            <el-icon><EditPen /></el-icon>
-            开始创作
+            <el-icon><Upload /></el-icon>
+            上传作品
           </el-button>
           <el-button
             size="large"
-            @click="$router.push('/community')"
+            @click="router.push('/community')"
           >
-            <el-icon><ChatDotRound /></el-icon>
-            探索社区
+            <el-icon><Compass /></el-icon>
+            浏览社区
           </el-button>
         </div>
       </div>
-      <div class="hero-visual">
-        <div class="pixel-showcase">
-          <div
-            v-for="i in 16"
-            :key="i"
-            class="pixel-block"
-            :style="{ animationDelay: `${i * 0.1}s` }"
-          />
-        </div>
-      </div>
-    </section>
 
-    <!-- 快捷操作卡片 -->
-    <section class="quick-actions">
-      <div
-        class="action-card"
-        @click="$router.push('/workbench')"
-      >
-        <div class="action-icon workbench">
-          <el-icon :size="28">
-            <Picture />
-          </el-icon>
-        </div>
-        <div class="action-info">
-          <h3>工作台</h3>
-          <p>图片处理与像素化</p>
-        </div>
-      </div>
-      <div
-        class="action-card"
-        @click="$router.push('/draw')"
-      >
-        <div class="action-icon draw">
-          <el-icon :size="28">
-            <EditPen />
-          </el-icon>
-        </div>
-        <div class="action-info">
-          <h3>手绘板</h3>
-          <p>自由创作像素画</p>
-        </div>
-      </div>
-      <div
-        class="action-card"
-        @click="$router.push('/community')"
-      >
-        <div class="action-icon community">
-          <el-icon :size="28">
-            <ChatDotRound />
-          </el-icon>
-        </div>
-        <div class="action-info">
-          <h3>社区</h3>
-          <p>发现优秀作品</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 我的作品 -->
-    <section class="my-works-card">
-      <div class="section-header">
-        <h2>我的作品</h2>
-        <el-button
-          text
-          @click="$router.push('/personal')"
-        >
-          查看全部 <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </div>
-      <div
-        v-if="recentWorks.length > 0"
-        class="works-grid"
-      >
+      <div class="hero-preview" aria-hidden="true">
         <div
-          v-for="work in recentWorks"
-          :key="work.id"
-          class="work-item"
+          v-for="(work, index) in previewWorks"
+          :key="work.id || index"
+          class="preview-card"
+          :class="`preview-card-${index + 1}`"
         >
           <img
+            v-if="work.url"
             :src="work.url"
-            :alt="work.name"
+            :alt="work.title || work.original_name || '作品预览'"
           >
-          <div class="work-overlay">
-            <span>{{ work.name }}</span>
-          </div>
         </div>
       </div>
-      <EmptyState
-        v-else
-        title="暂无作品"
-        description="开始创作你的第一个像素艺术吧！"
-        :show-action="false"
-      />
     </section>
 
-    <!-- 统计数据 -->
-    <section class="stats-card">
-      <div class="stat-item">
-        <span class="stat-value">{{ userStats.works }}</span>
-        <span class="stat-label">作品数</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-value">{{ userStats.likes }}</span>
-        <span class="stat-label">获赞数</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-value">{{ userStats.views }}</span>
-        <span class="stat-label">浏览量</span>
-      </div>
-    </section>
+    <div class="home-content">
+      <main class="feed-column">
+        <div class="section-heading">
+          <div>
+            <h2>精选作品</h2>
+            <p>图片优先的瀑布流浏览体验</p>
+          </div>
+          <el-button
+            text
+            @click="router.push('/community')"
+          >
+            查看更多 <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
 
-    <!-- 社区动态 -->
-    <section class="community-card">
-      <div class="section-header">
-        <h2>社区动态</h2>
-        <el-button
-          text
-          @click="$router.push('/community')"
-        >
-          更多 <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </div>
-      <div class="activity-list">
         <div
-          v-for="activity in communityActivities"
-          :key="activity.id"
-          class="activity-item"
+          v-loading="loading"
+          class="masonry-feed"
         >
-          <el-avatar
-            :size="36"
-            :src="activity.avatar"
-          >
-            {{ activity.user.charAt(0) }}
-          </el-avatar>
-          <div class="activity-content">
-            <p><strong>{{ activity.user }}</strong> 发布了 <em>{{ activity.title }}</em></p>
-            <span class="activity-time">{{ activity.time }}</span>
+          <PostCard
+            v-for="(work, index) in feedWorks"
+            :key="work.id"
+            :work="work"
+            :style="{ '--post-ratio': getCardRatio(index) }"
+            @select="openWork"
+          />
+        </div>
+
+        <EmptyState
+          v-if="!loading && feedWorks.length === 0"
+          title="暂无公开作品"
+          description="上传并公开你的作品后，这里会形成社区作品流。"
+          action-text="去上传"
+          show-action
+          @action="router.push('/personal')"
+        />
+      </main>
+
+      <aside class="discovery-rail">
+        <section class="rail-card tag-card">
+          <div class="rail-title">
+            <h3>热门标签</h3>
+            <span>Trending</span>
           </div>
-        </div>
-        <div v-if="communityActivities.length === 0" class="no-activity">
-          暂无社区动态
-        </div>
-      </div>
-    </section>
+          <div class="tag-list">
+            <button
+              v-for="tag in popularTags"
+              :key="tag"
+              type="button"
+              class="tag-chip"
+              @click="searchTag(tag)"
+            >
+              #{{ tag }}
+            </button>
+          </div>
+        </section>
+
+        <section class="rail-card creator-card">
+          <div class="rail-title">
+            <h3>推荐创作者</h3>
+            <span>Creators</span>
+          </div>
+          <div
+            v-if="recommendedCreators.length"
+            class="creator-list"
+          >
+            <div
+              v-for="creator in recommendedCreators"
+              :key="creator.name"
+              class="creator-item"
+            >
+              <el-avatar
+                :size="42"
+                :src="creator.avatar"
+              >
+                {{ creator.name.charAt(0) }}
+              </el-avatar>
+              <div>
+                <strong>{{ creator.name }}</strong>
+                <span>{{ creator.count }} 件作品</span>
+              </div>
+              <button
+                type="button"
+                @click="router.push('/community')"
+              >
+                查看
+              </button>
+            </div>
+          </div>
+          <div
+            v-else
+            class="rail-empty"
+          >
+            暂无推荐创作者
+          </div>
+        </section>
+
+        <section class="rail-card stats-card">
+          <div class="rail-title">
+            <h3>我的创作概览</h3>
+            <span>Stats</span>
+          </div>
+          <div class="stat-list">
+            <div
+              v-for="stat in userStatItems"
+              :key="stat.label"
+              class="stat-item"
+            >
+              <span>{{ stat.label }}</span>
+              <strong>{{ formatNumber(stat.value) }}</strong>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Picture, EditPen, ChatDotRound, ArrowRight } from '@element-plus/icons-vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ArrowRight, Compass, Upload } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { getUserImages } from '@/api/image'
+import PostCard from '@/components/community/PostCard.vue'
 import { getUserStats } from '@/api/auth'
-import { getActivities } from '@/api/community'
+import { getActivities, getPublicImages } from '@/api/community'
 
-const recentWorks = ref([])
+const router = useRouter()
+const loading = ref(false)
+const works = ref([])
+const activities = ref([])
 const userStats = ref({
   works: 0,
   likes: 0,
   views: 0
 })
-const communityActivities = ref([])
+
+const popularTags = ['像素艺术', '概念设计', '角色设定', '复古游戏', '赛博城市', '插画灵感', '公开作品', '灵感收藏']
+const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
 
 const toNumber = (value) => Number(value || 0)
 
@@ -199,363 +187,367 @@ const normalizeStats = (stats = {}) => ({
   views: toNumber(stats.views ?? stats.viewCount)
 })
 
-// 格式化时间
-const formatTime = (time) => {
-  if (!time) return ''
-  const date = new Date(time)
-  const now = new Date()
-  const diff = now - date
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
-  if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
-  return date.toLocaleDateString()
+const feedWorks = computed(() => works.value)
+const previewWorks = computed(() => {
+  const source = feedWorks.value.slice(0, 3)
+  if (source.length) return source
+  return [{ id: 'empty-1' }, { id: 'empty-2' }, { id: 'empty-3' }]
+})
+
+const userStatItems = computed(() => [
+  { label: '作品', value: userStats.value.works },
+  { label: '获赞', value: userStats.value.likes },
+  { label: '浏览', value: userStats.value.views }
+])
+
+const recommendedCreators = computed(() => {
+  const creatorMap = new Map()
+
+  feedWorks.value.forEach((work) => {
+    const name = work.author_name || work.nickname
+    if (!name) return
+    const cached = creatorMap.get(name) || {
+      name,
+      avatar: work.author_avatar || '',
+      count: 0
+    }
+    cached.count += 1
+    creatorMap.set(name, cached)
+  })
+
+  activities.value.forEach((activity) => {
+    const name = activity.author_name
+    if (!name || creatorMap.has(name)) return
+    creatorMap.set(name, {
+      name,
+      avatar: activity.author_avatar || '',
+      count: 1
+    })
+  })
+
+  return Array.from(creatorMap.values()).slice(0, 4)
+})
+
+const getCardRatio = (index) => cardRatios[index % cardRatios.length]
+
+const formatNumber = (value) => {
+  const number = toNumber(value)
+  if (number >= 10000) return `${(number / 10000).toFixed(1)}w`
+  if (number >= 1000) return `${(number / 1000).toFixed(1)}k`
+  return String(number)
+}
+
+const openWork = (work) => {
+  router.push({ path: '/community', query: { id: work.id } })
+}
+
+const searchTag = (tag) => {
+  router.push({ path: '/community', query: { keyword: tag } })
 }
 
 onMounted(async () => {
+  loading.value = true
   try {
-    // 并行请求
     const [imagesRes, statsRes, activitiesRes] = await Promise.all([
-      getUserImages(),
+      getPublicImages({ page: 1, pageSize: 16, sortBy: 'popular' }).catch(() => ({ list: [] })),
       getUserStats().catch(() => ({ works: 0, likes: 0, views: 0 })),
-      getActivities({ limit: 5 }).catch(() => [])
+      getActivities({ limit: 8 }).catch(() => [])
     ])
 
-    recentWorks.value = (imagesRes.list || []).slice(0, 4)
+    works.value = imagesRes.list || []
     userStats.value = normalizeStats(statsRes)
-    communityActivities.value = (activitiesRes || []).map(item => ({
-      id: item.id,
-      user: item.author_name || '匿名用户',
-      avatar: item.author_avatar || '',
-      title: item.title || item.original_name || '无标题作品',
-      time: formatTime(item.created_at)
-    }))
+    activities.value = activitiesRes || []
   } catch (error) {
-    console.error('获取数据失败:', error)
+    console.error('获取首页数据失败:', error)
+  } finally {
+    loading.value = false
   }
 })
 </script>
 
 <style scoped>
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  max-width: 1440px;
+.home-page {
+  width: min(1440px, 100%);
   margin: 0 auto;
-  padding: 0 16px;
 }
 
-/* Hero 卡片 */
-.hero-card {
-  grid-column: span 3;
-  display: flex;
+.home-hero {
+  min-height: 280px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
   align-items: center;
-  justify-content: space-between;
-  padding: 48px 56px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  border: 4px solid var(--border);
-  box-shadow: 12px 12px 0px 0px var(--border);
-  min-height: 300px;
+  gap: clamp(var(--space-6), 5vw, var(--space-12));
+  overflow: hidden;
+  position: relative;
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(22, 199, 132, 0.14), rgba(91, 141, 239, 0.1)),
+    var(--background-card);
+  box-shadow: var(--shadow);
+  padding: clamp(var(--space-8), 5vw, var(--space-12));
 }
 
-.hero-content {
-  flex: 1;
+.hero-copy h1 {
+  color: var(--foreground);
+  font-size: clamp(34px, 5vw, 56px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0;
 }
 
-.hero-title {
-  font-family: var(--font-mono);
-  font-size: 44px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: white;
-}
-
-.title-line {
-  display: block;
-}
-
-.title-highlight {
-  display: inline-block;
-  background: white;
-  color: var(--primary);
-  padding: 4px 16px;
-  margin-top: 8px;
-  border: 3px solid var(--border);
-  box-shadow: 4px 4px 0px 0px var(--border);
-}
-
-.hero-desc {
+.hero-copy p {
+  max-width: 460px;
+  margin-top: var(--space-4);
+  color: var(--foreground-muted);
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.9);
-  margin: 24px 0 32px;
-  max-width: 400px;
-  line-height: 1.6;
+  line-height: 1.8;
 }
 
 .hero-actions {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
 }
 
-.hero-visual {
-  width: 180px;
-  height: 180px;
+.hero-preview {
+  min-height: 230px;
   position: relative;
 }
 
-.pixel-showcase {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  transform: rotate(12deg);
-}
-
-.pixel-block {
-  width: 36px;
-  height: 36px;
-  background: white;
-  border: 2px solid var(--border);
-  animation: pixelPulse 2s infinite;
-}
-
-@keyframes pixelPulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-}
-
-/* 快捷操作 */
-.quick-actions {
-  grid-column: span 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.action-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 6px 6px 0px 0px var(--border);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.action-card:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 10px 10px 0px 0px var(--border);
-}
-
-.action-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 3px solid var(--border);
-  flex-shrink: 0;
-}
-
-.action-icon.workbench { background: var(--primary); color: white; }
-.action-icon.draw { background: var(--secondary); color: var(--foreground); }
-.action-icon.community { background: var(--accent); color: var(--foreground); }
-
-.action-info h3 {
-  font-size: 15px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 4px;
-}
-
-.action-info p {
-  font-size: 12px;
-  color: var(--foreground-muted);
-}
-
-/* 我的作品 */
-.my-works-card {
-  grid-column: span 2;
-  padding: 20px;
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 8px 8px 0px 0px var(--border);
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.section-header h2 {
-  font-size: 14px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.works-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-}
-
-.work-item {
-  position: relative;
-  aspect-ratio: 1;
-  border: 3px solid var(--border);
+.preview-card {
+  position: absolute;
   overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(22, 199, 132, 0.24), rgba(91, 141, 239, 0.2)),
+    var(--background-muted);
+  box-shadow: var(--shadow-md);
 }
 
-.work-item img {
+.preview-card img {
   width: 100%;
   height: 100%;
+  display: block;
   object-fit: cover;
 }
 
-.work-overlay {
-  position: absolute;
+.preview-card-1 {
+  width: 52%;
+  aspect-ratio: 4 / 5;
+  left: 2%;
   bottom: 0;
-  left: 0;
+}
+
+.preview-card-2 {
+  width: 48%;
+  aspect-ratio: 1;
   right: 0;
-  padding: 6px 8px;
-  background: var(--primary);
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  transform: translateY(100%);
-  transition: transform var(--transition-fast);
+  top: 0;
 }
 
-.work-item:hover .work-overlay {
-  transform: translateY(0);
+.preview-card-3 {
+  width: 44%;
+  aspect-ratio: 5 / 4;
+  right: 12%;
+  bottom: 8%;
 }
 
-/* 统计数据 */
-.stats-card {
-  grid-column: span 2;
+.home-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+  align-items: start;
+}
+
+.section-heading,
+.rail-title {
   display: flex;
-  justify-content: space-around;
   align-items: center;
-  padding: 20px 24px;
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 8px 8px 0px 0px var(--border);
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.section-heading {
+  margin-bottom: var(--space-5);
+}
+
+.section-heading h2,
+.rail-title h3 {
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.section-heading p,
+.rail-title span {
+  margin-top: 2px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.masonry-feed {
+  min-height: 360px;
+  column-count: 3;
+  column-gap: var(--space-5);
+}
+
+.discovery-rail {
+  display: grid;
+  gap: var(--space-5);
+  position: sticky;
+  top: 96px;
+}
+
+.rail-card {
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.tag-chip {
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--background-muted);
+  color: var(--foreground-muted);
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.tag-chip:hover {
+  color: var(--primary);
+  background: var(--primary-muted);
+  transform: translateY(-1px);
+}
+
+.creator-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.creator-item {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.creator-item strong,
+.creator-item span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-item strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.creator-item span,
+.rail-empty {
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.creator-item button {
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.stat-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 .stat-item {
+  border-radius: var(--radius-md);
+  background: var(--background-muted);
+  padding: var(--space-3);
   text-align: center;
 }
 
-.stat-value {
+.stat-item span,
+.stat-item strong {
   display: block;
-  font-family: var(--font-mono);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--primary);
-  margin-bottom: 2px;
 }
 
-.stat-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.stat-item span {
   color: var(--foreground-muted);
+  font-size: 12px;
 }
 
-/* 社区动态 */
-.community-card {
-  grid-column: span 2;
-  padding: 24px;
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 8px 8px 0px 0px var(--border);
+.stat-item strong {
+  margin-top: 2px;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 800;
 }
 
-.activity-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.activity-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 3px solid var(--border);
-  background: var(--background);
-}
-
-.activity-content p {
-  font-size: 13px;
-  margin-bottom: 2px;
-}
-
-.activity-time {
-  font-size: 11px;
-  color: var(--foreground-muted);
-}
-
-.no-activity {
-  text-align: center;
-  padding: 24px;
-  color: var(--foreground-muted);
-  font-size: 13px;
-}
-
-/* 响应式 */
-@media (max-width: 1200px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .hero-card {
-    grid-column: span 2;
-  }
-
-  .quick-actions {
-    grid-column: span 2;
-    flex-direction: row;
-  }
-}
-
-@media (max-width: 768px) {
-  .dashboard-grid {
+@media (max-width: 1180px) {
+  .home-content {
     grid-template-columns: 1fr;
-    gap: 16px;
   }
 
-  .hero-card {
-    grid-column: span 1;
-    flex-direction: column;
-    text-align: center;
-    padding: 32px 24px;
+  .discovery-rail {
+    position: static;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .home-hero {
+    grid-template-columns: 1fr;
   }
 
-  .hero-title {
-    font-size: 32px;
-  }
-
-  .hero-visual {
+  .hero-preview {
     display: none;
   }
 
-  .quick-actions {
-    grid-column: span 1;
+  .masonry-feed {
+    column-count: 2;
+  }
+
+  .discovery-rail {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-hero {
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+  }
+
+  .hero-actions {
     flex-direction: column;
   }
 
-  .my-works-card,
-  .stats-card,
-  .community-card {
-    grid-column: span 1;
+  .masonry-feed {
+    column-count: 1;
   }
 }
 </style>

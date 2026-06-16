@@ -9,24 +9,16 @@
         </div>
 
         <div class="profile-copy">
-          <div class="profile-kicker">
-            <span>Creator Studio</span>
-            <span class="role-pill">{{ userRoleLabel }}</span>
-          </div>
           <h1>{{ userInfo.nickname || userInfo.username || 'Pixel Creator' }}</h1>
           <p class="username">@{{ userInfo.username || 'creator' }}</p>
           <p class="profile-desc">
-            记录灵感、管理作品、查看互动反馈，把每一次像素创作整理成自己的视觉主页。
+            记录灵感、整理作品、分享创作，让每一次像素实验都沉淀成你的视觉主页。
           </p>
 
           <div class="hero-actions">
             <el-button type="primary" @click="handleUpload">
               <el-icon><Upload /></el-icon>
               上传图片
-            </el-button>
-            <el-button @click="router.push('/workbench')">
-              <el-icon><EditPen /></el-icon>
-              去工作台
             </el-button>
             <el-button @click="router.push('/settings')">
               <el-icon><Setting /></el-icon>
@@ -43,35 +35,6 @@
             <span class="stat-label">{{ item.label }}</span>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="spotlight-strip">
-      <div class="section-title">
-        <div>
-          <span class="eyebrow">精选预览</span>
-          <h2>最近作品</h2>
-        </div>
-        <el-button text @click="router.push('/draw')">
-          <el-icon><EditPen /></el-icon>
-          手绘创作
-        </el-button>
-      </div>
-
-      <div v-if="featuredImages.length" class="featured-row">
-        <button
-          v-for="image in featuredImages"
-          :key="image.id"
-          class="featured-card"
-          type="button"
-          @click="viewImage(image)"
-        >
-          <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
-          <span>{{ imageTitle(image) }}</span>
-        </button>
-      </div>
-      <div v-else class="soft-empty">
-        暂无作品。上传第一张图片后，这里会展示你的最近创作。
       </div>
     </section>
 
@@ -104,35 +67,33 @@
         <div v-loading="loadingImages" class="feed-shell">
           <div v-if="filteredImages.length" class="masonry-grid">
             <article v-for="image in filteredImages" :key="image.id" class="work-card">
-              <button class="work-cover" type="button" @click="viewImage(image)">
-                <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
-                <span class="visibility-badge" :class="{ public: isPublic(image) }">
-                  {{ isPublic(image) ? '公开' : '私有' }}
-                </span>
-                <span class="cover-overlay">
-                  <el-icon><View /></el-icon>
-                  预览
-                </span>
-              </button>
+              <div class="cover-shell">
+                <button class="work-cover" type="button" @click="viewImage(image)">
+                  <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
+                  <span class="visibility-badge" :class="{ public: isPublic(image) }">
+                    {{ isPublic(image) ? '公开' : '私有' }}
+                  </span>
+                </button>
 
-              <div class="work-meta">
-                <div>
-                  <h3 :title="imageTitle(image)">{{ imageTitle(image) }}</h3>
-                  <p>{{ formatDate(image.created_at) }}</p>
-                </div>
-                <el-dropdown trigger="click" placement="bottom-end" @command="(command) => handleImageCommand(image, command)">
-                  <button class="icon-button" type="button" aria-label="作品操作">
+                <el-dropdown
+                  class="card-menu"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(command) => handleImageCommand(image, command)"
+                >
+                  <button
+                    class="icon-button"
+                    type="button"
+                    aria-label="作品操作"
+                    @click.stop
+                  >
                     <el-icon><MoreFilled /></el-icon>
                   </button>
                   <template #dropdown>
                     <el-dropdown-menu>
                       <el-dropdown-item command="view">
                         <el-icon><View /></el-icon>
-                        查看图片
-                      </el-dropdown-item>
-                      <el-dropdown-item command="open">
-                        <el-icon><EditPen /></el-icon>
-                        在工作台打开
+                        查看
                       </el-dropdown-item>
                       <el-dropdown-item command="visibility">
                         <el-icon>
@@ -143,11 +104,18 @@
                       </el-dropdown-item>
                       <el-dropdown-item command="delete" divided>
                         <el-icon><Delete /></el-icon>
-                        删除图片
+                        删除
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
+              </div>
+
+              <div class="work-meta">
+                <div>
+                  <h3 :title="imageTitle(image)">{{ imageTitle(image) }}</h3>
+                  <p>{{ formatDate(image.created_at) }}</p>
+                </div>
               </div>
 
               <div class="metric-row">
@@ -251,7 +219,6 @@ import { useRouter } from 'vue-router'
 import { ElButton, ElIcon, ElMessage, ElMessageBox } from 'element-plus'
 import {
   Delete,
-  EditPen,
   FolderOpened,
   Lock,
   MoreFilled,
@@ -293,11 +260,7 @@ const ContentFeed = defineComponent({
               type: 'button',
               onClick: () => emit('item-click', item.id)
             }, [
-              h('img', { src: item.url, alt: title(item), loading: 'lazy' }),
-              h('span', { class: 'cover-overlay' }, [
-                h(ElIcon, null, () => h(View)),
-                '查看详情'
-              ])
+              h('img', { src: item.url, alt: title(item), loading: 'lazy' })
             ]),
             h('div', { class: 'work-meta' }, [
               h('div', null, [
@@ -352,8 +315,6 @@ const avatarText = computed(() => {
   return source.charAt(0).toUpperCase()
 })
 
-const userRoleLabel = computed(() => userInfo.value.role === 'admin' ? '管理员' : '创作者')
-
 const toNumber = (value) => Number(value || 0)
 
 const formatNumber = (value) => {
@@ -392,8 +353,6 @@ const heroStats = computed(() => [
   { label: '收藏', value: insightStats.value.receivedCollects },
   { label: '浏览', value: insightStats.value.views }
 ])
-
-const featuredImages = computed(() => images.value.slice(0, 6))
 
 const filteredImages = computed(() => {
   if (filterType.value === 'public') return images.value.filter(isPublic)
@@ -526,7 +485,6 @@ const openInWorkbench = (image) => {
 
 const handleImageCommand = (image, command) => {
   if (command === 'view') viewImage(image)
-  if (command === 'open') openInWorkbench(image)
   if (command === 'visibility') toggleVisibility(image)
   if (command === 'delete') confirmDelete(image)
 }
@@ -675,27 +633,24 @@ onUnmounted(() => {
 .personal-page {
   width: min(1440px, 100%);
   margin: 0 auto;
-  padding: var(--space-6);
+  padding: 0;
 }
 
 .profile-hero,
-.spotlight-strip,
 .toolbar-panel,
 .chart-card,
 .hot-card {
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01)),
-    var(--background-card);
-  box-shadow: var(--shadow);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .profile-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--space-6);
-  padding: var(--space-8);
+  padding: clamp(var(--space-6), 4vw, var(--space-10));
   overflow: hidden;
 }
 
@@ -710,7 +665,7 @@ onUnmounted(() => {
   flex: 0 0 auto;
   padding: 5px;
   border-radius: var(--radius-full);
-  background: conic-gradient(from 180deg, #ff4f8b, #ffb800, #00ff88, #00d4ff, #ff4f8b);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
 }
 
 .avatar-ring :deep(.el-avatar) {
@@ -725,23 +680,19 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.profile-kicker,
 .eyebrow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   color: var(--primary);
-  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
 }
 
-.role-pill,
 .visibility-badge {
-  border: 1px solid var(--border-light);
+  border: 0;
   border-radius: var(--radius-full);
-  background: var(--background-muted);
+  background: rgba(255, 255, 255, 0.86);
   color: var(--foreground-muted);
   padding: 4px 10px;
   font-size: 12px;
@@ -749,10 +700,10 @@ onUnmounted(() => {
 }
 
 .profile-copy h1 {
-  margin: var(--space-2) 0 0;
+  margin: 0;
   color: var(--foreground);
-  font-size: clamp(32px, 5vw, 56px);
-  line-height: 1;
+  font-size: clamp(30px, 4vw, 44px);
+  line-height: 1.1;
   letter-spacing: 0;
 }
 
@@ -789,13 +740,13 @@ onUnmounted(() => {
 }
 
 .hero-stat {
-  min-height: 96px;
+  min-height: 78px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--background-muted);
   padding: var(--space-4);
 }
 
@@ -805,8 +756,7 @@ onUnmounted(() => {
 
 .stat-value {
   color: var(--foreground);
-  font-family: var(--font-mono);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1;
 }
@@ -815,11 +765,6 @@ onUnmounted(() => {
   margin-top: var(--space-2);
   color: var(--foreground-muted);
   font-size: 12px;
-}
-
-.spotlight-strip {
-  margin-top: var(--space-5);
-  padding: var(--space-6);
 }
 
 .section-title {
@@ -842,42 +787,12 @@ onUnmounted(() => {
   line-height: 1.2;
 }
 
-.featured-row {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.featured-card {
-  position: relative;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background-muted);
-  cursor: pointer;
-}
-
-.featured-card img,
 .work-cover img,
 .hot-item img,
 .preview-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.featured-card span {
-  position: absolute;
-  inset: auto var(--space-2) var(--space-2);
-  overflow: hidden;
-  border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.62);
-  color: #fff;
-  padding: 6px 8px;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .creator-tabs {
@@ -913,27 +828,32 @@ onUnmounted(() => {
 }
 
 .masonry-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-4);
+  column-count: 4;
+  column-gap: var(--space-5);
 }
 
 .work-card {
+  display: inline-block;
+  width: 100%;
+  margin: 0 0 var(--space-5);
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--background-card);
   box-shadow: var(--shadow-sm);
+  break-inside: avoid;
   transition:
-    border-color var(--transition-fast),
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
 }
 
 .work-card:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--glow-sm);
-  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-5px);
+}
+
+.cover-shell {
+  position: relative;
 }
 
 .work-cover {
@@ -959,30 +879,19 @@ onUnmounted(() => {
   position: absolute;
   top: var(--space-2);
   left: var(--space-2);
-  background: rgba(0, 0, 0, 0.68);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: var(--shadow-sm);
 }
 
 .visibility-badge.public {
-  border-color: rgba(0, 255, 136, 0.45);
   color: var(--primary);
 }
 
-.cover-overlay {
+.card-menu {
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.48);
-  color: #fff;
-  font-weight: 700;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.work-cover:hover .cover-overlay {
-  opacity: 1;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 2;
 }
 
 .work-meta {
@@ -1015,18 +924,28 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-full);
-  background: var(--background-muted);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--foreground);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.icon-button:hover {
+  color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .metric-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  border-top: 1px solid var(--border);
   padding: 0 var(--space-4) var(--space-4);
   color: var(--foreground-muted);
   font-size: 12px;
@@ -1163,15 +1082,11 @@ onUnmounted(() => {
   .insights-grid {
     grid-template-columns: 1fr;
   }
-
-  .featured-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 768px) {
   .personal-page {
-    padding: var(--space-4);
+    padding: 0;
   }
 
   .profile-hero {
@@ -1183,10 +1098,13 @@ onUnmounted(() => {
     align-items: flex-start;
   }
 
-  .stat-grid,
-  .featured-row,
-  .masonry-grid {
+  .stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .masonry-grid {
+    column-count: 2;
+    column-gap: var(--space-3);
   }
 
   .hero-stat:last-child {
@@ -1205,10 +1123,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 520px) {
-  .stat-grid,
-  .featured-row,
-  .masonry-grid {
+  .stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .masonry-grid {
+    column-count: 1;
   }
 
   .hero-stat:last-child {
