@@ -8,7 +8,7 @@ const db = require('../db')
 /**
  * 获取公开作品列表
  */
-async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy = 'latest', userId = null }) {
+async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy = 'latest', category = '', userId = null }) {
   const offset = (page - 1) * pageSize
   let whereClause = 'WHERE i.is_public = 1 AND i.status = 1'
   const params = []
@@ -17,6 +17,11 @@ async function getPublicImages({ page = 1, pageSize = 20, keyword = '', sortBy =
     whereClause += ' AND (i.title LIKE ? OR i.tags LIKE ? OR u.nickname LIKE ?)'
     const likeKeyword = `%${keyword}%`
     params.push(likeKeyword, likeKeyword, likeKeyword)
+  }
+
+  if (category) {
+    whereClause += ' AND (i.tags = ? OR FIND_IN_SET(?, i.tags))'
+    params.push(category, category)
   }
 
   let orderBy = 'i.created_at DESC'

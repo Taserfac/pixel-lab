@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $Workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ToolsDir = Join-Path $Workspace '.tools'
 $TomcatHome = if ($env:CATALINA_HOME) { $env:CATALINA_HOME } else { Join-Path $ToolsDir 'apache-tomcat-9.0.93' }
-$MavenCmd = Join-Path $ToolsDir 'apache-maven-3.9.9\bin\mvn.cmd'
+$BundledMavenCmd = Join-Path $ToolsDir 'apache-maven-3.9.9\bin\mvn.cmd'
 $MavenRepo = Join-Path $Workspace '.m2repo'
 $JavaBackendDir = Join-Path $Workspace 'pixel-lab-java-backend'
 $FrontendDir = Join-Path $Workspace 'pixel-lab-frontend'
@@ -91,6 +91,23 @@ function Normalize-ProcessPath {
   }
 }
 
+function Resolve-MavenCmd {
+  if (Test-Path $BundledMavenCmd) {
+    return $BundledMavenCmd
+  }
+
+  $command = Get-Command 'mvn.cmd' -ErrorAction SilentlyContinue
+  if (!$command) {
+    $command = Get-Command 'mvn' -ErrorAction SilentlyContinue
+  }
+
+  if ($command) {
+    return $command.Source
+  }
+
+  throw "Maven not found. Install Maven and add it to PATH, or extract apache-maven-3.9.9 to $ToolsDir."
+}
+
 function Build-War {
   if ($SkipBuild) {
     if (!(Test-Path $WarPath)) {
@@ -110,9 +127,7 @@ function Build-War {
     Pop-Location
   }
 
-  if (!(Test-Path $MavenCmd)) {
-    $MavenCmd = 'mvn.cmd'
-  }
+  $MavenCmd = Resolve-MavenCmd
 
   Write-Host 'Building Java backend...'
   & $MavenCmd "-Dmaven.repo.local=$MavenRepo" -f (Join-Path $JavaBackendDir 'pom.xml') clean package
@@ -177,6 +192,9 @@ Stop-ExistingTomcat
 Deploy-War
 
 Write-Host 'Starting Tomcat in the background...'
+if (!(Test-Path $ToolsDir)) {
+  New-Item -ItemType Directory -Path $ToolsDir | Out-Null
+}
 $stdoutLog = Join-Path $ToolsDir 'tomcat-wrapper.out.log'
 $stderrLog = Join-Path $ToolsDir 'tomcat-wrapper.err.log'
 

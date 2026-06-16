@@ -83,6 +83,39 @@
       @change="onFileSelected"
     >
 
+    <el-dialog
+      v-model="uploadDialogVisible"
+      title="选择作品类型"
+      width="420px"
+      class="upload-category-dialog"
+      @closed="clearPendingUpload"
+    >
+      <div v-if="pendingUploadFile" class="upload-file-summary">
+        <strong>{{ pendingUploadFile.name }}</strong>
+        <span>{{ formatFileSize(pendingUploadFile.size) }}</span>
+      </div>
+      <div class="category-picker" role="radiogroup" aria-label="作品类型">
+        <button
+          v-for="category in IMAGE_CATEGORIES"
+          :key="category.value"
+          class="category-option"
+          :class="{ active: selectedUploadCategory === category.value }"
+          type="button"
+          role="radio"
+          :aria-checked="selectedUploadCategory === category.value"
+          @click="selectedUploadCategory = category.value"
+        >
+          {{ category.label }}
+        </button>
+      </div>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploading" @click="confirmUpload">
+          上传
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-tabs v-model="activeTab" class="creator-tabs" @tab-change="handleTabChange">
       <el-tab-pane name="works">
         <template #label>
@@ -108,6 +141,9 @@
                 <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
                 <span class="visibility-badge" :class="{ public: isPublic(image) }">
                   {{ isPublic(image) ? '公开' : '私有' }}
+                </span>
+                <span v-if="image.tags" class="category-badge">
+                  {{ categoryLabel(image.tags) }}
                 </span>
                 <span class="cover-overlay">
                   <el-icon><View /></el-icon>
@@ -268,6 +304,7 @@ import { useUserStore } from '@/store/user'
 import { getUserStats } from '@/api/auth'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility } from '@/api/image'
 import { getUserCollections, getUserLikes } from '@/api/community'
+import { DEFAULT_IMAGE_CATEGORY, IMAGE_CATEGORIES, getImageCategoryLabel } from '@/constants/imageCategories'
 
 const ContentFeed = defineComponent({
   name: 'ContentFeed',
@@ -341,6 +378,9 @@ const loadingImages = ref(false)
 const loadingCollections = ref(false)
 const loadingLikes = ref(false)
 const uploading = ref(false)
+const uploadDialogVisible = ref(false)
+const pendingUploadFile = ref(null)
+const selectedUploadCategory = ref(DEFAULT_IMAGE_CATEGORY)
 
 const previewVisible = ref(false)
 const previewImage = ref(null)
@@ -366,6 +406,14 @@ const formatNumber = (value) => {
 const imageTitle = (image = {}) => image.title || image.original_name || image.filename || '未命名作品'
 
 const isPublic = (image = {}) => image.is_public === true || image.is_public === 1 || image.is_public === '1'
+
+const categoryLabel = (tags) => getImageCategoryLabel(String(tags || '').split(',')[0])
+
+const formatFileSize = (size) => {
+  if (!size) return '0 KB'
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
+  return `${Math.ceil(size / 1024)} KB`
+}
 
 const normalizeStats = (stats = {}) => ({
   works: toNumber(stats.works ?? stats.imageCount),
@@ -497,17 +545,34 @@ const onFileSelected = async (event) => {
     return
   }
 
+  pendingUploadFile.value = file
+  selectedUploadCategory.value = DEFAULT_IMAGE_CATEGORY
+  uploadDialogVisible.value = true
+  event.target.value = ''
+}
+
+const clearPendingUpload = () => {
+  if (uploading.value) return
+  pendingUploadFile.value = null
+  selectedUploadCategory.value = DEFAULT_IMAGE_CATEGORY
+}
+
+const confirmUpload = async () => {
+  if (!pendingUploadFile.value) return
+
   uploading.value = true
   try {
-    await uploadImage(file)
+    await uploadImage(pendingUploadFile.value, { category: selectedUploadCategory.value })
     ElMessage.success('上传成功')
+    uploadDialogVisible.value = false
+    pendingUploadFile.value = null
+    selectedUploadCategory.value = DEFAULT_IMAGE_CATEGORY
     await Promise.all([fetchImages(), fetchStats()])
   } catch (error) {
     console.error('上传失败:', error)
     ElMessage.error('上传失败')
   } finally {
     uploading.value = false
-    event.target.value = ''
   }
 }
 
@@ -738,7 +803,8 @@ onUnmounted(() => {
 }
 
 .role-pill,
-.visibility-badge {
+.visibility-badge,
+.category-badge {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
   background: var(--background-muted);
@@ -967,6 +1033,15 @@ onUnmounted(() => {
   color: var(--primary);
 }
 
+.category-badge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  border-color: rgba(0, 212, 255, 0.42);
+  background: rgba(0, 0, 0, 0.68);
+  color: #dff7ff;
+}
+
 .cover-overlay {
   position: absolute;
   inset: 0;
@@ -1143,6 +1218,63 @@ onUnmounted(() => {
 
 .preview-dialog :deep(.el-dialog__body) {
   height: min(68vh, 720px);
+}
+
+.upload-category-dialog :deep(.el-dialog__body) {
+  padding-top: var(--space-2);
+}
+
+.upload-file-summary {
+  display: grid;
+  gap: 4px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background-muted);
+}
+
+.upload-file-summary strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-file-summary span {
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.category-option {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground-muted);
+  background: var(--background-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.category-option:hover,
+.category-option.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-muted);
+  box-shadow: 0 0 0 2px var(--primary-muted);
 }
 
 .preview-image {

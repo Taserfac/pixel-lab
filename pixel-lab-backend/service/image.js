@@ -9,13 +9,13 @@ const { query, insert, update: dbUpdate, remove } = require('../db')
  * 创建图片记录
  */
 const create = async (imageData) => {
-  const { userId, filename, originalName, url, thumbnailUrl, width, height, size, format } = imageData
+  const { userId, filename, originalName, url, thumbnailUrl, width, height, size, format, tags } = imageData
   
   return await insert(
     `INSERT INTO image 
-     (user_id, filename, original_name, url, thumbnail_url, width, height, size, format) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, filename, originalName, url, thumbnailUrl, width, height, size, format]
+     (user_id, filename, original_name, url, thumbnail_url, width, height, size, format, tags) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [userId, filename, originalName, url, thumbnailUrl, width, height, size, format, tags]
   )
 }
 

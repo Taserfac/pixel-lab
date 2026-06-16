@@ -32,3 +32,8 @@ pixel-lab-frontend/dist/
 .env.local
 pixel-lab-backend/.env
 pixel-lab-frontend/.env.local
+
+# Augenstern 相关
+Augenstern_FIX_NOTES_zh.md
+start-java-backend-local.bat
+stop-java-backend-local.bat

@@ -17,11 +17,19 @@ CREATE TABLE IF NOT EXISTS `image` (
   `format` VARCHAR(10) DEFAULT NULL COMMENT '图片格式(jpg/png等)',
   `is_public` TINYINT DEFAULT 0 COMMENT '是否公开：0-私有，1-公开',
   `status` TINYINT DEFAULT 1 COMMENT '状态：0-删除，1-正常',
+  `title` VARCHAR(100) DEFAULT NULL COMMENT '作品标题',
+  `description` TEXT DEFAULT NULL COMMENT '作品描述',
+  `tags` VARCHAR(255) DEFAULT NULL COMMENT '标签，逗号分隔',
+  `view_count` INT UNSIGNED DEFAULT 0 COMMENT '浏览次数',
+  `like_count` INT UNSIGNED DEFAULT 0 COMMENT '点赞数',
+  `comment_count` INT UNSIGNED DEFAULT 0 COMMENT '评论数',
+  `collect_count` INT UNSIGNED DEFAULT 0 COMMENT '收藏数',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX `idx_user_id` (`user_id`),
   INDEX `idx_is_public` (`is_public`),
   INDEX `idx_status` (`status`),
+  INDEX `idx_tags` (`tags`),
   FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图片表';
 

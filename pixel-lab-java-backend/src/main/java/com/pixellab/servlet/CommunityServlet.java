@@ -27,6 +27,7 @@ public class CommunityServlet extends BaseApiServlet {
             RequestUtil.intParam(request, "pageSize", 20),
             request.getParameter("keyword"),
             request.getParameter("sortBy"),
+            request.getParameter("category"),
             userId));
         return;
       }

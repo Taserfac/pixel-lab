@@ -9,6 +9,30 @@ const path = require('path')
 const sharp = require('sharp')
 const config = require('../config')
 
+const IMAGE_CATEGORIES = new Set([
+  'drawing',
+  'edit',
+  'ai',
+  'pixel',
+  'photo',
+  'character',
+  'landscape',
+  'avatar',
+  'other'
+])
+
+const normalizeCategory = (value) => {
+  if (!value) return null
+  const category = String(value).trim().toLowerCase()
+  return IMAGE_CATEGORIES.has(category) ? category : null
+}
+
+const normalizeTags = (value) => {
+  if (!value) return null
+  const tags = String(value).trim()
+  return tags.length > 255 ? tags.slice(0, 255) : tags
+}
+
 /**
  * 处理图片压缩
  */
@@ -97,6 +121,7 @@ const upload = async (req, res) => {
     
     // 生成图片URL
     const url = `${baseUrl}/uploads/${file.filename}`
+    const tags = normalizeCategory(req.body.category) || normalizeTags(req.body.tags)
     
     const imageData = {
       userId,
@@ -107,7 +132,8 @@ const upload = async (req, res) => {
       width,
       height,
       size: finalSize,
-      format: path.extname(file.originalname).slice(1)
+      format: path.extname(file.originalname).slice(1),
+      tags
     }
     
     const imageId = await imageService.create(imageData)
@@ -116,6 +142,7 @@ const upload = async (req, res) => {
       id: imageId,
       url,
       originalName: file.originalname,
+      tags,
       size: finalSize,
       width,
       height

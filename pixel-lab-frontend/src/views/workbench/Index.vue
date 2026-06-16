@@ -470,7 +470,7 @@ const saveToGallery = async () => {
       type: 'image/png'
     })
 
-    await uploadImage(file)
+    await uploadImage(file, { category: 'edit' })
     ElMessage.success('已保存到个人中心')
   } catch (error) {
     console.error('保存失败:', error)

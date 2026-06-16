@@ -19,7 +19,7 @@ public class CommunityDao {
     this.dataSource = dataSource;
   }
 
-  public Map<String, Object> publicImages(int page, int pageSize, String keyword, String sortBy, Long userId) throws Exception {
+  public Map<String, Object> publicImages(int page, int pageSize, String keyword, String sortBy, String category, Long userId) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     List<Object> params = new ArrayList<>();
     StringBuilder where = new StringBuilder(" WHERE i.is_public = 1 AND i.status = 1 ");
@@ -29,6 +29,12 @@ public class CommunityDao {
       params.add(like);
       params.add(like);
       params.add(like);
+    }
+    if (category != null && !category.isBlank()) {
+      where.append(" AND (i.tags = ? OR FIND_IN_SET(?, i.tags)) ");
+      String normalizedCategory = category.trim();
+      params.add(normalizedCategory);
+      params.add(normalizedCategory);
     }
 
     String orderBy = "i.created_at DESC";

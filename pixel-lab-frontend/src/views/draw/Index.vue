@@ -37,6 +37,18 @@
             <span class="btn-key">H</span>
           </button>
         </el-tooltip>
+
+        <el-tooltip content="框选 (S)" placement="right">
+          <button
+            class="rail-btn primary-tool"
+            :class="{ active: currentTool === 'select' }"
+            type="button"
+            @click="selectTool('select')"
+          >
+            <span class="btn-icon"><el-icon :size="22"><Aim /></el-icon></span>
+            <span class="btn-key">S</span>
+          </button>
+        </el-tooltip>
       </div>
 
       <div class="rail-group history-tools">
@@ -152,8 +164,10 @@
         :class="{
           'show-grid': showGrid,
           'pan-tool': currentTool === 'pan',
+          'select-tool': currentTool === 'select',
           'space-pan': isSpacePressed,
-          'is-panning': isPanning
+          'is-panning': isPanning,
+          'is-selecting': isSelecting
         }"
         @wheel="handleCanvasWheel"
         @pointerdown.capture="handleCanvasPanStart"
@@ -169,6 +183,46 @@
           >
             <canvas ref="canvasRef" />
             <div v-show="showGrid" class="canvas-grid-overlay" />
+            <div
+              v-if="activeSelectionRect"
+              class="selection-rect"
+              :class="{ draft: isSelecting }"
+              :style="selectionRectStyle"
+            >
+              <div
+                v-if="selectionRect && !isSelecting"
+                class="selection-actions"
+                @pointerdown.stop
+              >
+                <button
+                  class="selection-action"
+                  type="button"
+                  title="复制选区"
+                  aria-label="复制选区"
+                  @click.stop="copySelection"
+                >
+                  <el-icon><CopyDocument /></el-icon>
+                </button>
+                <button
+                  class="selection-action"
+                  type="button"
+                  title="剪切选区"
+                  aria-label="剪切选区"
+                  @click.stop="cutSelection"
+                >
+                  <el-icon><Scissor /></el-icon>
+                </button>
+                <button
+                  class="selection-action danger"
+                  type="button"
+                  title="删除选区"
+                  aria-label="删除选区"
+                  @click.stop="eraseSelection"
+                >
+                  <el-icon><Delete /></el-icon>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -179,7 +233,7 @@
         <span>{{ currentToolLabel }}</span>
         <span>历史 {{ historyIndex + 1 }}/{{ historyCount }}</span>
         <span v-if="pointerPosition">x {{ pointerPosition.x }}, y {{ pointerPosition.y }}</span>
-        <span class="hint">B 画笔 · E 橡皮 · H 移动 · Ctrl+滚轮 缩放</span>
+        <span class="hint">B 画笔 · E 橡皮 · H 移动 · S 框选 · Ctrl+V 粘贴 · Ctrl+滚轮 缩放</span>
       </footer>
     </section>
 
@@ -195,11 +249,14 @@
 
       <section class="panel-section">
         <div class="section-row">
-          <h2>画笔</h2>
-          <span class="meter">{{ brushSize }}px</span>
+          <h2>{{ currentTool === 'select' ? '框选' : '画笔' }}</h2>
+          <span v-if="currentTool !== 'select'" class="meter">{{ brushSize }}px</span>
         </div>
         <div v-show="currentTool === 'pan'" class="tool-note">
           左键拖动画布视图，不会修改画布内容。
+        </div>
+        <div v-show="currentTool === 'select'" class="tool-note">
+          拖拽框选画布区域，选中后可复制、剪切或删除。Ctrl+V 可粘贴复制内容。
         </div>
         <label v-show="currentTool === 'brush'" class="field">
           <span>类型</span>
@@ -237,7 +294,7 @@
             v-model="brushSize"
             :min="1"
             :max="96"
-            :disabled="currentTool === 'pan'"
+            :disabled="currentTool === 'pan' || currentTool === 'select'"
             :show-tooltip="false"
           />
         </label>
@@ -248,7 +305,7 @@
             :min="10"
             :max="100"
             :step="5"
-            :disabled="currentTool === 'eraser' || currentTool === 'pan'"
+            :disabled="currentTool === 'eraser' || currentTool === 'pan' || currentTool === 'select'"
             :show-tooltip="false"
           />
         </label>
@@ -467,9 +524,9 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { EditPen, Delete, Back, Right, Download, Upload, RefreshRight, ArrowDown, MagicStick, UploadFilled, ZoomIn, ZoomOut, FullScreen, Rank } from '@element-plus/icons-vue'
+import { EditPen, Delete, Back, Right, Download, Upload, RefreshRight, ArrowDown, MagicStick, UploadFilled, ZoomIn, ZoomOut, FullScreen, Rank, Aim, CopyDocument, Scissor } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { Canvas as FabricCanvas, CircleBrush, FabricImage, PencilBrush, Shadow, SprayBrush } from 'fabric'
+import { Canvas as FabricCanvas, CircleBrush, FabricImage, PencilBrush, Rect, Shadow, SprayBrush } from 'fabric'
 import { uploadImage } from '@/api/image'
 import { refineDrawing } from '@/api/ai'
 
@@ -481,6 +538,7 @@ const AI_PROMPT_LIMIT = 1500
 const ZOOM_MIN = 25
 const ZOOM_MAX = 400
 const ZOOM_STEP = 25
+const SELECTION_MIN_SIZE = 4
 
 const currentTool = ref('brush')
 const brushType = ref('hard')
@@ -493,7 +551,7 @@ const canvasHeight = ref(600)
 const draftWidth = ref(800)
 const draftHeight = ref(600)
 const selectedPreset = ref('800x600')
-const backgroundMode = ref('transparent')
+const backgroundMode = ref('white')
 const backgroundColor = ref('#ffffff')
 const showGrid = ref(true)
 const pointerPosition = ref(null)
@@ -511,11 +569,16 @@ const aiResultUrl = ref('')
 const aiResultText = ref('')
 const aiResultNotice = ref('')
 const aiLoading = ref(false)
+const selectionRect = ref(null)
+const selectionDraft = ref(null)
+const selectionClipboard = ref(null)
+const isSelecting = ref(false)
 
 const toolOptions = [
   { label: '画笔', value: 'brush' },
   { label: '橡皮', value: 'eraser' },
-  { label: '移动', value: 'pan' }
+  { label: '移动', value: 'pan' },
+  { label: '框选', value: 'select' }
 ]
 
 const brushTypes = [
@@ -584,6 +647,11 @@ const activeBrushName = computed(() => brushTypes.find((brush) => brush.value ==
 const activeEraserName = computed(() => eraserTypes.find((eraser) => eraser.value === eraserType.value)?.label || '硬橡皮')
 const currentToolLabel = computed(() => {
   if (currentTool.value === 'pan') return '移动画布'
+  if (currentTool.value === 'select') {
+    return selectionRect.value
+      ? `框选 ${Math.round(selectionRect.value.width)} × ${Math.round(selectionRect.value.height)}`
+      : '框选区域'
+  }
   return currentTool.value === 'eraser'
     ? `${activeEraserName.value} ${brushSize.value}px`
     : `${activeBrushName.value} ${brushSize.value}px / ${brushOpacity.value}%`
@@ -622,6 +690,19 @@ const canvasShellStyle = computed(() => {
     transform: `scale(${zoomScale.value})`
   }
 })
+const activeSelectionRect = computed(() => selectionDraft.value || selectionRect.value)
+const selectionRectStyle = computed(() => {
+  const rect = activeSelectionRect.value
+  if (!rect) return {}
+
+  return {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`
+  }
+})
+let selectionStart = null
 
 const refreshCanvasOffset = () => {
   nextTick(() => {
@@ -668,6 +749,9 @@ const initCanvas = async () => {
   })
 
   fabricCanvas.on('path:created', handlePathCreated)
+  fabricCanvas.on('mouse:down', handleSelectionMouseDown)
+  fabricCanvas.on('mouse:move', handleSelectionMouseMove)
+  fabricCanvas.on('mouse:up', handleSelectionMouseUp)
   fabricCanvas.on('mouse:move', updatePointerPosition)
   fabricCanvas.on('mouse:out', () => {
     pointerPosition.value = null
@@ -679,6 +763,9 @@ const initCanvas = async () => {
 }
 
 const selectTool = (tool) => {
+  if (tool !== 'select') {
+    clearSelection()
+  }
   currentTool.value = tool
   updateBrush()
 }
@@ -792,12 +879,25 @@ const updateBrush = () => {
 
   if (currentTool.value === 'pan') {
     fabricCanvas.isDrawingMode = false
+    fabricCanvas.selection = false
+    fabricCanvas.skipTargetFind = true
     fabricCanvas.defaultCursor = 'grab'
     fabricCanvas.hoverCursor = 'grab'
     return
   }
 
+  if (currentTool.value === 'select') {
+    fabricCanvas.isDrawingMode = false
+    fabricCanvas.selection = false
+    fabricCanvas.skipTargetFind = true
+    fabricCanvas.defaultCursor = 'crosshair'
+    fabricCanvas.hoverCursor = 'crosshair'
+    return
+  }
+
   fabricCanvas.isDrawingMode = true
+  fabricCanvas.selection = false
+  fabricCanvas.skipTargetFind = true
   fabricCanvas.defaultCursor = 'crosshair'
   fabricCanvas.hoverCursor = 'crosshair'
   fabricCanvas.freeDrawingBrush = createBrush()
@@ -846,6 +946,202 @@ const updatePointerPosition = (event) => {
   }
 }
 
+const clampCanvasCoordinate = (value, max) => {
+  return Math.min(max, Math.max(0, Math.round(value)))
+}
+
+const getSelectionPoint = (event) => {
+  if (!fabricCanvas || !event) return null
+  const pointer = fabricCanvas.getScenePoint
+    ? fabricCanvas.getScenePoint(event)
+    : fabricCanvas.getPointer(event)
+
+  return {
+    x: clampCanvasCoordinate(pointer.x, canvasWidth.value),
+    y: clampCanvasCoordinate(pointer.y, canvasHeight.value)
+  }
+}
+
+const normalizeSelectionRect = (start, end) => {
+  const x = Math.min(start.x, end.x)
+  const y = Math.min(start.y, end.y)
+  const width = Math.abs(end.x - start.x)
+  const height = Math.abs(end.y - start.y)
+  return { x, y, width, height }
+}
+
+const clearSelection = () => {
+  selectionRect.value = null
+  selectionDraft.value = null
+  isSelecting.value = false
+  selectionStart = null
+}
+
+const updateSelectionDrag = (event) => {
+  if (!isSelecting.value || !selectionStart) return
+  const point = getSelectionPoint(event)
+  if (!point) return
+
+  event.preventDefault?.()
+  selectionDraft.value = normalizeSelectionRect(selectionStart, point)
+  pointerPosition.value = {
+    x: point.x,
+    y: point.y
+  }
+}
+
+const finishSelectionDrag = (event) => {
+  if (!isSelecting.value || !selectionStart) return
+
+  if (event) {
+    updateSelectionDrag(event)
+  }
+
+  const rect = selectionDraft.value
+  selectionRect.value = rect && rect.width >= SELECTION_MIN_SIZE && rect.height >= SELECTION_MIN_SIZE
+    ? rect
+    : null
+  selectionDraft.value = null
+  isSelecting.value = false
+  selectionStart = null
+}
+
+const handleSelectionMouseDown = (event) => {
+  if (currentTool.value !== 'select' || isSpacePressed.value || event.e?.button !== 0) return
+  const point = getSelectionPoint(event.e)
+  if (!point) return
+
+  event.e.preventDefault?.()
+  fabricCanvas?.discardActiveObject?.()
+  isSelecting.value = true
+  selectionStart = point
+  selectionRect.value = null
+  selectionDraft.value = { ...point, width: 0, height: 0 }
+}
+
+const handleSelectionMouseMove = (event) => {
+  updateSelectionDrag(event.e)
+}
+
+const handleSelectionMouseUp = (event) => {
+  finishSelectionDrag(event.e)
+}
+
+const getSelectionDataUrl = () => {
+  if (!fabricCanvas || !selectionRect.value) return ''
+  const rect = selectionRect.value
+
+  return fabricCanvas.toDataURL({
+    format: 'png',
+    quality: 1,
+    multiplier: 1,
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height
+  })
+}
+
+const copySelection = (options = {}) => {
+  if (!selectionRect.value) {
+    ElMessage.warning('请先框选区域')
+    return false
+  }
+
+  const dataUrl = getSelectionDataUrl()
+  if (!dataUrl) return false
+
+  selectionClipboard.value = {
+    dataUrl,
+    width: selectionRect.value.width,
+    height: selectionRect.value.height
+  }
+
+  if (options?.silent !== true) {
+    ElMessage.success('已复制选区')
+  }
+  return true
+}
+
+const eraseSelection = (historyName = '删除框选') => {
+  if (typeof historyName !== 'string') {
+    historyName = '删除框选'
+  }
+  if (!fabricCanvas || !selectionRect.value) {
+    ElMessage.warning('请先框选区域')
+    return false
+  }
+
+  const rect = selectionRect.value
+  const eraseRect = new Rect({
+    left: rect.x,
+    top: rect.y,
+    width: rect.width,
+    height: rect.height,
+    fill: '#ffffff',
+    strokeWidth: 0,
+    globalCompositeOperation: 'destination-out',
+    selectable: false,
+    evented: false,
+    objectCaching: false
+  })
+
+  fabricCanvas.add(eraseRect)
+  fabricCanvas.requestRenderAll()
+  clearSelection()
+  saveHistory(historyName)
+  return true
+}
+
+const cutSelection = () => {
+  if (!copySelection({ silent: true })) return
+  if (eraseSelection('剪切框选')) {
+    ElMessage.success('已剪切选区')
+  }
+}
+
+const pasteSelection = async () => {
+  if (!fabricCanvas || !selectionClipboard.value) {
+    ElMessage.warning('暂无可粘贴的选区')
+    return
+  }
+
+  const { dataUrl, width, height } = selectionClipboard.value
+  const baseX = selectionRect.value
+    ? selectionRect.value.x + 16
+    : Math.round((canvasWidth.value - width) / 2)
+  const baseY = selectionRect.value
+    ? selectionRect.value.y + 16
+    : Math.round((canvasHeight.value - height) / 2)
+  const left = Math.max(0, Math.min(canvasWidth.value - width, baseX))
+  const top = Math.max(0, Math.min(canvasHeight.value - height, baseY))
+  const image = await FabricImage.fromURL(
+    dataUrl,
+    { crossOrigin: 'anonymous' },
+    {
+      left,
+      top,
+      selectable: false,
+      evented: false,
+      imageSmoothing: false
+    }
+  )
+
+  image.set({
+    left,
+    top,
+    originX: 'left',
+    originY: 'top',
+    selectable: false,
+    evented: false
+  })
+  fabricCanvas.add(image)
+  fabricCanvas.requestRenderAll()
+  selectionRect.value = { x: left, y: top, width, height }
+  saveHistory('粘贴选区')
+  ElMessage.success('已粘贴选区')
+}
+
 const saveHistory = (name) => {
   if (!fabricCanvas || isRestoring) return
 
@@ -873,6 +1169,7 @@ const redo = () => {
 const restoreHistory = async (index) => {
   if (!fabricCanvas || !historyList.value[index]) return
 
+  clearSelection()
   isRestoring = true
   historyIndex.value = index
   await fabricCanvas.loadFromJSON(historyList.value[index].json)
@@ -884,6 +1181,7 @@ const restoreHistory = async (index) => {
 const clearCanvas = () => {
   if (!fabricCanvas) return
 
+  clearSelection()
   fabricCanvas.clear()
   fabricCanvas.backgroundColor = ''
   fabricCanvas.renderAll()
@@ -903,6 +1201,7 @@ const applyPreset = (value) => {
 const resizeCanvas = () => {
   if (!fabricCanvas) return
 
+  clearSelection()
   canvasWidth.value = draftWidth.value
   canvasHeight.value = draftHeight.value
   fabricCanvas.setDimensions({
@@ -1033,10 +1332,12 @@ const stopCanvasPanning = (event) => {
 }
 
 const handleGlobalPointerMove = (event) => {
+  updateSelectionDrag(event)
   moveCanvasPan(event)
 }
 
 const handleGlobalPointerUp = (event) => {
+  finishSelectionDrag(event)
   stopCanvasPanning(event)
 }
 
@@ -1352,6 +1653,7 @@ const applyAiResult = async () => {
   if (!fabricCanvas || !aiResultUrl.value) return
 
   try {
+    clearSelection()
     const normalizedUrl = await normalizeAiResultToCanvas(aiResultUrl.value)
     const image = await FabricImage.fromURL(
       normalizedUrl,
@@ -1396,7 +1698,7 @@ const saveToGallery = async () => {
     const res = await fetch(dataURL)
     const blob = await res.blob()
     const file = new File([blob], `drawing_${Date.now()}.png`, { type: 'image/png' })
-    await uploadImage(file)
+    await uploadImage(file, { category: 'drawing' })
     ElMessage.success('已保存到个人中心')
   } catch (error) {
     console.error('[Draw] Save failed:', error)
@@ -1436,12 +1738,35 @@ const handleKeydown = (event) => {
       event.preventDefault()
       resetZoom()
     }
+    if (event.key.toLowerCase() === 'c') {
+      event.preventDefault()
+      copySelection()
+    }
+    if (event.key.toLowerCase() === 'x') {
+      event.preventDefault()
+      cutSelection()
+    }
+    if (event.key.toLowerCase() === 'v') {
+      event.preventDefault()
+      pasteSelection()
+    }
+    return
+  }
+
+  if (event.key === 'Escape') {
+    clearSelection()
+    return
+  }
+  if ((event.key === 'Delete' || event.key === 'Backspace') && selectionRect.value) {
+    event.preventDefault()
+    eraseSelection()
     return
   }
 
   if (event.key.toLowerCase() === 'b') selectTool('brush')
   if (event.key.toLowerCase() === 'e') selectTool('eraser')
   if (event.key.toLowerCase() === 'h') selectTool('pan')
+  if (event.key.toLowerCase() === 's') selectTool('select')
 }
 
 const handleKeyup = (event) => {
@@ -1760,6 +2085,16 @@ onUnmounted(() => {
   user-select: none;
 }
 
+.canvas-stage.select-tool,
+.canvas-stage.select-tool .canvas-shell canvas,
+.canvas-stage.select-tool .canvas-shell :deep(canvas) {
+  cursor: crosshair;
+}
+
+.canvas-stage.is-selecting {
+  user-select: none;
+}
+
 .canvas-viewport {
   position: relative;
   flex: 0 0 auto;
@@ -1832,6 +2167,63 @@ onUnmounted(() => {
     linear-gradient(rgba(0, 255, 136, 0.2) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 255, 136, 0.2) 1px, transparent 1px);
   background-size: 16px 16px, 16px 16px, 64px 64px, 64px 64px;
+}
+
+.selection-rect {
+  position: absolute;
+  z-index: 4;
+  box-sizing: border-box;
+  min-width: 1px;
+  min-height: 1px;
+  border: 1px dashed var(--primary);
+  background: rgba(0, 255, 136, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18), 0 0 18px rgba(0, 255, 136, 0.16);
+  pointer-events: none;
+}
+
+.selection-rect.draft {
+  background: rgba(0, 255, 136, 0.12);
+}
+
+.selection-actions {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+}
+
+.selection-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--foreground-muted);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.selection-action:hover {
+  color: var(--primary);
+  background: var(--primary-muted);
+}
+
+.selection-action.danger:hover {
+  color: var(--error);
+  background: rgba(255, 71, 87, 0.12);
 }
 
 .status-bar {

@@ -26,6 +26,19 @@
       </div>
     </div>
 
+    <div class="category-nav" aria-label="作品分类">
+      <button
+        v-for="category in ALL_IMAGE_CATEGORIES"
+        :key="category.value || 'all'"
+        class="category-tab"
+        :class="{ active: selectedCategory === category.value }"
+        type="button"
+        @click="changeCategory(category.value)"
+      >
+        {{ category.label }}
+      </button>
+    </div>
+
     <!-- 作品列表 -->
     <div
       v-loading="loading"
@@ -47,6 +60,7 @@
           <div class="work-overlay">
             <span class="work-title">{{ work.title || work.original_name }}</span>
           </div>
+          <span v-if="work.tags" class="work-category">{{ categoryLabel(work.tags) }}</span>
         </div>
         <div class="work-info">
           <div class="author">
@@ -122,6 +136,10 @@
             class="detail-desc"
           >
             {{ currentWork.description }}
+          </div>
+
+          <div v-if="currentWork.tags" class="detail-tags">
+            <span>{{ categoryLabel(currentWork.tags) }}</span>
           </div>
 
           <div class="detail-stats">
@@ -211,6 +229,7 @@ import { ref, onMounted, computed } from 'vue'
 import { Search, View, CollectionTag, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
+import { ALL_IMAGE_CATEGORIES, getImageCategoryLabel } from '@/constants/imageCategories'
 import {
   getPublicImages,
   getImageDetail,
@@ -227,6 +246,7 @@ const loading = ref(false)
 const loadingMore = ref(false)
 const keyword = ref('')
 const sortBy = ref('latest')
+const selectedCategory = ref('')
 const works = ref([])
 const page = ref(1)
 const pageSize = ref(12) // 减少每页数量，提升加载速度
@@ -254,7 +274,8 @@ const loadWorks = async (reset = false) => {
       page: page.value,
       pageSize: pageSize.value,
       keyword: keyword.value,
-      sortBy: sortBy.value
+      sortBy: sortBy.value,
+      category: selectedCategory.value
     })
     works.value = reset ? res.list : [...works.value, ...res.list]
     total.value = res.total
@@ -272,6 +293,13 @@ const changeSort = (sort) => {
   sortBy.value = sort
   loadWorks(true)
 }
+
+const changeCategory = (category) => {
+  selectedCategory.value = category
+  loadWorks(true)
+}
+
+const categoryLabel = (tags) => getImageCategoryLabel(String(tags || '').split(',')[0])
 
 const loadMore = () => {
   page.value++
@@ -389,7 +417,7 @@ onMounted(() => loadWorks())
 .search-bar {
   display: flex;
   gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-3);
 }
 
 .search-bar .el-input {
@@ -400,6 +428,38 @@ onMounted(() => loadWorks())
 .sort-buttons {
   display: flex;
   gap: var(--space-2);
+}
+
+.category-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.category-tab {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground-muted);
+  background: var(--background-card);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.category-tab:hover,
+.category-tab.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-muted);
+  box-shadow: 0 0 0 2px var(--primary-muted);
 }
 
 /* Bento Grid 作品列表 */
@@ -489,6 +549,20 @@ onMounted(() => loadWorks())
   font-size: 13px;
 }
 
+.work-category {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  border: 1px solid rgba(0, 212, 255, 0.42);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.68);
+  color: #dff7ff;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .work-info {
   padding: var(--space-4);
   display: flex;
@@ -575,6 +649,23 @@ onMounted(() => loadWorks())
   border-radius: var(--radius);
   font-size: 14px;
   line-height: 1.6;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.detail-tags span {
+  border: 1px solid rgba(0, 212, 255, 0.42);
+  border-radius: var(--radius-full);
+  background: rgba(0, 212, 255, 0.1);
+  color: #73dcff;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .detail-stats {
@@ -671,6 +762,12 @@ onMounted(() => loadWorks())
 }
 
 @media (max-width: 768px) {
+  .search-bar {
+    flex-direction: column;
+  }
+  .search-bar .el-input {
+    max-width: none;
+  }
   .works-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: var(--space-3);

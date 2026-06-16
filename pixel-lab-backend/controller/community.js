@@ -10,7 +10,7 @@ const { success, error } = require('../utils/result')
  * 获取公开作品列表
  */
 async function getPublicImages(req, res) {
-  const { page = 1, pageSize = 20, keyword = '', sortBy = 'latest' } = req.query
+  const { page = 1, pageSize = 20, keyword = '', sortBy = 'latest', category = '' } = req.query
   const userId = req.user?.id
 
   const result = await communityService.getPublicImages({
@@ -18,6 +18,7 @@ async function getPublicImages(req, res) {
     pageSize: parseInt(pageSize),
     keyword,
     sortBy,
+    category,
     userId
   })
 

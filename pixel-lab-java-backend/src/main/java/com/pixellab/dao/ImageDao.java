@@ -18,9 +18,9 @@ public class ImageDao {
   }
 
   public long create(long userId, String filename, String originalName, String url, Integer width,
-                     Integer height, long size, String format) throws Exception {
-    String sql = "INSERT INTO image (user_id, filename, original_name, url, thumbnail_url, width, height, size, format) "
-        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     Integer height, long size, String format, String tags) throws Exception {
+    String sql = "INSERT INTO image (user_id, filename, original_name, url, thumbnail_url, width, height, size, format, tags) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
          PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, userId);
@@ -40,6 +40,7 @@ public class ImageDao {
       }
       stmt.setLong(8, size);
       stmt.setString(9, format);
+      stmt.setString(10, tags);
       stmt.executeUpdate();
       try (ResultSet rs = stmt.getGeneratedKeys()) {
         return rs.next() ? rs.getLong(1) : 0;

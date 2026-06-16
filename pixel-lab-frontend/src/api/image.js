@@ -9,9 +9,15 @@ import request from '@/utils/request'
  * 上传图片
  * @param {File} file - 图片文件
  */
-export const uploadImage = (file) => {
+export const uploadImage = (file, options = {}) => {
   const formData = new FormData()
   formData.append('image', file)
+  if (options.category) {
+    formData.append('category', options.category)
+  }
+  if (options.tags) {
+    formData.append('tags', options.tags)
+  }
   
   return request.post('/api/images/upload', formData, {
     headers: {

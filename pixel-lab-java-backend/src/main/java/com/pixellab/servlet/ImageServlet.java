@@ -28,6 +28,8 @@ import java.util.UUID;
 @MultipartConfig
 public class ImageServlet extends BaseApiServlet {
   private static final Set<String> ALLOWED_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp");
+  private static final Set<String> IMAGE_CATEGORIES = Set.of(
+      "drawing", "edit", "ai", "pixel", "photo", "character", "landscape", "avatar", "other");
 
   @Override
   protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -144,12 +146,15 @@ public class ImageServlet extends BaseApiServlet {
     }
 
     String url = publicBaseUrl(request) + "/uploads/" + filename;
-    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, width, height, target.length(), ext);
+    String category = normalizeCategory(request.getParameter("category"));
+    String tags = category != null ? category : normalizeTags(request.getParameter("tags"));
+    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, width, height, target.length(), ext, tags);
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", imageId);
     data.put("url", url);
     data.put("originalName", originalName);
+    data.put("tags", tags);
     data.put("size", target.length());
     data.put("width", width);
     data.put("height", height);
@@ -202,6 +207,22 @@ public class ImageServlet extends BaseApiServlet {
   private String extension(String filename) {
     int index = filename == null ? -1 : filename.lastIndexOf('.');
     return index < 0 ? "" : filename.substring(index + 1).toLowerCase(Locale.ROOT);
+  }
+
+  private String normalizeCategory(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    String category = value.trim().toLowerCase(Locale.ROOT);
+    return IMAGE_CATEGORIES.contains(category) ? category : null;
+  }
+
+  private String normalizeTags(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    String tags = value.trim();
+    return tags.length() > 255 ? tags.substring(0, 255) : tags;
   }
 
   private String publicBaseUrl(HttpServletRequest request) {
