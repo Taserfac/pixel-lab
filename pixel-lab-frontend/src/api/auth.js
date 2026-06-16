@@ -4,7 +4,7 @@
  * - 登录、注册、获取用户信息
  */
 
-import { get, post, patch } from '@/utils/request'
+import request, { get, post, patch } from '@/utils/request'
 
 /**
  * 用户登录
@@ -44,8 +44,8 @@ export const getUserInfo = () => {
  * 获取用户统计数据
  * @returns {Promise}
  */
-export const getUserStats = () => {
-  return get('/api/auth/stats')
+export const getUserStats = (params = {}) => {
+  return get('/api/auth/stats', params)
 }
 
 /**
@@ -55,6 +55,22 @@ export const getUserStats = () => {
  */
 export const updateProfile = (data) => {
   return patch('/api/auth/profile', data)
+}
+
+/**
+ * 上传用户头像，不写入作品库
+ * @param {File} file
+ * @returns {Promise}
+ */
+export const uploadAvatar = (file) => {
+  const formData = new FormData()
+  formData.append('avatar', file)
+
+  return request.post('/api/auth/avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
 }
 
 /**

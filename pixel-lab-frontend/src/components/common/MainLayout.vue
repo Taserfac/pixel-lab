@@ -73,9 +73,10 @@
       <router-link
         v-for="route in menuRoutes"
         :key="route.path"
-        :to="route.path.startsWith('/') ? route.path : '/' + route.path"
+        :to="resolveMenuPath(route.path)"
         class="dock-item"
-        :class="{ active: activeRoute === route.path }"
+        :class="{ active: isMenuActive(route.path) }"
+        :style="{ '--dock-accent': getDockAccent(route.path) }"
       >
         <span class="dock-icon">
           <el-icon :size="22">
@@ -104,7 +105,24 @@ const userStore = useUserStore()
 const themeStore = useThemeStore()
 const searchQuery = ref('')
 
-const activeRoute = computed(() => route.path)
+const dockAccentMap = {
+  '/dashboard': '#00f08a',
+  '/workbench': '#28c8ff',
+  '/draw': '#a78bfa',
+  '/community': '#f59e0b',
+  '/personal': '#f472b6',
+  '/stats': '#22d3ee',
+  '/admin': '#ef4444'
+}
+
+const resolveMenuPath = (path) => path.startsWith('/') ? path : `/${path}`
+
+const isMenuActive = (path) => {
+  const menuPath = resolveMenuPath(path)
+  return route.path === menuPath || route.path.startsWith(`${menuPath}/`)
+}
+
+const getDockAccent = (path) => dockAccentMap[resolveMenuPath(path)] || 'var(--primary)'
 const isDarkTheme = computed(() => themeStore.theme === 'dark')
 const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
 
@@ -285,33 +303,92 @@ const handleCommand = (command) => {
 }
 
 .dock-item {
+  --dock-accent: var(--primary);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   padding: var(--space-3) var(--space-4);
   min-width: 64px;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
   text-decoration: none;
   color: var(--foreground-muted);
   border-radius: var(--radius);
   border: 1px solid transparent;
-  transition: all var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.dock-item::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  z-index: -1;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background-muted);
+  background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    background var(--transition-fast);
 }
 
 .dock-item:hover {
-  background: var(--background-muted);
-  color: var(--foreground);
+  color: var(--dock-accent);
   transform: translateY(-2px);
 }
 
+.dock-item:hover::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.dock-item:active {
+  color: var(--dock-accent);
+  transform: translateY(0) scale(0.94);
+}
+
 .dock-item.active {
-  background: var(--primary-muted);
-  color: var(--primary);
+  background: transparent;
+  color: var(--dock-accent);
   border-color: var(--border-glow);
+  border-color: color-mix(in srgb, var(--dock-accent) 58%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent),
+    0 8px 24px color-mix(in srgb, var(--dock-accent) 18%, transparent);
+}
+
+.dock-item.active::before {
+  opacity: 1;
+  transform: scale(1);
+  background: color-mix(in srgb, var(--dock-accent) 22%, transparent);
+}
+
+[data-theme='light'] .dock-item.active::before {
+  background: color-mix(in srgb, var(--dock-accent) 18%, white);
+}
+
+.dock-item:focus-visible {
+  outline: 2px solid var(--dock-accent);
+  outline-offset: 3px;
+}
+
+.dock-icon,
+.dock-label {
+  position: relative;
+  z-index: 1;
 }
 
 .dock-item.active .dock-icon {
-  filter: drop-shadow(0 0 8px var(--primary-glow));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--dock-accent) 72%, transparent));
 }
 
 .dock-label {

@@ -83,13 +83,30 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Picture, View, Star, FolderOpened } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getUserStats } from '@/api/auth'
-import { getUserImages } from '@/api/image'
 
 const dateRange = ref('7')
 const stats = ref({ works: 0, views: 0, likes: 0, collects: 0 })
 const hotWorks = ref([])
+const trendData = ref([])
 const trendChartRef = ref(null)
 let trendChart = null
+
+const toNumber = (value) => Number(value || 0)
+
+const normalizeStats = (stats = {}) => ({
+  works: toNumber(stats.works ?? stats.imageCount),
+  views: toNumber(stats.views ?? stats.viewCount),
+  likes: toNumber(stats.likes ?? stats.receivedLikeCount ?? stats.likeCount),
+  collects: toNumber(stats.collects ?? stats.receivedCollectCount ?? stats.collectionCount)
+})
+
+const normalizeTrend = (trend = []) => trend.map(item => ({
+  label: item.label || item.date || '',
+  works: toNumber(item.works),
+  views: toNumber(item.views),
+  likes: toNumber(item.likes),
+  collects: toNumber(item.collects)
+}))
 
 // 格式化数字
 const formatNumber = (num) => {
@@ -107,18 +124,13 @@ const formatDate = (date) => {
 // 获取数据
 const fetchData = async () => {
   try {
-    const [statsRes, imagesRes] = await Promise.all([
-      getUserStats(),
-      getUserImages({ pageSize: 100 })
-    ])
+    const statsRes = await getUserStats({ days: dateRange.value })
 
-    stats.value = statsRes
+    stats.value = normalizeStats(statsRes)
 
     // 热门作品按浏览量排序
-    const allWorks = imagesRes.list || []
-    hotWorks.value = allWorks
-      .sort((a, b) => (b.view_count || 0) - (a.view_count || 0))
-      .slice(0, 5)
+    trendData.value = normalizeTrend(statsRes.trend || [])
+    hotWorks.value = statsRes.hotWorks || []
 
     // 初始化图表
     await nextTick()
@@ -138,23 +150,11 @@ const initTrendChart = () => {
 
   trendChart = echarts.init(trendChartRef.value)
 
-  const days = parseInt(dateRange.value)
-  const dateLabels = []
-  const viewsData = []
-  const likesData = []
-  const collectsData = []
-
-  // 生成模拟数据（实际项目应从后端获取）
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    dateLabels.push(date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }))
-    
-    // 模拟数据
-    viewsData.push(Math.floor(Math.random() * 100) + 10)
-    likesData.push(Math.floor(Math.random() * 20))
-    collectsData.push(Math.floor(Math.random() * 10))
-  }
+  const source = trendData.value
+  const dateLabels = source.map(item => item.label)
+  const viewsData = source.map(item => item.views)
+  const likesData = source.map(item => item.likes)
+  const collectsData = source.map(item => item.collects)
 
   const option = {
     tooltip: {

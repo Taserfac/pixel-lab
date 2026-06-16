@@ -191,6 +191,14 @@ const userStats = ref({
 })
 const communityActivities = ref([])
 
+const toNumber = (value) => Number(value || 0)
+
+const normalizeStats = (stats = {}) => ({
+  works: toNumber(stats.works ?? stats.imageCount),
+  likes: toNumber(stats.likes ?? stats.receivedLikeCount ?? stats.likeCount),
+  views: toNumber(stats.views ?? stats.viewCount)
+})
+
 // 格式化时间
 const formatTime = (time) => {
   if (!time) return ''
@@ -214,7 +222,7 @@ onMounted(async () => {
     ])
 
     recentWorks.value = (imagesRes.list || []).slice(0, 4)
-    userStats.value = statsRes
+    userStats.value = normalizeStats(statsRes)
     communityActivities.value = (activitiesRes || []).map(item => ({
       id: item.id,
       user: item.author_name || '匿名用户',

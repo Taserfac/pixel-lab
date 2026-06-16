@@ -64,8 +64,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { updateProfile, changePassword } from '@/api/auth'
-import { uploadImage } from '@/api/image'
+import { updateProfile, changePassword, uploadAvatar } from '@/api/auth'
 
 const userStore = useUserStore()
 
@@ -106,15 +105,18 @@ const beforeAvatarUpload = async (file) => {
 
   try {
     console.log('开始上传...')
-    const res = await uploadImage(file)
+    const res = await uploadAvatar(file)
     console.log('上传结果:', res)
     
     form.value.avatar = res.url
     
     // 自动保存头像
     console.log('保存头像...')
-    await updateProfile({ avatar: res.url })
-    userStore.updateUserInfo({ avatar: res.url })
+    if (res.user) {
+      userStore.setUserInfo(res.user)
+    } else {
+      userStore.updateUserInfo({ avatar: res.url })
+    }
     ElMessage.success('头像更新成功')
   } catch (error) {
     console.error('上传失败:', error)

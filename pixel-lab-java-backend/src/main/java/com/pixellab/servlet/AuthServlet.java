@@ -8,16 +8,29 @@ import com.pixellab.util.PasswordUtil;
 import com.pixellab.util.RequestUtil;
 import com.pixellab.util.Result;
 
+import javax.imageio.ImageIO;
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.servlet.http.Part;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
+@MultipartConfig
 public class AuthServlet extends BaseApiServlet {
+  private static final Set<String> ALLOWED_AVATAR_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp");
+
   @Override
   protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
     List<String> segments = RequestUtil.pathSegments(request);
@@ -29,6 +42,8 @@ public class AuthServlet extends BaseApiServlet {
         register(request, response);
       } else if ("logout".equals(action)) {
         logout(request, response);
+      } else if ("avatar".equals(action)) {
+        uploadAvatar(request, response);
       } else {
         Result.notFound(response, "接口不存在");
       }
@@ -154,7 +169,8 @@ public class AuthServlet extends BaseApiServlet {
 
   private void stats(HttpServletRequest request, HttpServletResponse response) throws Exception {
     SessionUser current = currentUser(request);
-    ok(response, new UserDao(dataSource()).getStats(current.getId()));
+    int days = RequestUtil.intParam(request, "days", 7);
+    ok(response, new UserDao(dataSource()).getStats(current.getId(), days));
   }
 
   private void updateProfile(HttpServletRequest request, HttpServletResponse response) throws Exception {
@@ -172,6 +188,64 @@ public class AuthServlet extends BaseApiServlet {
     Map<String, Object> user = userDao.findById(current.getId());
     request.getSession(false).setAttribute(AppContextKeys.LOGIN_USER, userDao.toSessionUser(user));
     ok(response, "更新成功", user);
+  }
+
+  private void uploadAvatar(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    SessionUser current = currentUser(request);
+    if (current == null) {
+      Result.unauthorized(response, "请先登录");
+      return;
+    }
+
+    Part part = request.getPart("avatar");
+    if (part == null || part.getSize() == 0) {
+      Result.badRequest(response, "请选择要上传的头像");
+      return;
+    }
+
+    long maxSize = 2L * 1024 * 1024;
+    if (part.getSize() > maxSize) {
+      Result.badRequest(response, "头像大小不能超过 2MB");
+      return;
+    }
+
+    String originalName = getFileName(part);
+    String ext = extension(originalName);
+    if (!ALLOWED_AVATAR_EXT.contains(ext)) {
+      Result.badRequest(response, "仅支持 jpg、png、gif、webp 图片");
+      return;
+    }
+
+    File uploadDir = (File) getServletContext().getAttribute(AppContextKeys.UPLOAD_DIR);
+    File avatarDir = new File(uploadDir, "avatars");
+    if (!avatarDir.exists() && !avatarDir.mkdirs()) {
+      throw new IllegalStateException("Cannot create avatar directory: " + avatarDir.getAbsolutePath());
+    }
+
+    String filename = "avatar_" + current.getId() + "_" + System.currentTimeMillis() + "_"
+        + UUID.randomUUID().toString().replace("-", "") + "." + ext;
+    File target = new File(avatarDir, filename);
+    try (var inputStream = part.getInputStream()) {
+      Files.copy(inputStream, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    BufferedImage image = ImageIO.read(target);
+    if (image == null) {
+      Files.deleteIfExists(target.toPath());
+      Result.badRequest(response, "请上传有效的图片文件");
+      return;
+    }
+
+    String avatarUrl = publicBaseUrl(request) + "/uploads/avatars/" + filename;
+    UserDao userDao = new UserDao(dataSource());
+    userDao.updateProfile(current.getId(), null, avatarUrl);
+    Map<String, Object> user = userDao.findById(current.getId());
+    request.getSession(false).setAttribute(AppContextKeys.LOGIN_USER, userDao.toSessionUser(user));
+
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("url", avatarUrl);
+    data.put("user", user);
+    ok(response, "头像更新成功", data);
   }
 
   private void changePassword(HttpServletRequest request, HttpServletResponse response) throws Exception {
@@ -192,5 +266,36 @@ public class AuthServlet extends BaseApiServlet {
     }
     userDao.updatePassword(current.getId(), PasswordUtil.hash(newPassword));
     ok(response, "密码修改成功", null);
+  }
+
+  private String getFileName(Part part) {
+    String header = part.getHeader("content-disposition");
+    if (header == null) {
+      return "avatar";
+    }
+    for (String item : header.split(";")) {
+      String trimmed = item.trim();
+      if (trimmed.startsWith("filename=")) {
+        return trimmed.substring(trimmed.indexOf('=') + 1).trim().replace("\"", "");
+      }
+    }
+    return "avatar";
+  }
+
+  private String extension(String filename) {
+    int index = filename == null ? -1 : filename.lastIndexOf('.');
+    return index < 0 ? "" : filename.substring(index + 1).toLowerCase(Locale.ROOT);
+  }
+
+  private String publicBaseUrl(HttpServletRequest request) {
+    String proto = request.getHeader("X-Forwarded-Proto");
+    String host = request.getHeader("X-Forwarded-Host");
+    if (proto == null || proto.isBlank()) {
+      proto = request.getScheme();
+    }
+    if (host == null || host.isBlank()) {
+      host = request.getHeader("Host");
+    }
+    return proto + "://" + host;
   }
 }
