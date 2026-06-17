@@ -82,6 +82,13 @@ const routes = [
         component: () => import('@/views/stats/Index.vue'),
         meta: { title: '数据统计', icon: 'TrendCharts' }
       },
+      // 排行榜
+      {
+        path: 'ranking',
+        name: 'Ranking',
+        component: () => import('@/views/ranking/Index.vue'),
+        meta: { title: '排行榜', icon: 'Trophy' }
+      },
       // 后台管理（仅管理员）
       {
         path: 'admin',

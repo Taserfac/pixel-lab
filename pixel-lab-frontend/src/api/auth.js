@@ -44,8 +44,8 @@ export const getUserInfo = () => {
  * 获取用户统计数据
  * @returns {Promise}
  */
-export const getUserStats = (params = {}) => {
-  return get('/api/auth/stats', params)
+export const getUserStats = (params = {}, config = {}) => {
+  return get('/api/auth/stats', params, config)
 }
 
 /**

@@ -62,6 +62,14 @@ public class CommunityServlet extends BaseApiServlet {
         ok(response, dao.activities(RequestUtil.intParam(request, "limit", 10)));
         return;
       }
+      // GET /api/community/images/{id}/similar
+      if (segments.size() == 3 && "images".equals(segments.get(0)) && "similar".equals(segments.get(2))) {
+        long imageId = parseId(segments.get(1));
+        int limit = RequestUtil.intParam(request, "limit", 4);
+        List<Map<String, Object>> similar = dao.similarWorks(imageId, limit);
+        ok(response, Map.of("list", similar));
+        return;
+      }
       Result.notFound(response, "接口不存在");
     } catch (Exception ex) {
       getServletContext().log("[Pixel Lab] Community API failed", ex);

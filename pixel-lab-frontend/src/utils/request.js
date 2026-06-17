@@ -41,6 +41,7 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response) => {
     const { data } = response
+    const silent = response.config?.silent
 
     // 如果响应成功，直接返回数据 (200-299 都是成功)
     if (data.code >= 200 && data.code < 300) {
@@ -48,11 +49,14 @@ request.interceptors.response.use(
     }
 
     // 业务错误，显示错误信息
-    ElMessage.error(data.msg || '请求失败')
+    if (!silent) {
+      ElMessage.error(data.msg || '请求失败')
+    }
     return Promise.reject(new Error(data.msg || '请求失败'))
   },
   (error) => {
     const { response } = error
+    const silent = error.config?.silent
 
     if (response) {
       const { status, data } = response
@@ -60,20 +64,30 @@ request.interceptors.response.use(
 
       if (status === 401) {
         // Session 失效，清除本地用户信息并跳转到登录页
-        ElMessage.error('登录已过期，请重新登录')
-        const userStore = useUserStore()
-        userStore.logout()
-        router.push('/login')
+        if (!silent) {
+          ElMessage.error('登录已过期，请重新登录')
+          const userStore = useUserStore()
+          userStore.logout()
+          router.push('/login')
+        }
       } else if (status === 403) {
-        ElMessage.error('没有权限访问该资源')
+        if (!silent) {
+          ElMessage.error('没有权限访问该资源')
+        }
       } else if (status === 404) {
-        ElMessage.error('请求的资源不存在')
+        if (!silent) {
+          ElMessage.error('请求的资源不存在')
+        }
       } else if (status === 500 && !serverMessage) {
-        ElMessage.error('服务器内部错误')
+        if (!silent) {
+          ElMessage.error('服务器内部错误')
+        }
       } else {
-        ElMessage.error(serverMessage || `请求失败 (${status})`)
+        if (!silent) {
+          ElMessage.error(serverMessage || `请求失败 (${status})`)
+        }
       }
-    } else {
+    } else if (!silent) {
       // 网络错误
       ElMessage.error('网络连接失败，请检查网络设置')
     }
@@ -88,8 +102,8 @@ request.interceptors.response.use(
  * @param {object} params - 请求参数
  * @returns {Promise}
  */
-export const get = (url, params = {}) => {
-  return request.get(url, { params })
+export const get = (url, params = {}, config = {}) => {
+  return request.get(url, { ...config, params })
 }
 
 /**
@@ -98,8 +112,8 @@ export const get = (url, params = {}) => {
  * @param {object} data - 请求体数据
  * @returns {Promise}
  */
-export const post = (url, data = {}) => {
-  return request.post(url, data)
+export const post = (url, data = {}, config = {}) => {
+  return request.post(url, data, config)
 }
 
 /**
@@ -108,8 +122,8 @@ export const post = (url, data = {}) => {
  * @param {object} data - 请求体数据
  * @returns {Promise}
  */
-export const put = (url, data = {}) => {
-  return request.put(url, data)
+export const put = (url, data = {}, config = {}) => {
+  return request.put(url, data, config)
 }
 
 /**
@@ -118,8 +132,8 @@ export const put = (url, data = {}) => {
  * @param {object} params - 请求参数
  * @returns {Promise}
  */
-export const del = (url, params = {}) => {
-  return request.delete(url, { params })
+export const del = (url, params = {}, config = {}) => {
+  return request.delete(url, { ...config, params })
 }
 
 /**
@@ -128,8 +142,8 @@ export const del = (url, params = {}) => {
  * @param {object} data - 请求体数据
  * @returns {Promise}
  */
-export const patch = (url, data = {}) => {
-  return request.patch(url, data)
+export const patch = (url, data = {}, config = {}) => {
+  return request.patch(url, data, config)
 }
 
 export default request

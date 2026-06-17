@@ -10,16 +10,70 @@
           <span class="pixel-text">PX</span>
         </div>
         <span class="brand-name">Pixel Lab</span>
+        <span class="brand-tag">{{ $t('community.communityTag') }}</span>
       </router-link>
 
-      <div class="search-bar">
+      <div
+        class="search-bar"
+        @mouseenter="showSearchSuggestions = true"
+        @mouseleave="showSearchSuggestions = false"
+      >
         <el-input
+          ref="searchInputRef"
           v-model="searchQuery"
-          placeholder="搜索作品、作者、标签"
+          :placeholder="$t('community.searchPlaceholderFull')"
           :prefix-icon="Search"
           clearable
           @keyup.enter="handleSearch"
+          @focus="showSearchSuggestions = true"
         />
+        <div
+          v-if="showSearchSuggestions && (searchHistory.length || hotSearchTags.length)"
+          class="search-suggestions"
+        >
+          <div
+            v-if="searchHistory.length"
+            class="suggestion-section"
+          >
+            <div class="suggestion-header">
+              <span>最近搜索</span>
+              <button
+                type="button"
+                @click="clearSearchHistory"
+              >
+                清除
+              </button>
+            </div>
+            <button
+              v-for="item in searchHistory"
+              :key="item"
+              type="button"
+              class="suggestion-item"
+              @click="quickSearch(item)"
+            >
+              <el-icon><Clock /></el-icon> {{ item }}
+            </button>
+          </div>
+          <div
+            v-if="hotSearchTags.length"
+            class="suggestion-section"
+          >
+            <div class="suggestion-header">
+              <span>热门搜索</span>
+            </div>
+            <div class="hot-tags">
+              <button
+                v-for="tag in hotSearchTags"
+                :key="tag"
+                type="button"
+                class="hot-tag-item"
+                @click="quickSearch(tag)"
+              >
+                #{{ tag }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="top-actions">
@@ -30,17 +84,65 @@
           @click="triggerUpload"
         >
           <el-icon><Upload /></el-icon>
-          上传作品
+          {{ $t('action.upload') + ' ' + $t('dashboard.uploadWork') }}
         </el-button>
-        <button
-          class="icon-action"
-          type="button"
-          title="消息通知"
-          aria-label="消息通知"
-          @click="handleNotifications"
+        <el-popover
+          placement="bottom-end"
+          :width="360"
+          trigger="click"
         >
-          <el-icon><Bell /></el-icon>
-        </button>
+          <template #reference>
+            <button
+              class="icon-action"
+              type="button"
+              :title="$t('notification.title')"
+              :aria-label="$t('notification.title')"
+            >
+              <el-icon><Bell /></el-icon>
+              <span
+                v-if="unreadCount > 0"
+                class="notice-badge"
+              >{{ unreadCount }}</span>
+            </button>
+          </template>
+          <div class="notification-panel">
+            <div class="notification-header">
+              <strong>{{ $t('notification.title') }}</strong>
+              <button
+                type="button"
+                class="mark-read-btn"
+                @click="markAllRead"
+              >
+                {{ $t('notification.markAllRead') }}
+              </button>
+            </div>
+            <div class="notification-list">
+              <div
+                v-for="n in notifications"
+                :key="n.id"
+                class="notification-item"
+                :class="{ unread: !n.read }"
+              >
+                <span
+                  class="notification-icon"
+                  :style="{ color: notificationColorMap[n.type] }"
+                >
+                  <el-icon><component :is="notificationIconMap[n.type]" /></el-icon>
+                </span>
+                <div class="notification-content">
+                  <p>{{ n.text }}</p>
+                  <span class="notification-time">{{ n.time }}</span>
+                </div>
+              </div>
+              <div
+                v-if="notifications.length === 0"
+                class="notification-empty"
+              >
+                {{ $t('notification.noNotifications') }}
+              </div>
+            </div>
+          </div>
+        </el-popover>
         <button
           class="icon-action"
           type="button"
@@ -65,26 +167,27 @@
             >
               {{ userStore.userInfo?.nickname?.charAt(0) || 'U' }}
             </el-avatar>
+            <el-icon class="avatar-caret"><ArrowDown /></el-icon>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">
-                <el-icon><User /></el-icon>个人中心
+                <el-icon><User /></el-icon>{{ $t('nav.personal') }}
               </el-dropdown-item>
               <el-dropdown-item command="settings">
-                <el-icon><Setting /></el-icon>设置
+                <el-icon><Setting /></el-icon>{{ $t('nav.settings') }}
               </el-dropdown-item>
               <el-dropdown-item
                 v-if="userStore.isAdmin"
                 command="admin"
               >
-                <el-icon><Setting /></el-icon>后台管理
+                <el-icon><Setting /></el-icon>{{ $t('nav.admin') }}
               </el-dropdown-item>
               <el-dropdown-item
                 divided
                 command="logout"
               >
-                <el-icon><SwitchButton /></el-icon>退出登录
+                <el-icon><SwitchButton /></el-icon>{{ $t('auth.logout') }}
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -138,7 +241,7 @@
         <span class="dock-icon">
           <el-icon :size="22"><Upload /></el-icon>
         </span>
-        <span class="dock-label">上传</span>
+        <span class="dock-label">{{ $t('action.upload') }}</span>
       </button>
     </nav>
   </div>
@@ -147,18 +250,25 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowDown,
   Bell,
+  ChatDotRound,
+  Clock,
   Compass,
   HomeFilled,
+  InfoFilled,
   Moon,
   Search,
   Setting,
+  Star,
   Sunny,
   SwitchButton,
   Upload,
-  User
+  User,
+  UserFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
@@ -169,19 +279,35 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const { t } = useI18n()
 const searchQuery = ref('')
 const fileInput = ref(null)
 const uploading = ref(false)
+const searchInputRef = ref(null)
+const showSearchSuggestions = ref(false)
+const searchHistory = ref(JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]').slice(0, 5))
+const hotSearchTags = ['插画', '摄影', 'UI设计', '像素艺术', 'AI艺术']
+const showNotifications = ref(false)
+const notifications = ref([
+  { id: 1, type: 'like', text: '鹿与森 赞了你的作品「雾野织网」', time: '2分钟前', read: false },
+  { id: 2, type: 'comment', text: 'DesignLin 评论了你的作品「垂直城市」', time: '15分钟前', read: false },
+  { id: 3, type: 'follow', text: 'PixelCat 关注了你', time: '1小时前', read: true },
+  { id: 4, type: 'system', text: '你的作品「光环窗口」已通过审核', time: '3小时前', read: true }
+])
+const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+
+const notificationIconMap = { like: Star, comment: ChatDotRound, follow: UserFilled, system: InfoFilled }
+const notificationColorMap = { like: '#FF6B6B', comment: '#5B8DEF', follow: '#16C784', system: '#FFB454' }
 
 const navItems = computed(() => {
   const items = [
-    { path: '/dashboard', label: '首页', icon: HomeFilled, accent: '#16C784' },
-    { path: '/community', label: '社区', icon: Compass, accent: '#5B8DEF' },
-    { path: '/personal', label: '我的', icon: User, accent: '#FF8AB3' }
+    { path: '/dashboard', label: t('nav.home'), icon: HomeFilled, accent: '#16C784' },
+    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' },
+    { path: '/personal', label: t('nav.personal'), icon: User, accent: '#FF8AB3' }
   ]
 
   if (userStore.isAdmin) {
-    items.push({ path: '/admin', label: '管理', icon: Setting, accent: '#FF4757' })
+    items.push({ path: '/admin', label: t('nav.admin'), icon: Setting, accent: '#FF4757' })
   }
 
   return items
@@ -195,11 +321,35 @@ const isMenuActive = (path) => route.path === path || route.path.startsWith(`${p
 const handleSearch = () => {
   const keyword = searchQuery.value.trim()
   if (!keyword) return
+  saveSearchHistory(keyword)
   router.push({ path: '/community', query: { keyword } })
 }
 
+const quickSearch = (keyword) => {
+  searchQuery.value = keyword
+  saveSearchHistory(keyword)
+  showSearchSuggestions.value = false
+  router.push({ path: '/community', query: { keyword } })
+}
+
+const saveSearchHistory = (keyword) => {
+  const history = searchHistory.value.filter(h => h !== keyword)
+  history.unshift(keyword)
+  searchHistory.value = history.slice(0, 5)
+  localStorage.setItem('pixel_lab_search_history', JSON.stringify(searchHistory.value))
+}
+
+const clearSearchHistory = () => {
+  searchHistory.value = []
+  localStorage.removeItem('pixel_lab_search_history')
+}
+
 const handleNotifications = () => {
-  ElMessage.info('暂无新通知')
+  showNotifications.value = !showNotifications.value
+}
+
+const markAllRead = () => {
+  notifications.value.forEach(n => { n.read = true })
 }
 
 const triggerUpload = () => {
@@ -224,9 +374,21 @@ const onFileSelected = async (event) => {
 
   uploading.value = true
   try {
-    await uploadImage(file)
+    const res = await uploadImage(file)
     ElMessage.success('上传成功')
-    router.push('/personal')
+    const imageUrl = res?.url || res?.data?.url || ''
+    ElMessageBox.confirm('上传成功！是否进入工作台编辑此图片？', '上传完成', {
+      confirmButtonText: '进入工作台',
+      cancelButtonText: '留在个人中心',
+      type: 'success'
+    }).then(() => {
+      if (imageUrl) {
+        localStorage.setItem('pixel_lab_workbench_image', imageUrl)
+      }
+      router.push('/workbench')
+    }).catch(() => {
+      router.push('/personal')
+    })
   } catch (error) {
     console.error('上传失败:', error)
     ElMessage.error('上传失败')
@@ -274,8 +436,7 @@ const handleCommand = (command) => {
 
 .top-bar {
   height: 72px;
-  display: grid;
-  grid-template-columns: max-content minmax(240px, 520px) max-content;
+  display: flex;
   align-items: center;
   gap: var(--space-6);
   padding: 0 clamp(var(--space-4), 4vw, var(--space-10));
@@ -325,9 +486,22 @@ const handleCommand = (command) => {
   letter-spacing: 0;
 }
 
+.brand-tag {
+  border-radius: var(--radius-full);
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .search-bar {
-  width: 100%;
-  justify-self: center;
+  flex: 1;
+  max-width: 520px;
+  margin: 0 auto;
+  position: relative;
 }
 
 .search-bar :deep(.el-input__wrapper) {
@@ -360,6 +534,7 @@ const handleCommand = (command) => {
   color: var(--foreground-muted);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+  position: relative;
   transition:
     color var(--transition-fast),
     transform var(--transition-fast),
@@ -371,6 +546,208 @@ const handleCommand = (command) => {
   color: var(--primary);
   transform: translateY(-1px);
   box-shadow: var(--shadow);
+}
+
+.notice-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--error);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.suggestion-section {
+  padding: var(--space-3);
+}
+
+.suggestion-section + .suggestion-section {
+  border-top: 1px solid var(--border);
+}
+
+.suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.suggestion-header span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--foreground-muted);
+}
+
+.suggestion-header button {
+  border: 0;
+  background: transparent;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.suggestion-header button:hover {
+  color: var(--primary);
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background: var(--background-muted);
+}
+
+.suggestion-item .el-icon {
+  color: var(--foreground-muted);
+  font-size: 14px;
+}
+
+.hot-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hot-tag-item {
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.hot-tag-item:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.notification-panel {
+  margin: calc(var(--space-2) * -1);
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-header strong {
+  font-size: 14px;
+}
+
+.mark-read-btn {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.notification-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  transition: background var(--transition-fast);
+  cursor: pointer;
+}
+
+.notification-item:hover {
+  background: var(--background-muted);
+}
+
+.notification-item.unread {
+  background: var(--primary-muted);
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--background-muted);
+  font-size: 16px;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-content p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--foreground);
+}
+
+.notification-time {
+  font-size: 11px;
+  color: var(--foreground-muted);
+}
+
+.notification-empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--foreground-muted);
+  font-size: 13px;
+}
+
+.user-avatar {
+  width: auto;
+  min-width: 54px;
+  gap: 4px;
+  padding: 0 8px 0 3px;
+}
+
+.avatar-caret {
+  color: var(--foreground-muted);
+  font-size: 12px;
 }
 
 .main-area {
@@ -494,11 +871,14 @@ const handleCommand = (command) => {
 
 @media (max-width: 900px) {
   .top-bar {
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
     gap: var(--space-4);
   }
 
   .brand-name {
+    display: none;
+  }
+
+  .brand-tag {
     display: none;
   }
 
@@ -509,7 +889,6 @@ const handleCommand = (command) => {
 
 @media (max-width: 720px) {
   .top-bar {
-    grid-template-columns: max-content 1fr max-content;
     padding: 0 var(--space-4);
   }
 

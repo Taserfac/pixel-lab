@@ -103,6 +103,40 @@ public class ImageServlet extends BaseApiServlet {
     }
   }
 
+  @Override
+  protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    List<String> segments = RequestUtil.pathSegments(request);
+    try {
+      if (segments.size() == 2 && "description".equals(segments.get(1))) {
+        long id = parseId(segments.get(0));
+        if (id <= 0) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        SessionUser user = currentUser(request);
+        ImageDao imageDao = new ImageDao(dataSource());
+        Map<String, Object> image = imageDao.findById(id);
+        if (image == null) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        if (((Number) image.get("user_id")).longValue() != user.getId()) {
+          Result.forbidden(response, "无权修改");
+          return;
+        }
+        Map<String, Object> body = body(request);
+        String description = RequestUtil.string(body, "description");
+        imageDao.updateDescription(id, description);
+        ok(response, "更新成功", null);
+        return;
+      }
+      Result.notFound(response, "接口不存在");
+    } catch (Exception ex) {
+      getServletContext().log("[Pixel Lab] Image PATCH failed", ex);
+      Result.serverError(response, "服务器错误");
+    }
+  }
+
   private void upload(HttpServletRequest request, HttpServletResponse response) throws Exception {
     SessionUser user = currentUser(request);
     Part part = request.getPart("image");
@@ -144,7 +178,8 @@ public class ImageServlet extends BaseApiServlet {
     }
 
     String url = publicBaseUrl(request) + "/uploads/" + filename;
-    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, width, height, target.length(), ext);
+    String description = request.getParameter("description");
+    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, width, height, target.length(), ext, description);
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", imageId);

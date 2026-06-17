@@ -108,6 +108,15 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>AlbumServlet</servlet-name>
+    <servlet-class>com.pixellab.servlet.AlbumServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>AlbumServlet</servlet-name>
+    <url-pattern>/api/albums/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>AdminServlet</servlet-name>
     <servlet-class>com.pixellab.servlet.AdminServlet</servlet-class>
   </servlet>
@@ -137,6 +146,15 @@
   <servlet-mapping>
     <servlet-name>HealthServlet</servlet-name>
     <url-pattern>/api/health</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
+    <servlet-name>SocialServlet</servlet-name>
+    <servlet-class>com.pixellab.servlet.SocialServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>SocialServlet</servlet-name>
+    <url-pattern>/api/social/*</url-pattern>
   </servlet-mapping>
 
   <servlet>

@@ -18,9 +18,9 @@ public class ImageDao {
   }
 
   public long create(long userId, String filename, String originalName, String url, Integer width,
-                     Integer height, long size, String format) throws Exception {
-    String sql = "INSERT INTO image (user_id, filename, original_name, url, thumbnail_url, width, height, size, format) "
-        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     Integer height, long size, String format, String description) throws Exception {
+    String sql = "INSERT INTO image (user_id, filename, original_name, url, thumbnail_url, width, height, size, format, description) "
+        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
          PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
       stmt.setLong(1, userId);
@@ -40,6 +40,11 @@ public class ImageDao {
       }
       stmt.setLong(8, size);
       stmt.setString(9, format);
+      if (description == null || description.isBlank()) {
+        stmt.setNull(10, java.sql.Types.LONGVARCHAR);
+      } else {
+        stmt.setString(10, description);
+      }
       stmt.executeUpdate();
       try (ResultSet rs = stmt.getGeneratedKeys()) {
         return rs.next() ? rs.getLong(1) : 0;
@@ -94,6 +99,19 @@ public class ImageDao {
     try (Connection conn = dataSource.getConnection();
          PreparedStatement stmt = conn.prepareStatement("UPDATE image SET is_public = ? WHERE id = ?")) {
       stmt.setInt(1, isPublic ? 1 : 0);
+      stmt.setLong(2, id);
+      stmt.executeUpdate();
+    }
+  }
+
+  public void updateDescription(long id, String description) throws Exception {
+    try (Connection conn = dataSource.getConnection();
+         PreparedStatement stmt = conn.prepareStatement("UPDATE image SET description = ? WHERE id = ?")) {
+      if (description == null || description.isBlank()) {
+        stmt.setNull(1, java.sql.Types.LONGVARCHAR);
+      } else {
+        stmt.setString(1, description);
+      }
       stmt.setLong(2, id);
       stmt.executeUpdate();
     }

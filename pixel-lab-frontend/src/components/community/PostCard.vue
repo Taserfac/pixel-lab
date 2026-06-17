@@ -28,6 +28,18 @@
         {{ title }}
       </h3>
 
+      <div
+        v-if="tags.length"
+        class="post-tags"
+      >
+        <span
+          v-for="tag in tags"
+          :key="tag"
+          class="post-tag"
+          @click.stop="emit('tag-click', tag)"
+        >#{{ tag }}</span>
+      </div>
+
       <div class="post-footer">
         <div class="post-author">
           <el-avatar
@@ -69,7 +81,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'tag-click'])
 
 const title = computed(() => (
   props.work.title ||
@@ -80,6 +92,7 @@ const title = computed(() => (
 ))
 
 const coverUrl = computed(() => props.work.url || props.work.image_url || '')
+const tags = computed(() => (props.work.tags || []).slice(0, 3))
 const authorName = computed(() => props.work.author_name || props.work.nickname || '匿名创作者')
 const authorInitial = computed(() => authorName.value.charAt(0).toUpperCase())
 
@@ -158,6 +171,28 @@ const formatNumber = (value) => {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.post-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
+.post-tag {
+  border-radius: var(--radius-full);
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.post-tag:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 .post-footer {

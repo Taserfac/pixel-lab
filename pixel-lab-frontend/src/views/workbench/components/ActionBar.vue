@@ -21,6 +21,10 @@
       </el-button>
     </div>
     <div class="right-actions">
+      <el-button @click="$emit('templates')">
+        <el-icon><Grid /></el-icon>
+        模板
+      </el-button>
       <el-button @click="$emit('change-image')">
         <el-icon><FolderOpened /></el-icon>
         换一张
@@ -44,14 +48,14 @@
 </template>
 
 <script setup>
-import { Back, Right, Refresh, FolderOpened, Upload, Download } from '@element-plus/icons-vue'
+import { Back, Right, Refresh, FolderOpened, Upload, Download, Grid } from '@element-plus/icons-vue'
 
 defineProps({
   canUndo: { type: Boolean, default: false },
   canRedo: { type: Boolean, default: false }
 })
 
-defineEmits(['undo', 'redo', 'reset', 'change-image', 'save', 'download'])
+defineEmits(['undo', 'redo', 'reset', 'templates', 'change-image', 'save', 'download'])
 </script>
 
 <style scoped>

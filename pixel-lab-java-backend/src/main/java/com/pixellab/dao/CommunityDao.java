@@ -205,6 +205,31 @@ public class CommunityDao {
     }
   }
 
+  public List<Map<String, Object>> similarWorks(long imageId, int limit) throws Exception {
+    try (Connection conn = dataSource.getConnection()) {
+      Map<String, Object> image = queryOne(conn,
+          "SELECT tags FROM image WHERE id = ? AND status = 1", List.of(imageId));
+      if (image == null) {
+        return List.of();
+      }
+      String tags = (String) image.get("tags");
+      if (tags == null || tags.isBlank()) {
+        return List.of();
+      }
+      String firstTag = tags.contains(",") ? tags.substring(0, tags.indexOf(",")).trim() : tags.trim();
+      if (firstTag.isEmpty()) {
+        return List.of();
+      }
+      return query(conn,
+          "SELECT i.id, i.title, i.original_name, i.url, i.like_count, "
+              + "u.nickname AS author_name "
+              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
+              + "WHERE i.is_public = 1 AND i.status = 1 AND i.id != ? AND i.tags LIKE ? "
+              + "ORDER BY i.like_count DESC LIMIT ?",
+          List.of(imageId, "%" + firstTag + "%", limit));
+    }
+  }
+
   public List<Map<String, Object>> activities(int limit) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
       return query(conn,

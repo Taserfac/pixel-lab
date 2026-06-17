@@ -31,6 +31,9 @@ import * as echarts from 'echarts'
 import { useUserStore } from './store/user'
 import { useThemeStore } from './store/theme'
 
+// i18n 国际化
+import i18n from './i18n'
+
 const app = createApp(App)
 
 // 注册 Pinia
@@ -45,6 +48,9 @@ themeStore.init()
 
 // 注册 Vue Router
 app.use(router)
+
+// 注册 i18n
+app.use(i18n)
 
 // 注册 Element Plus，配置中文语言包
 app.use(ElementPlus, {
@@ -63,3 +69,10 @@ app.config.globalProperties.$echarts = echarts
 
 // 挂载应用
 app.mount('#app')
+
+// 注册 Service Worker (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

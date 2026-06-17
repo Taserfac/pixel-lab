@@ -114,6 +114,11 @@
               <div class="work-meta">
                 <div>
                   <h3 :title="imageTitle(image)">{{ imageTitle(image) }}</h3>
+                  <p v-if="image.description" class="image-desc">{{ image.description }}</p>
+                  <button class="desc-edit-btn" type="button" @click.stop="openDescriptionEdit(image)">
+                    <el-icon><Edit /></el-icon>
+                    {{ image.description ? '编辑说明' : '添加说明' }}
+                  </button>
                   <p>{{ formatDate(image.created_at) }}</p>
                 </div>
               </div>
@@ -164,6 +169,96 @@
         />
       </el-tab-pane>
 
+      <el-tab-pane name="albums">
+        <template #label>
+          <span class="tab-label"><el-icon><Files /></el-icon>作品集</span>
+        </template>
+
+        <section v-if="!selectedAlbum" class="toolbar-panel">
+          <div>
+            <h2>我的作品集</h2>
+            <p>{{ albums.length }} 个作品集</p>
+          </div>
+          <el-button type="primary" @click="showCreateAlbumDialog = true">
+            <el-icon><Plus /></el-icon>
+            新建作品集
+          </el-button>
+        </section>
+        <section v-else class="toolbar-panel">
+          <div>
+            <el-button text @click="selectedAlbum = null">
+              <el-icon><ArrowLeft /></el-icon>
+              返回作品集列表
+            </el-button>
+          </div>
+          <div>
+            <h2>{{ selectedAlbum.title }}</h2>
+            <p>{{ selectedAlbum.images?.length || 0 }} 张图片 · {{ selectedAlbum.description || '暂无描述' }}</p>
+          </div>
+          <el-button type="primary" @click="showAddImageDialog = true">
+            <el-icon><Plus /></el-icon>
+            添加图片
+          </el-button>
+        </section>
+
+        <div v-loading="loadingAlbums" class="feed-shell">
+          <!-- Album list view -->
+          <div v-if="!selectedAlbum">
+            <div v-if="albums.length" class="album-grid">
+              <article v-for="album in albums" :key="album.id" class="album-card" @click="openAlbumDetail(album)">
+                <div class="album-cover">
+                  <img v-if="album.cover_url" :src="album.cover_url" :alt="album.title" loading="lazy">
+                  <div v-else class="album-cover-placeholder">
+                    <el-icon><FolderOpened /></el-icon>
+                  </div>
+                  <span class="album-count">{{ album.image_count || 0 }} 张</span>
+                </div>
+                <div class="album-meta">
+                  <h3 :title="album.title">{{ album.title }}</h3>
+                  <p v-if="album.description" class="album-desc-snippet">{{ album.description }}</p>
+                  <p class="album-date">{{ formatDate(album.created_at) }}</p>
+                </div>
+              </article>
+            </div>
+            <div v-else class="empty-panel">
+              <el-icon><FolderOpened /></el-icon>
+              <h3>还没有作品集</h3>
+              <p>创建作品集，将相关作品整理在一起。</p>
+              <el-button type="primary" @click="showCreateAlbumDialog = true">新建作品集</el-button>
+            </div>
+          </div>
+
+          <!-- Album detail view -->
+          <div v-else>
+            <div v-if="selectedAlbum.images?.length" class="album-image-list">
+              <article v-for="img in selectedAlbum.images" :key="img.id" class="album-image-item">
+                <div class="album-image-cover" @click="viewImage(img)">
+                  <img :src="img.url" :alt="img.title || '图片'" loading="lazy">
+                </div>
+                <div class="album-image-info">
+                  <h4>{{ img.title || img.original_name || '未命名' }}</h4>
+                  <p v-if="img.description" class="album-image-desc">{{ img.description }}</p>
+                  <button class="desc-edit-btn" type="button" @click.stop="openAlbumImageDescEdit(img)">
+                    <el-icon><Edit /></el-icon>
+                    {{ img.description ? '编辑描述' : '添加描述' }}
+                  </button>
+                </div>
+                <el-button type="danger" text size="small" @click.stop="confirmRemoveImage(img)">
+                  <el-icon><Delete /></el-icon>
+                  移除
+                </el-button>
+              </article>
+            </div>
+            <div v-else class="empty-panel">
+              <el-icon><Picture /></el-icon>
+              <h3>作品集为空</h3>
+              <p>添加图片到这个作品集中。</p>
+              <el-button type="primary" @click="showAddImageDialog = true">添加图片</el-button>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane name="insights">
         <template #label>
           <span class="tab-label"><el-icon><TrendCharts /></el-icon>数据</span>
@@ -210,6 +305,114 @@
         <el-button type="primary" @click="openInWorkbench(previewImage)">在工作台打开</el-button>
       </template>
     </el-dialog>
+
+    <!-- Description edit dialog -->
+    <el-dialog v-model="descDialogVisible" title="编辑说明" width="480px">
+      <el-input
+        v-model="descEditValue"
+        type="textarea"
+        :rows="4"
+        placeholder="输入图片说明..."
+        maxlength="500"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="descDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="descSaving" @click="saveDescription">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Create album dialog -->
+    <el-dialog v-model="showCreateAlbumDialog" title="新建作品集" width="560px">
+      <el-form label-position="top">
+        <el-form-item label="标题" required>
+          <el-input v-model="newAlbum.title" placeholder="作品集标题" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input
+            v-model="newAlbum.description"
+            type="textarea"
+            :rows="3"
+            placeholder="简要描述这个作品集..."
+            maxlength="200"
+          />
+        </el-form-item>
+        <el-form-item label="封面图片">
+          <div v-if="newAlbum.coverImage" class="cover-preview">
+            <img :src="newAlbum.coverImage.url" alt="封面预览">
+            <el-button text type="danger" size="small" @click="newAlbum.coverImage = null">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+          <div v-else class="cover-picker">
+            <p>从你的作品中选择封面：</p>
+            <div class="cover-option-grid">
+              <button
+                v-for="img in images"
+                :key="img.id"
+                type="button"
+                class="cover-option"
+                :class="{ active: newAlbum.coverImage?.id === img.id }"
+                @click="newAlbum.coverImage = img"
+              >
+                <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
+              </button>
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreateAlbumDialog = false">取消</el-button>
+        <el-button type="primary" :loading="albumSaving" :disabled="!newAlbum.title.trim()" @click="handleCreateAlbum">
+          创建
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Album image description edit dialog -->
+    <el-dialog v-model="albumDescDialogVisible" title="编辑作品集图片描述" width="480px">
+      <el-input
+        v-model="albumDescEditValue"
+        type="textarea"
+        :rows="4"
+        placeholder="输入这张图片在作品集中的描述..."
+        maxlength="500"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="albumDescDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="albumDescSaving" @click="saveAlbumImageDescription">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Add image to album dialog -->
+    <el-dialog v-model="showAddImageDialog" title="添加图片到作品集" width="640px">
+      <p class="add-image-hint">选择要添加到「{{ selectedAlbum?.title }}」的图片：</p>
+      <div class="add-image-grid">
+        <button
+          v-for="img in availableImagesForAlbum"
+          :key="img.id"
+          type="button"
+          class="add-image-option"
+          :class="{ selected: imagesToAdd.includes(img.id) }"
+          @click="toggleImageToAdd(img.id)"
+        >
+          <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
+          <span v-if="imagesToAdd.includes(img.id)" class="add-check">
+            <el-icon><Check /></el-icon>
+          </span>
+        </button>
+      </div>
+      <div v-if="!availableImagesForAlbum.length" class="soft-empty small">
+        没有可添加的图片。
+      </div>
+      <template #footer>
+        <el-button @click="showAddImageDialog = false">取消</el-button>
+        <el-button type="primary" :loading="addingImages" :disabled="!imagesToAdd.length" @click="handleAddImages">
+          添加 ({{ imagesToAdd.length }})
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -218,11 +421,16 @@ import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, wa
 import { useRouter } from 'vue-router'
 import { ElButton, ElIcon, ElMessage, ElMessageBox } from 'element-plus'
 import {
+  ArrowLeft,
+  Check,
   Delete,
+  Edit,
+  Files,
   FolderOpened,
   Lock,
   MoreFilled,
   Picture,
+  Plus,
   Setting,
   Star,
   TrendCharts,
@@ -233,8 +441,17 @@ import {
 import * as echarts from 'echarts'
 import { useUserStore } from '@/store/user'
 import { getUserStats } from '@/api/auth'
-import { uploadImage, getUserImages, deleteImage, updateImageVisibility } from '@/api/image'
+import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription } from '@/api/image'
 import { getUserCollections, getUserLikes } from '@/api/community'
+import {
+  createAlbum,
+  getAlbums,
+  getAlbumDetail,
+  deleteAlbum,
+  addImageToAlbum,
+  removeImageFromAlbum,
+  updateAlbumImageDescription
+} from '@/api/album'
 
 const ContentFeed = defineComponent({
   name: 'ContentFeed',
@@ -309,6 +526,35 @@ const previewVisible = ref(false)
 const previewImage = ref(null)
 const trendChartRef = ref(null)
 let trendChart = null
+
+// Description editing
+const descDialogVisible = ref(false)
+const descEditValue = ref('')
+const descSaving = ref(false)
+let descEditTarget = null
+
+// Album state
+const albums = ref([])
+const loadingAlbums = ref(false)
+const selectedAlbum = ref(null)
+const showCreateAlbumDialog = ref(false)
+const albumSaving = ref(false)
+const newAlbum = ref({
+  title: '',
+  description: '',
+  coverImage: null
+})
+
+// Album image description editing
+const albumDescDialogVisible = ref(false)
+const albumDescEditValue = ref('')
+const albumDescSaving = ref(false)
+let albumDescEditTarget = null
+
+// Add image to album
+const showAddImageDialog = ref(false)
+const imagesToAdd = ref([])
+const addingImages = ref(false)
 
 const avatarText = computed(() => {
   const source = userInfo.value.nickname || userInfo.value.username || 'U'
@@ -425,7 +671,8 @@ const fetchInitialData = async () => {
     fetchImages(),
     fetchStats(),
     fetchCollections(),
-    fetchLikes()
+    fetchLikes(),
+    fetchAlbums()
   ])
 }
 
@@ -433,6 +680,8 @@ const handleTabChange = async (tab) => {
   if (tab === 'insights') {
     await nextTick()
     renderTrendChart()
+  } else if (tab === 'albums') {
+    fetchAlbums()
   }
 }
 
@@ -477,7 +726,7 @@ const viewImage = (image) => {
 
 const openInWorkbench = (image) => {
   if (image?.url) {
-    localStorage.setItem('last-open-image', image.url)
+    localStorage.setItem('pixel_lab_workbench_image', image.url)
   }
   previewVisible.value = false
   router.push('/workbench')
@@ -528,6 +777,155 @@ const goToCommunity = (imageId) => {
     router.push({ path: '/community', query: { id: imageId } })
   } else {
     router.push('/community')
+  }
+}
+
+// Description editing functions
+const openDescriptionEdit = (image) => {
+  descEditTarget = image
+  descEditValue.value = image.description || ''
+  descDialogVisible.value = true
+}
+
+const saveDescription = async () => {
+  if (!descEditTarget) return
+  descSaving.value = true
+  try {
+    await updateImageDescription(descEditTarget.id, descEditValue.value)
+    descEditTarget.description = descEditValue.value
+    ElMessage.success('说明已更新')
+    descDialogVisible.value = false
+  } catch (error) {
+    console.error('更新说明失败:', error)
+    ElMessage.error('更新失败')
+  } finally {
+    descSaving.value = false
+  }
+}
+
+// Album functions
+const fetchAlbums = async () => {
+  loadingAlbums.value = true
+  try {
+    const res = await getAlbums({ pageSize: 50 })
+    albums.value = res.list || []
+  } catch (error) {
+    console.error('获取作品集失败:', error)
+  } finally {
+    loadingAlbums.value = false
+  }
+}
+
+const openAlbumDetail = async (album) => {
+  try {
+    const res = await getAlbumDetail(album.id)
+    selectedAlbum.value = res
+  } catch (error) {
+    console.error('获取作品集详情失败:', error)
+    ElMessage.error('获取详情失败')
+  }
+}
+
+const handleCreateAlbum = async () => {
+  if (!newAlbum.value.title.trim()) return
+  albumSaving.value = true
+  try {
+    const data = {
+      title: newAlbum.value.title.trim(),
+      description: newAlbum.value.description.trim()
+    }
+    if (newAlbum.value.coverImage) {
+      data.cover_image_id = newAlbum.value.coverImage.id
+    }
+    const res = await createAlbum(data)
+    albums.value.unshift(res)
+    ElMessage.success('作品集创建成功')
+    showCreateAlbumDialog.value = false
+    newAlbum.value = { title: '', description: '', coverImage: null }
+  } catch (error) {
+    console.error('创建作品集失败:', error)
+    ElMessage.error('创建失败')
+  } finally {
+    albumSaving.value = false
+  }
+}
+
+const confirmRemoveImage = (img) => {
+  ElMessageBox.confirm(
+    `确定将此图片从作品集中移除吗？`,
+    '确认移除',
+    {
+      confirmButtonText: '移除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await removeImageFromAlbum(selectedAlbum.value.id, img.id)
+      selectedAlbum.value.images = selectedAlbum.value.images.filter(i => i.id !== img.id)
+      ElMessage.success('已移除')
+    } catch (error) {
+      console.error('移除图片失败:', error)
+      ElMessage.error('移除失败')
+    }
+  }).catch(() => {})
+}
+
+// Album image description editing
+const openAlbumImageDescEdit = (img) => {
+  albumDescEditTarget = img
+  albumDescEditValue.value = img.description || ''
+  albumDescDialogVisible.value = true
+}
+
+const saveAlbumImageDescription = async () => {
+  if (!albumDescEditTarget || !selectedAlbum.value) return
+  albumDescSaving.value = true
+  try {
+    await updateAlbumImageDescription(selectedAlbum.value.id, albumDescEditTarget.id, albumDescEditValue.value)
+    albumDescEditTarget.description = albumDescEditValue.value
+    ElMessage.success('描述已更新')
+    albumDescDialogVisible.value = false
+  } catch (error) {
+    console.error('更新描述失败:', error)
+    ElMessage.error('更新失败')
+  } finally {
+    albumDescSaving.value = false
+  }
+}
+
+// Add images to album
+const availableImagesForAlbum = computed(() => {
+  if (!selectedAlbum.value?.images) return images.value
+  const existingIds = new Set(selectedAlbum.value.images.map(img => img.id))
+  return images.value.filter(img => !existingIds.has(img.id))
+})
+
+const toggleImageToAdd = (id) => {
+  const idx = imagesToAdd.value.indexOf(id)
+  if (idx >= 0) {
+    imagesToAdd.value.splice(idx, 1)
+  } else {
+    imagesToAdd.value.push(id)
+  }
+}
+
+const handleAddImages = async () => {
+  if (!selectedAlbum.value || !imagesToAdd.value.length) return
+  addingImages.value = true
+  try {
+    await addImageToAlbum(selectedAlbum.value.id, { image_ids: imagesToAdd.value })
+    // Refresh album detail
+    const res = await getAlbumDetail(selectedAlbum.value.id)
+    selectedAlbum.value = res
+    imagesToAdd.value = []
+    showAddImageDialog.value = false
+    ElMessage.success('图片已添加')
+  } catch (error) {
+    console.error('添加图片失败:', error)
+    ElMessage.error('添加失败')
+  } finally {
+    addingImages.value = false
   }
 }
 
@@ -615,7 +1013,13 @@ watch(activeTab, async (tab) => {
   if (tab === 'insights') {
     await nextTick()
     renderTrendChart()
+  } else if (tab === 'albums') {
+    fetchAlbums()
   }
+})
+
+watch(showAddImageDialog, (val) => {
+  if (!val) imagesToAdd.value = []
 })
 
 onMounted(() => {
@@ -1077,6 +1481,279 @@ onUnmounted(() => {
   clip: rect(0 0 0 0);
 }
 
+/* Image description editing */
+.image-desc {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.desc-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.desc-edit-btn:hover {
+  text-decoration: underline;
+}
+
+/* Album grid */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+}
+
+.album-card {
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.album-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-3px);
+}
+
+.album-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--background-muted);
+}
+
+.album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground-subtle);
+  font-size: 48px;
+}
+
+.album-count {
+  position: absolute;
+  bottom: var(--space-2);
+  right: var(--space-2);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.album-meta {
+  padding: var(--space-4);
+}
+
+.album-meta h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-desc-snippet {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--foreground-muted);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.album-date {
+  margin-top: var(--space-2);
+  color: var(--foreground-subtle);
+  font-size: 12px;
+}
+
+/* Album image list */
+.album-image-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.album-image-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--background-muted);
+  padding: var(--space-3);
+}
+
+.album-image-cover {
+  flex: 0 0 100px;
+  width: 100px;
+  height: 100px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.album-image-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-image-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.album-image-info h4 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-image-desc {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--foreground-muted);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Cover picker in album creation */
+.cover-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cover-preview img {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.cover-picker p {
+  margin: 0 0 var(--space-2);
+  color: var(--foreground-muted);
+  font-size: 13px;
+}
+
+.cover-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: var(--space-2);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cover-option {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cover-option.active {
+  border-color: var(--primary);
+}
+
+.cover-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Add image to album */
+.add-image-hint {
+  margin: 0 0 var(--space-4);
+  color: var(--foreground-muted);
+  font-size: 14px;
+}
+
+.add-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: var(--space-2);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.add-image-option {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.add-image-option.selected {
+  border-color: var(--primary);
+}
+
+.add-image-option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.add-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: #fff;
+  font-size: 12px;
+}
+
 @media (max-width: 1180px) {
   .profile-hero,
   .insights-grid {
@@ -1119,6 +1796,14 @@ onUnmounted(() => {
 
   .trend-chart {
     height: 300px;
+  }
+
+  .album-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .album-image-item {
+    flex-wrap: wrap;
   }
 }
 

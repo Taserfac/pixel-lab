@@ -45,6 +45,7 @@
           @undo="undo"
           @redo="redo"
           @reset="resetImage"
+          @templates="templatePanelVisible = true"
           @change-image="showImageSelector"
           @save="saveToGallery"
           @download="downloadImage"
@@ -66,11 +67,56 @@
       :image-src="originalImage?.src || ''"
       @confirm="handleCropConfirm"
     />
+
+    <!-- 模板选择对话框 -->
+    <TemplatePanel
+      v-model="templatePanelVisible"
+      @select="applyTemplate"
+    />
+
+    <!-- 导出格式对话框 -->
+    <el-dialog
+      v-model="exportDialogVisible"
+      title="导出设置"
+      width="400px"
+    >
+      <div class="export-options">
+        <div class="export-format-group">
+          <label>导出格式</label>
+          <el-radio-group v-model="exportFormat">
+            <el-radio-button value="png">PNG</el-radio-button>
+            <el-radio-button value="jpeg">JPG</el-radio-button>
+            <el-radio-button value="webp">WebP</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div
+          v-if="exportFormat !== 'png'"
+          class="export-quality"
+        >
+          <label>质量 ({{ exportQuality }}%)</label>
+          <el-slider
+            v-model="exportQuality"
+            :min="10"
+            :max="100"
+            :step="5"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="exportDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          @click="confirmExport"
+        >
+          下载
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ImportArea from './components/ImportArea.vue'
 import ToolBar from './components/ToolBar.vue'
@@ -78,8 +124,18 @@ import CanvasArea from './components/CanvasArea.vue'
 import ActionBar from './components/ActionBar.vue'
 import ImageSelector from './components/ImageSelector.vue'
 import CropDialog from './components/CropDialog.vue'
+import TemplatePanel from './components/TemplatePanel.vue'
 import { getUserImages, uploadImage } from '@/api/image'
 import { useHistory } from './composables/useHistory'
+
+// ========== 自动加载图片 ==========
+onMounted(() => {
+  const pendingImage = localStorage.getItem('pixel_lab_workbench_image')
+  if (pendingImage) {
+    localStorage.removeItem('pixel_lab_workbench_image')
+    loadImage(pendingImage, 'uploaded_image.png')
+  }
+})
 
 // ========== 组件 refs ==========
 const canvasAreaRef = ref(null)
@@ -96,6 +152,14 @@ const myImages = ref([])
 
 // 裁剪对话框
 const cropDialogVisible = ref(false)
+
+// 模板面板
+const templatePanelVisible = ref(false)
+
+// 导出格式
+const exportDialogVisible = ref(false)
+const exportFormat = ref('png')
+const exportQuality = ref(90)
 
 // 滤镜选项
 const filters = [
@@ -479,14 +543,27 @@ const saveToGallery = async () => {
 }
 
 const downloadImage = () => {
+  exportDialogVisible.value = true
+}
+
+const confirmExport = () => {
   const canvas = canvasAreaRef.value?.canvas
   if (!canvas) return
 
+  const mimeType = `image/${exportFormat.value}`
+  const quality = exportFormat.value === 'png' ? undefined : exportQuality.value / 100
+  const ext = exportFormat.value === 'jpeg' ? 'jpg' : exportFormat.value
+
   const link = document.createElement('a')
-  link.download = `edited_${currentImage.value?.name || 'image.png'}`
-  link.href = canvas.toDataURL('image/png', 1.0)
+  link.download = `edited_${currentImage.value?.name || 'image'}.${ext}`
+  link.href = canvas.toDataURL(mimeType, quality)
   link.click()
+  exportDialogVisible.value = false
   ElMessage.success('下载成功')
+}
+
+const applyTemplate = (template) => {
+  ElMessage.success(`已应用模板: ${template.name} (${template.width}×${template.height})`)
 }
 </script>
 
@@ -513,5 +590,19 @@ const downloadImage = () => {
   gap: var(--space-6);
   min-height: 0;
   overflow: hidden;
+}
+
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.export-format-group label,
+.export-quality label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  font-size: 14px;
 }
 </style>

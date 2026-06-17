@@ -4,7 +4,7 @@
     <div class="search-bar">
       <el-input
         v-model="keyword"
-        placeholder="搜索作品、标签..."
+        :placeholder="$t('community.searchPlaceholder')"
         :prefix-icon="Search"
         clearable
         @keyup.enter="handleSearch"
@@ -15,15 +15,29 @@
           :type="sortBy === 'latest' ? 'primary' : 'default'"
           @click="changeSort('latest')"
         >
-          最新
+          {{ $t('community.latest') }}
         </el-button>
         <el-button
           :type="sortBy === 'popular' ? 'primary' : 'default'"
           @click="changeSort('popular')"
         >
-          最热
+          {{ $t('community.hottest') }}
         </el-button>
       </div>
+    </div>
+
+    <!-- 标签筛选栏 -->
+    <div class="tag-filter-bar">
+      <button
+        v-for="tag in tagList"
+        :key="tag"
+        type="button"
+        class="tag-filter-chip"
+        :class="{ active: activeTag === tag }"
+        @click="selectTag(tag)"
+      >
+        {{ tag === '全部' ? $t('community.all') : `#${tag}` }}
+      </button>
     </div>
 
     <!-- 作品列表 -->
@@ -36,34 +50,42 @@
         :key="work.id"
         :work="work"
         :style="{ '--post-ratio': getCardRatio(index) }"
-        @select="openDetail"
+        @select="openLightbox"
+        @tag-click="handleTagClick"
+      />
+    </div>
+
+    <!-- 无限滚动哨兵 -->
+    <div
+      v-if="hasMore"
+      ref="scrollSentinel"
+      class="scroll-sentinel"
+    >
+      <el-button
+        v-if="loadingMore"
+        :loading="true"
+        text
       />
     </div>
 
     <!-- 空状态 -->
     <EmptyState
       v-if="!loading && works.length === 0"
-      title="暂无作品"
-      description="还没有公开的作品，快来上传你的第一个作品吧！"
+      :title="$t('community.noWorks')"
+      :description="$t('community.noWorksDesc')"
     />
 
-    <!-- 加载更多 -->
-    <div
-      v-if="hasMore"
-      class="load-more"
-    >
-      <el-button
-        :loading="loadingMore"
-        @click="loadMore"
-      >
-        加载更多
-      </el-button>
-    </div>
+    <!-- 图片灯箱 -->
+    <ImageLightbox
+      v-model="lightboxVisible"
+      :url="lightboxUrl"
+      :alt="lightboxAlt"
+    />
 
     <!-- 作品详情弹窗 -->
     <el-dialog
       v-model="detailVisible"
-      :title="currentWork?.title || currentWork?.original_name || '作品详情'"
+      :title="currentWork?.title || currentWork?.original_name || $t('workDetail.details')"
       width="800px"
       class="detail-dialog"
     >
@@ -86,7 +108,7 @@
               {{ currentWork.author_name?.charAt(0) || '?' }}
             </el-avatar>
             <div class="author-info">
-              <span class="name">{{ currentWork.author_name || '匿名' }}</span>
+              <span class="name">{{ currentWork.author_name || $t('workDetail.anonymous') }}</span>
               <span class="time">{{ formatTime(currentWork.created_at) }}</span>
             </div>
           </div>
@@ -99,9 +121,9 @@
           </div>
 
           <div class="detail-stats">
-            <span><el-icon><View /></el-icon> {{ currentWork.view_count || 0 }} 浏览</span>
-            <span>♡ {{ currentWork.like_count || 0 }} 点赞</span>
-            <span><el-icon><CollectionTag /></el-icon> {{ currentWork.collect_count || 0 }} 收藏</span>
+            <span><el-icon><View /></el-icon> {{ currentWork.view_count || 0 }} {{ $t('workDetail.views') }}</span>
+            <span>♡ {{ currentWork.like_count || 0 }} {{ $t('workDetail.likes') }}</span>
+            <span><el-icon><CollectionTag /></el-icon> {{ currentWork.collect_count || 0 }} {{ $t('workDetail.collects') }}</span>
           </div>
 
           <div class="detail-actions">
@@ -110,37 +132,49 @@
               @click="handleLike"
             >
               {{ currentWork.isLiked ? '♥' : '♡' }}
-              {{ currentWork.isLiked ? '已点赞' : '点赞' }}
+              {{ currentWork.isLiked ? $t('workDetail.liked') : $t('workDetail.unliked') }}
             </el-button>
             <el-button
               :class="{ 'collected': currentWork.isCollected }"
               @click="handleCollect"
             >
               <el-icon><FolderOpened /></el-icon>
-              {{ currentWork.isCollected ? '已收藏' : '收藏' }}
+              {{ currentWork.isCollected ? $t('workDetail.collected') : $t('workDetail.uncollected') }}
+            </el-button>
+            <el-button @click="handleShare">
+              <el-icon><Share /></el-icon> {{ $t('action.share') }}
             </el-button>
           </div>
 
           <!-- 评论区 -->
           <div class="comments-section">
-            <h4>评论 ({{ currentWork.comment_count || 0 }})</h4>
+            <h4>{{ $t('community.comments') }} ({{ currentWork.comment_count || 0 }})</h4>
 
             <div class="comment-input">
               <el-input
                 v-model="commentContent"
                 type="textarea"
                 :rows="2"
-                placeholder="写下你的评论..."
+                :placeholder="replyTo ? `回复 @${replyTo}...` : $t('community.commentPlaceholder')"
                 maxlength="500"
                 show-word-limit
               />
-              <el-button
-                type="primary"
-                :disabled="!commentContent.trim()"
-                @click="submitComment"
-              >
-                发表
-              </el-button>
+              <div class="comment-input-actions">
+                <el-button
+                  v-if="replyTo"
+                  text
+                  @click="cancelReply"
+                >
+                  取消回复
+                </el-button>
+                <el-button
+                  type="primary"
+                  :disabled="!commentContent.trim()"
+                  @click="submitComment"
+                >
+                  {{ $t('community.publish') }}
+                </el-button>
+              </div>
             </div>
 
             <div class="comments-list">
@@ -157,21 +191,73 @@
                 </el-avatar>
                 <div class="comment-content">
                   <div class="comment-header">
-                    <span class="comment-author">{{ comment.nickname || '匿名' }}</span>
+                    <span class="comment-author">{{ comment.nickname || $t('workDetail.anonymous') }}</span>
                     <span class="comment-time">{{ formatTime(comment.created_at) }}</span>
                   </div>
                   <p class="comment-text">
                     {{ comment.content }}
                   </p>
+                  <button
+                    type="button"
+                    class="reply-btn"
+                    @click="setReplyTo(comment)"
+                  >
+                    回复
+                  </button>
+                  <!-- 子评论 -->
+                  <div
+                    v-if="comment.replies && comment.replies.length"
+                    class="comment-replies"
+                  >
+                    <div
+                      v-for="reply in comment.replies"
+                      :key="reply.id"
+                      class="reply-item"
+                    >
+                      <el-avatar
+                        :size="24"
+                        :src="reply.avatar"
+                      >
+                        {{ reply.nickname?.charAt(0) || '?' }}
+                      </el-avatar>
+                      <div class="reply-content">
+                        <span class="reply-author">{{ reply.nickname || $t('workDetail.anonymous') }}</span>
+                        <span v-if="reply.replyTo" class="reply-to"> 回复 {{ reply.replyTo }}</span>
+                        <p>{{ reply.content }}</p>
+                        <span class="reply-time">{{ formatTime(reply.created_at) }}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <EmptyState
                 v-if="comments.length === 0"
-                title="暂无评论"
-                description="快来发表第一条评论吧！"
+                :title="$t('community.noComments')"
+                :description="$t('community.noCommentsDesc')"
                 :show-action="false"
               />
+            </div>
+          </div>
+
+          <!-- 相似作品推荐 -->
+          <div
+            v-if="similarWorks.length"
+            class="similar-section"
+          >
+            <h4>相似作品</h4>
+            <div class="similar-grid">
+              <div
+                v-for="sw in similarWorks"
+                :key="sw.id"
+                class="similar-item"
+                @click="openDetail(sw)"
+              >
+                <img
+                  :src="sw.url"
+                  :alt="sw.title"
+                >
+              </div>
             </div>
           </div>
         </div>
@@ -181,12 +267,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
-import { Search, View, CollectionTag, FolderOpened } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+import { Search, View, CollectionTag, FolderOpened, Share } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PostCard from '@/components/community/PostCard.vue'
+import ImageLightbox from '@/components/common/ImageLightbox.vue'
 import {
   getPublicImages,
   getImageDetail,
@@ -199,6 +287,7 @@ import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 const route = useRoute()
+const { t } = useI18n()
 
 const loading = ref(false)
 const loadingMore = ref(false)
@@ -206,9 +295,11 @@ const keyword = ref('')
 const sortBy = ref('latest')
 const works = ref([])
 const page = ref(1)
-const pageSize = ref(12) // 减少每页数量，提升加载速度
+const pageSize = ref(12)
 const total = ref(0)
 const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
+const activeTag = ref('')
+const tagList = ['全部', '插画', '摄影', '设计', 'UI设计', '像素艺术', 'AI艺术']
 
 const hasMore = computed(() => works.value.length < total.value)
 
@@ -216,6 +307,17 @@ const detailVisible = ref(false)
 const currentWork = ref(null)
 const comments = ref([])
 const commentContent = ref('')
+const replyTo = ref('')
+const similarWorks = ref([])
+
+// 灯箱状态
+const lightboxVisible = ref(false)
+const lightboxUrl = ref('')
+const lightboxAlt = ref('')
+
+// 无限滚动
+const scrollSentinel = ref(null)
+let scrollObserver = null
 
 const loadWorks = async (reset = false) => {
   if (reset) {
@@ -251,9 +353,28 @@ const changeSort = (sort) => {
   loadWorks(true)
 }
 
-const loadMore = () => {
-  page.value++
-  loadWorks()
+const selectTag = (tag) => {
+  if (tag === '全部' || tag === activeTag.value) {
+    activeTag.value = ''
+    keyword.value = ''
+  } else {
+    activeTag.value = tag
+    keyword.value = tag
+  }
+  loadWorks(true)
+}
+
+const handleTagClick = (tag) => {
+  activeTag.value = tag
+  keyword.value = tag
+  loadWorks(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+const openLightbox = (work) => {
+  lightboxUrl.value = work.url || work.image_url || ''
+  lightboxAlt.value = work.title || work.original_name || ''
+  lightboxVisible.value = true
 }
 
 const getCardRatio = (index) => cardRatios[index % cardRatios.length]
@@ -263,12 +384,12 @@ const openDetail = async (work) => {
   try {
     const res = await getImageDetail(work.id)
     currentWork.value = res
-    // 同步更新列表中的浏览量（详情页会+1）
     const workInList = works.value.find(w => w.id === work.id)
     if (workInList && res.view_count) {
       workInList.view_count = res.view_count
     }
     loadComments(work.id)
+    loadSimilarWorks(work.id)
   } catch (error) {
     console.error('获取详情失败:', error)
   }
@@ -283,6 +404,16 @@ const loadComments = async (imageId) => {
   }
 }
 
+const loadSimilarWorks = async (imageId) => {
+  try {
+    const { getSimilarWorks } = await import('@/api/social')
+    const res = await getSimilarWorks(imageId, { limit: 4 })
+    similarWorks.value = res.list || res || []
+  } catch {
+    similarWorks.value = []
+  }
+}
+
 const handleLike = async () => {
   if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录')
@@ -292,7 +423,6 @@ const handleLike = async () => {
     const res = await toggleLike(currentWork.value.id)
     currentWork.value.isLiked = res.liked
     currentWork.value.like_count += res.liked ? 1 : -1
-    // 同步更新列表中的数据
     const workInList = works.value.find(w => w.id === currentWork.value.id)
     if (workInList) {
       workInList.isLiked = res.liked
@@ -313,7 +443,6 @@ const handleCollect = async () => {
     const res = await toggleCollect(currentWork.value.id)
     currentWork.value.isCollected = res.collected
     currentWork.value.collect_count += res.collected ? 1 : -1
-    // 同步更新列表中的数据
     const workInList = works.value.find(w => w.id === currentWork.value.id)
     if (workInList) {
       workInList.isCollected = res.collected
@@ -325,18 +454,50 @@ const handleCollect = async () => {
   }
 }
 
+const handleShare = async () => {
+  const url = window.location.origin + `/community?id=${currentWork.value.id}`
+  const title = currentWork.value.title || 'Pixel Lab 作品'
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url })
+    } catch {}
+  } else {
+    try {
+      await navigator.clipboard.writeText(url)
+      ElMessage.success(t('common.copySuccess'))
+    } catch {
+      ElMessage.info('请手动复制链接: ' + url)
+    }
+  }
+}
+
+const setReplyTo = (comment) => {
+  replyTo.value = comment.nickname || '匿名'
+  commentContent.value = ''
+}
+
+const cancelReply = () => {
+  replyTo.value = ''
+  commentContent.value = ''
+}
+
 const submitComment = async () => {
   if (!userStore.isLoggedIn) {
     ElMessage.warning('请先登录')
     return
   }
   try {
-    await addComment({
+    const data = {
       imageId: currentWork.value.id,
       content: commentContent.value
-    })
+    }
+    if (replyTo.value) {
+      data.replyTo = replyTo.value
+    }
+    await addComment(data)
     ElMessage.success('评论成功')
     commentContent.value = ''
+    replyTo.value = ''
     loadComments(currentWork.value.id)
     currentWork.value.comment_count++
   } catch (error) {
@@ -354,6 +515,19 @@ const formatTime = (time) => {
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
   if (diff < 604800000) return `${Math.floor(diff / 86400000)} 天前`
   return date.toLocaleDateString()
+}
+
+const setupInfiniteScroll = () => {
+  nextTick(() => {
+    if (!scrollSentinel.value) return
+    scrollObserver = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore.value && !loadingMore.value && !loading.value) {
+        page.value++
+        loadWorks()
+      }
+    }, { rootMargin: '200px' })
+    scrollObserver.observe(scrollSentinel.value)
+  })
 }
 
 watch(
@@ -375,12 +549,15 @@ onMounted(async () => {
   if (route.query.keyword) {
     keyword.value = String(route.query.keyword)
   }
-
   await loadWorks(true)
-
+  setupInfiniteScroll()
   if (route.query.id) {
     openDetail({ id: route.query.id })
   }
+})
+
+onUnmounted(() => {
+  scrollObserver?.disconnect()
 })
 </script>
 
@@ -411,6 +588,40 @@ onMounted(async () => {
 .sort-buttons {
   display: flex;
   gap: var(--space-2);
+}
+
+.tag-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.tag-filter-chip {
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--background-muted);
+  color: var(--foreground-muted);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.tag-filter-chip:hover {
+  color: var(--primary);
+  background: var(--primary-muted);
+  transform: translateY(-1px);
+}
+
+.tag-filter-chip.active {
+  color: white;
+  background: var(--primary);
+  box-shadow: var(--glow-sm);
 }
 
 .works-grid {
@@ -568,6 +779,105 @@ onMounted(async () => {
   color: var(--foreground-muted);
 }
 
+.comment-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.reply-btn {
+  border: 0;
+  background: transparent;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.reply-btn:hover {
+  color: var(--primary);
+}
+
+.comment-replies {
+  margin-top: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--border);
+}
+
+.reply-item {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.reply-content {
+  flex: 1;
+  font-size: 12px;
+}
+
+.reply-author {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.reply-to {
+  color: var(--foreground-muted);
+}
+
+.reply-content p {
+  margin: 2px 0;
+  color: var(--foreground-muted);
+  line-height: 1.5;
+}
+
+.reply-time {
+  color: var(--foreground-subtle, var(--foreground-muted));
+  font-size: 11px;
+}
+
+.scroll-sentinel {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) 0;
+}
+
+.similar-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.similar-section h4 {
+  margin-bottom: var(--space-4);
+  font-weight: 600;
+}
+
+.similar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.similar-item {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.similar-item:hover {
+  transform: scale(1.05);
+}
+
+.similar-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 @media (max-width: 768px) {
   .search-bar {
     align-items: stretch;
@@ -576,6 +886,15 @@ onMounted(async () => {
 
   .search-bar .el-input {
     max-width: none;
+  }
+
+  .tag-filter-bar {
+    gap: var(--space-1);
+  }
+
+  .tag-filter-chip {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 
   .works-grid {

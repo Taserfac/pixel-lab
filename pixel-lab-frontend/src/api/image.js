@@ -44,3 +44,12 @@ export const deleteImage = (id) => {
 export const updateImageVisibility = (id, isPublic) => {
   return request.post(`/api/images/${id}/visibility`, { isPublic })
 }
+
+/**
+ * 更新图片说明
+ * @param {number} id - 图片ID
+ * @param {string} description - 说明文字
+ */
+export const updateImageDescription = (id, description) => {
+  return request.patch(`/api/images/${id}/description`, { description })
+}

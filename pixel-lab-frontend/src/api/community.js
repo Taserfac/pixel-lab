@@ -1,8 +1,8 @@
 import request from '@/utils/request'
 
 // 获取公开作品列表
-export function getPublicImages(params) {
-  return request.get('/api/community/images', { params })
+export function getPublicImages(params, config = {}) {
+  return request.get('/api/community/images', { params, ...config })
 }
 
 // 获取作品详情
@@ -46,6 +46,6 @@ export function getUserLikes(params) {
 }
 
 // 获取社区动态
-export function getActivities(params) {
-  return request.get('/api/community/activities', { params })
+export function getActivities(params, config = {}) {
+  return request.get('/api/community/activities', { params, ...config })
 }
