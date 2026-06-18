@@ -60,3 +60,8 @@ CREATE TABLE IF NOT EXISTS `album_images` (
   CONSTRAINT `fk_ai_album` FOREIGN KEY (`album_id`) REFERENCES `albums` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_ai_image` FOREIGN KEY (`image_id`) REFERENCES `image` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 用户封禁字段
+ALTER TABLE `user` ADD COLUMN `ban_days` INT DEFAULT NULL COMMENT '封禁天数，0=永久' AFTER `status`;
+ALTER TABLE `user` ADD COLUMN `ban_reason` VARCHAR(255) DEFAULT NULL COMMENT '封禁原因' AFTER `ban_days`;
+ALTER TABLE `user` ADD COLUMN `ban_end_at` TIMESTAMP NULL DEFAULT NULL COMMENT '封禁到期时间' AFTER `ban_reason`;

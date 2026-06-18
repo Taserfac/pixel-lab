@@ -34,6 +34,13 @@ public class AdminServlet extends BaseApiServlet {
             request.getParameter("status")));
         return;
       }
+      if (segments.size() == 1 && "albums".equals(segments.get(0))) {
+        ok(response, dao.albums(
+            RequestUtil.intParam(request, "page", 1),
+            RequestUtil.intParam(request, "pageSize", 20),
+            request.getParameter("keyword")));
+        return;
+      }
       if (segments.size() == 1 && "stats".equals(segments.get(0))) {
         ok(response, dao.platformStats(SessionListener.getOnlineCount()));
         return;
@@ -59,12 +66,41 @@ public class AdminServlet extends BaseApiServlet {
         }
         Map<String, Object> body = body(request);
         int status = Integer.parseInt(String.valueOf(body.get("status")));
-        boolean updated = dao.updateUserStatus(userId, status);
+        if (status == 0) {
+          // 封禁用户
+          int banDays = body.containsKey("banDays") ? Integer.parseInt(String.valueOf(body.get("banDays"))) : 0;
+          String banReason = RequestUtil.string(body, "banReason");
+          dao.banUser(userId, banDays, banReason);
+          ok(response, "已封禁", null);
+        } else {
+          // 解封用户
+          dao.updateUserStatus(userId, status);
+          ok(response, "已启用", null);
+        }
+        return;
+      }
+      if (segments.size() == 3 && "images".equals(segments.get(0)) && "status".equals(segments.get(2))) {
+        long imageId = parseId(segments.get(1));
+        Map<String, Object> body = body(request);
+        int status = Integer.parseInt(String.valueOf(body.get("status")));
+        boolean updated = dao.banImage(imageId, status);
         if (!updated) {
-          Result.notFound(response, "用户不存在");
+          Result.notFound(response, "作品不存在");
           return;
         }
-        ok(response, status == 1 ? "已启用" : "已禁用", null);
+        ok(response, status == 2 ? "已封禁" : "已恢复", null);
+        return;
+      }
+      if (segments.size() == 3 && "albums".equals(segments.get(0)) && "status".equals(segments.get(2))) {
+        long albumId = parseId(segments.get(1));
+        Map<String, Object> body = body(request);
+        int status = Integer.parseInt(String.valueOf(body.get("status")));
+        boolean updated = dao.banAlbum(albumId, status);
+        if (!updated) {
+          Result.notFound(response, "作品集不存在");
+          return;
+        }
+        ok(response, status == 2 ? "已封禁" : "已恢复", null);
         return;
       }
       if (segments.size() == 3 && "users".equals(segments.get(0)) && "role".equals(segments.get(2))) {
@@ -101,6 +137,15 @@ public class AdminServlet extends BaseApiServlet {
         boolean deleted = new AdminDao(dataSource()).deleteImage(parseId(segments.get(1)));
         if (!deleted) {
           Result.notFound(response, "作品不存在");
+          return;
+        }
+        ok(response, "已删除", null);
+        return;
+      }
+      if (segments.size() == 2 && "albums".equals(segments.get(0))) {
+        boolean deleted = new AdminDao(dataSource()).deleteAlbum(parseId(segments.get(1)));
+        if (!deleted) {
+          Result.notFound(response, "作品集不存在");
           return;
         }
         ok(response, "已删除", null);

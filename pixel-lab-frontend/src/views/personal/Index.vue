@@ -102,6 +102,10 @@
                         </el-icon>
                         {{ isPublic(image) ? '设为私有' : '设为公开' }}
                       </el-dropdown-item>
+                      <el-dropdown-item command="workbench">
+                        <el-icon><EditPen /></el-icon>
+                        在工作台中编辑
+                      </el-dropdown-item>
                       <el-dropdown-item command="delete" divided>
                         <el-icon><Delete /></el-icon>
                         删除
@@ -425,6 +429,7 @@ import {
   Check,
   Delete,
   Edit,
+  EditPen,
   Files,
   FolderOpened,
   Lock,
@@ -735,6 +740,7 @@ const openInWorkbench = (image) => {
 const handleImageCommand = (image, command) => {
   if (command === 'view') viewImage(image)
   if (command === 'visibility') toggleVisibility(image)
+  if (command === 'workbench') openInWorkbench(image)
   if (command === 'delete') confirmDelete(image)
 }
 

@@ -34,7 +34,7 @@ public class AdminDao {
       pageParams.add(pageSize);
       pageParams.add(offset);
       List<Map<String, Object>> rows = query(conn,
-          "SELECT id, username, nickname, avatar, role, status, created_at FROM `user` "
+          "SELECT id, username, nickname, avatar, role, status, ban_days, ban_reason, ban_end_at, created_at FROM `user` "
               + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
           pageParams);
       return pageResult(rows, total, page, pageSize);
@@ -42,7 +42,18 @@ public class AdminDao {
   }
 
   public boolean updateUserStatus(long userId, int status) throws Exception {
-    return update("UPDATE `user` SET status = ? WHERE id = ? AND is_deleted = 0", List.of(status, userId)) > 0;
+    return update("UPDATE `user` SET status = ?, ban_days = NULL, ban_reason = NULL, ban_end_at = NULL WHERE id = ? AND is_deleted = 0", List.of(status, userId)) > 0;
+  }
+
+  public boolean banUser(long userId, int banDays, String banReason) throws Exception {
+    String sql = "UPDATE `user` SET status = 0, ban_days = ?, ban_reason = ?, ban_end_at = ";
+    if (banDays <= 0) {
+      sql += "NULL WHERE id = ? AND is_deleted = 0";
+      return update(sql, List.of(0, banReason, userId)) > 0;
+    } else {
+      sql += "DATE_ADD(NOW(), INTERVAL ? DAY) WHERE id = ? AND is_deleted = 0";
+      return update(sql, List.of(banDays, banReason, banDays, userId)) > 0;
+    }
   }
 
   public boolean updateUserRole(long userId, String role) throws Exception {
@@ -79,6 +90,43 @@ public class AdminDao {
 
   public boolean deleteImage(long imageId) throws Exception {
     return update("UPDATE image SET status = 0 WHERE id = ?", List.of(imageId)) > 0;
+  }
+
+  public boolean banImage(long imageId, int status) throws Exception {
+    return update("UPDATE image SET status = ? WHERE id = ?", List.of(status, imageId)) > 0;
+  }
+
+  public Map<String, Object> albums(int page, int pageSize, String keyword) throws Exception {
+    int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
+    StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
+    List<Object> params = new ArrayList<>();
+    if (keyword != null && !keyword.isBlank()) {
+      where.append(" AND (a.title LIKE ? OR u.nickname LIKE ?) ");
+      String like = "%" + keyword.trim() + "%";
+      params.add(like);
+      params.add(like);
+    }
+    try (Connection conn = dataSource.getConnection()) {
+      long total = count(conn, "SELECT COUNT(*) FROM albums a LEFT JOIN `user` u ON a.user_id = u.id " + where, params);
+      List<Object> pageParams = new ArrayList<>(params);
+      pageParams.add(pageSize);
+      pageParams.add(offset);
+      List<Map<String, Object>> rows = query(conn,
+          "SELECT a.*, u.username, u.nickname AS author_name, "
+              + "(SELECT COUNT(*) FROM album_images ai WHERE ai.album_id = a.id) AS image_count "
+              + "FROM albums a LEFT JOIN `user` u ON a.user_id = u.id "
+              + where + " ORDER BY a.created_at DESC LIMIT ? OFFSET ?",
+          pageParams);
+      return pageResult(rows, total, page, pageSize);
+    }
+  }
+
+  public boolean deleteAlbum(long albumId) throws Exception {
+    return update("UPDATE albums SET status = 0 WHERE id = ?", List.of(albumId)) > 0;
+  }
+
+  public boolean banAlbum(long albumId, int status) throws Exception {
+    return update("UPDATE albums SET status = ? WHERE id = ?", List.of(status, albumId)) > 0;
   }
 
   public Map<String, Object> platformStats(int onlineCount) throws Exception {

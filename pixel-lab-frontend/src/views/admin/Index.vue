@@ -80,11 +80,13 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="100">
+          <el-table-column label="状态" width="140">
             <template #default="{ row }">
-              <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-                {{ row.status === 1 ? '正常' : '禁用' }}
+              <el-tag v-if="row.status === 1" type="success">正常</el-tag>
+              <el-tag v-else-if="row.ban_end_at" type="danger">
+                封禁至 {{ formatDate(row.ban_end_at) }}
               </el-tag>
+              <el-tag v-else type="danger">永久封禁</el-tag>
             </template>
           </el-table-column>
           <el-table-column prop="created_at" label="注册时间" width="160">
@@ -92,7 +94,7 @@
               {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <template v-if="row.id === userStore.userInfo?.id">
                 <span class="self-label">当前用户</span>
@@ -102,17 +104,17 @@
                   v-if="row.status === 1"
                   type="danger"
                   size="small"
-                  @click="handleDisableUser(row)"
+                  @click="handleBanUser(row)"
                 >
-                  禁用
+                  封禁
                 </el-button>
                 <el-button
                   v-else
                   type="success"
                   size="small"
-                  @click="handleEnableUser(row)"
+                  @click="handleUnbanUser(row)"
                 >
-                  启用
+                  解封
                 </el-button>
                 <el-button
                   v-if="row.role !== 'admin'"
@@ -150,6 +152,7 @@
           <el-select v-model="imageStatus" placeholder="状态" clearable @change="fetchImages">
             <el-option label="全部" value="" />
             <el-option label="正常" value="1" />
+            <el-option label="已封禁" value="2" />
             <el-option label="已删除" value="0" />
           </el-select>
           <el-button @click="fetchImages">搜索</el-button>
@@ -173,6 +176,13 @@
               <span class="data-item">❤️ {{ row.like_count || 0 }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="状态" width="80">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === 1" type="success" size="small">正常</el-tag>
+              <el-tag v-else-if="row.status === 2" type="danger" size="small">封禁</el-tag>
+              <el-tag v-else type="info" size="small">已删除</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="公开" width="80">
             <template #default="{ row }">
               <el-tag :type="row.is_public ? 'success' : 'info'" size="small">
@@ -185,16 +195,15 @@
               {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="操作" width="140" fixed="right">
             <template #default="{ row }">
-              <el-button
-                v-if="row.status === 1"
-                type="danger"
-                size="small"
-                @click="handleDeleteImage(row)"
-              >
-                删除
-              </el-button>
+              <template v-if="row.status === 1">
+                <el-button type="danger" size="small" @click="handleDeleteImage(row)">删除</el-button>
+                <el-button type="warning" size="small" @click="handleBanImage(row)">封禁</el-button>
+              </template>
+              <template v-else-if="row.status === 2">
+                <el-button type="success" size="small" @click="handleUnbanImage(row)">解封</el-button>
+              </template>
               <span v-else class="deleted-text">已删除</span>
             </template>
           </el-table-column>
@@ -209,7 +218,96 @@
           />
         </div>
       </el-tab-pane>
+
+      <!-- 作品集管理 -->
+      <el-tab-pane label="作品集管理" name="albums">
+        <div class="search-bar">
+          <el-input
+            v-model="albumSearch"
+            placeholder="搜索作品集标题"
+            clearable
+            @keyup.enter="fetchAlbums"
+            @clear="fetchAlbums"
+          />
+          <el-button @click="fetchAlbums">搜索</el-button>
+        </div>
+        <el-table :data="albums" v-loading="loadingAlbums" stripe>
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="标题" min-width="150">
+            <template #default="{ row }">
+              {{ row.title || '未命名' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="author_name" label="作者" width="100" />
+          <el-table-column label="图片数" width="80">
+            <template #default="{ row }">
+              {{ row.image_count || 0 }}
+            </template>
+          </el-table-column>
+          <el-table-column label="公开" width="80">
+            <template #default="{ row }">
+              <el-tag :type="row.is_public ? 'success' : 'info'" size="small">
+                {{ row.is_public ? '是' : '否' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="80">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === 1" type="success" size="small">正常</el-tag>
+              <el-tag v-else-if="row.status === 2" type="danger" size="small">封禁</el-tag>
+              <el-tag v-else type="info" size="small">已删除</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="创建时间" width="160">
+            <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <template v-if="row.status === 1">
+                <el-button type="danger" size="small" @click="handleDeleteAlbum(row)">删除</el-button>
+                <el-button type="warning" size="small" @click="handleBanAlbum(row)">封禁</el-button>
+              </template>
+              <template v-else-if="row.status === 2">
+                <el-button type="success" size="small" @click="handleUnbanAlbum(row)">解封</el-button>
+              </template>
+              <span v-else class="deleted-text">已删除</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="pagination">
+          <el-pagination
+            v-model:current-page="albumPage"
+            :page-size="10"
+            :total="albumTotal"
+            layout="total, prev, pager, next"
+            @current-change="fetchAlbums"
+          />
+        </div>
+      </el-tab-pane>
     </el-tabs>
+
+    <!-- 封禁用户对话框 -->
+    <el-dialog v-model="banDialogVisible" title="封禁用户" width="420px">
+      <el-form label-position="top">
+        <el-form-item label="封禁天数">
+          <el-radio-group v-model="banDays">
+            <el-radio :value="3">3 天</el-radio>
+            <el-radio :value="7">7 天</el-radio>
+            <el-radio :value="30">30 天</el-radio>
+            <el-radio :value="0">永久</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="封禁原因">
+          <el-input v-model="banReason" type="textarea" :rows="3" placeholder="输入封禁原因（可选）" maxlength="200" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="banDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmBanUser">确认封禁</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -218,7 +316,7 @@ import { ref, onMounted } from 'vue'
 import { User, Picture, View, Star } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats } from '@/api/admin'
+import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats, banUser, banImage, getAlbums, banAlbum, deleteAlbum } from '@/api/admin'
 
 const userStore = useUserStore()
 const activeTab = ref('stats')
@@ -244,6 +342,19 @@ const imageStatus = ref('')
 const imagePage = ref(1)
 const imageTotal = ref(0)
 const loadingImages = ref(false)
+
+// 作品集管理
+const albums = ref([])
+const albumSearch = ref('')
+const albumPage = ref(1)
+const albumTotal = ref(0)
+const loadingAlbums = ref(false)
+
+// 封禁对话框
+const banDialogVisible = ref(false)
+const banDays = ref(7)
+const banReason = ref('')
+const banTargetUser = ref(null)
 
 // 格式化数字
 const formatNumber = (num) => {
@@ -292,28 +403,37 @@ const fetchUsers = async () => {
   }
 }
 
-// 禁用用户
-const handleDisableUser = async (user) => {
+// 封禁用户
+const handleBanUser = (user) => {
+  banTargetUser.value = user
+  banDays.value = 7
+  banReason.value = ''
+  banDialogVisible.value = true
+}
+
+const confirmBanUser = async () => {
+  if (!banTargetUser.value) return
   try {
-    await ElMessageBox.confirm(`确定要禁用用户 "${user.nickname || user.username}" 吗？`, '确认', { type: 'warning' })
-    await updateUserStatus(user.id, 0)
-    ElMessage.success('已禁用')
+    await banUser(banTargetUser.value.id, banDays.value, banReason.value)
+    ElMessage.success('已封禁')
+    banDialogVisible.value = false
+    fetchUsers()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.msg || '操作失败')
+  }
+}
+
+// 解封用户
+const handleUnbanUser = async (user) => {
+  try {
+    await ElMessageBox.confirm(`确定要解封用户 "${user.nickname || user.username}" 吗？`, '确认', { type: 'warning' })
+    await updateUserStatus(user.id, 1)
+    ElMessage.success('已解封')
     fetchUsers()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(error.response?.data?.msg || '操作失败')
     }
-  }
-}
-
-// 启用用户
-const handleEnableUser = async (user) => {
-  try {
-    await updateUserStatus(user.id, 1)
-    ElMessage.success('已启用')
-    fetchUsers()
-  } catch (error) {
-    ElMessage.error(error.response?.data?.msg || '操作失败')
   }
 }
 
@@ -364,10 +484,99 @@ const handleDeleteImage = async (image) => {
   }
 }
 
+// 封禁作品
+const handleBanImage = async (image) => {
+  try {
+    await ElMessageBox.confirm(`确定要封禁作品 "${image.title || image.original_name || '未命名'}" 吗？`, '确认封禁', { type: 'warning' })
+    await banImage(image.id, 2)
+    ElMessage.success('已封禁')
+    fetchImages()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 解封作品
+const handleUnbanImage = async (image) => {
+  try {
+    await ElMessageBox.confirm(`确定要解封作品 "${image.title || image.original_name || '未命名'}" 吗？`, '确认解封', { type: 'warning' })
+    await banImage(image.id, 1)
+    ElMessage.success('已解封')
+    fetchImages()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 获取作品集列表
+const fetchAlbums = async () => {
+  loadingAlbums.value = true
+  try {
+    const res = await getAlbums({
+      page: albumPage.value,
+      pageSize: 10,
+      keyword: albumSearch.value
+    })
+    albums.value = res.list || []
+    albumTotal.value = res.total || 0
+  } catch (error) {
+    console.error('获取作品集失败:', error)
+  } finally {
+    loadingAlbums.value = false
+  }
+}
+
+// 删除作品集
+const handleDeleteAlbum = async (album) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除作品集 "${album.title}" 吗？`, '确认', { type: 'warning' })
+    await deleteAlbum(album.id)
+    ElMessage.success('已删除')
+    fetchAlbums()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 封禁作品集
+const handleBanAlbum = async (album) => {
+  try {
+    await ElMessageBox.confirm(`确定要封禁作品集 "${album.title}" 吗？`, '确认封禁', { type: 'warning' })
+    await banAlbum(album.id, 2)
+    ElMessage.success('已封禁')
+    fetchAlbums()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 解封作品集
+const handleUnbanAlbum = async (album) => {
+  try {
+    await ElMessageBox.confirm(`确定要解封作品集 "${album.title}" 吗？`, '确认解封', { type: 'warning' })
+    await banAlbum(album.id, 1)
+    ElMessage.success('已解封')
+    fetchAlbums()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
 onMounted(() => {
   fetchStats()
   fetchUsers()
   fetchImages()
+  fetchAlbums()
 })
 </script>
 

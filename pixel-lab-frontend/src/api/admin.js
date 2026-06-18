@@ -22,6 +22,41 @@ export const updateUserStatus = (userId, status) => {
 }
 
 /**
+ * 封禁用户
+ */
+export const banUser = (userId, banDays, banReason) => {
+  return patch(`/api/admin/users/${userId}/status`, { status: 0, banDays, banReason })
+}
+
+/**
+ * 封禁/解封作品
+ */
+export const banImage = (imageId, status) => {
+  return patch(`/api/admin/images/${imageId}/status`, { status })
+}
+
+/**
+ * 获取作品集列表
+ */
+export const getAlbums = (params) => {
+  return get('/api/admin/albums', params)
+}
+
+/**
+ * 封禁/解封作品集
+ */
+export const banAlbum = (albumId, status) => {
+  return patch(`/api/admin/albums/${albumId}/status`, { status })
+}
+
+/**
+ * 删除作品集
+ */
+export const deleteAlbum = (albumId) => {
+  return del(`/api/admin/albums/${albumId}`)
+}
+
+/**
  * 更新用户角色
  */
 export const updateUserRole = (userId, role) => {

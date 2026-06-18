@@ -128,7 +128,18 @@ public class AuthServlet extends BaseApiServlet {
     }
     int status = row.get("status") == null ? 1 : ((Number) row.get("status")).intValue();
     if (status != 1) {
-      Result.forbidden(response, "账号已被禁用");
+      String banReason = row.get("ban_reason") == null ? "" : String.valueOf(row.get("ban_reason"));
+      Object banEndAtObj = row.get("ban_end_at");
+      String msg;
+      if (banEndAtObj != null) {
+        msg = "账号已被封禁，到期时间: " + String.valueOf(banEndAtObj).replace("T", " ");
+      } else {
+        msg = "账号已被永久封禁";
+      }
+      if (!banReason.isEmpty()) {
+        msg += "，原因: " + banReason;
+      }
+      Result.forbidden(response, msg);
       return;
     }
 
