@@ -123,7 +123,7 @@ public class AuthServlet extends BaseApiServlet {
     UserDao userDao = new UserDao(dataSource());
     Map<String, Object> row = userDao.findByUsername(username);
     if (row == null || !PasswordUtil.verify(password, String.valueOf(row.get("password")))) {
-      Result.unauthorized(response, "用户名或密码错误");
+      Result.unauthorized(response, "用户名或密码错误，请重新输入");
       return;
     }
     int status = row.get("status") == null ? 1 : ((Number) row.get("status")).intValue();

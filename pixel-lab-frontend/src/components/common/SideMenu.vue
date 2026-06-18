@@ -10,9 +10,7 @@
   >
     <!-- Logo -->
     <div class="logo">
-      <div class="logo-icon">
-        <span class="pixel-text">PX</span>
-      </div>
+      <img class="logo-icon" :src="pixelLabLogo" alt="Pixel Lab logo">
       <span
         v-if="!menuStore.collapsed"
         class="logo-text"
@@ -58,6 +56,7 @@ import { useRoute } from 'vue-router'
 import { useMenuStore } from '@/store/menu'
 import { useUserStore } from '@/store/user'
 import router from '@/router'
+import pixelLabLogo from '@/assets/images/pixel-lab-logo.svg'
 
 const route = useRoute()
 const menuStore = useMenuStore()
@@ -113,19 +112,9 @@ const menuRoutes = computed(() => {
 .logo-icon {
   width: 48px;
   height: 48px;
-  background: var(--accent);
-  border: 4px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-}
-
-.pixel-text {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--foreground);
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--border);
 }
 
 .logo-text {

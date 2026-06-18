@@ -12,7 +12,7 @@
       <!-- Logo -->
       <div class="logo">
         <h1>创建账号</h1>
-        <p>加入 Pixel Lab Pro 开始创作</p>
+        <p>加入 Pixel Lab 开始创作</p>
       </div>
       
       <!-- 注册表单 -->

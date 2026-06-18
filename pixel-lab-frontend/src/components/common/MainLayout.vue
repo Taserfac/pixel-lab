@@ -3,9 +3,7 @@
     <!-- 顶部导航栏 -->
     <header class="top-bar">
       <div class="brand">
-        <div class="brand-icon">
-          <span class="pixel-text">PX</span>
-        </div>
+        <img class="brand-icon" :src="pixelLabLogo" alt="Pixel Lab logo">
         <span class="brand-name">Pixel Lab</span>
       </div>
 
@@ -98,6 +96,7 @@ import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
 import { logout as logoutApi } from '@/api/auth'
 import router from '@/router'
+import pixelLabLogo from '@/assets/images/pixel-lab-logo.svg'
 
 const route = useRoute()
 const routerInstance = useRouter()
@@ -203,19 +202,9 @@ const handleCommand = (command) => {
 .brand-icon {
   width: 40px;
   height: 40px;
-  background: var(--primary);
   border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   box-shadow: 0 0 20px var(--primary-glow);
-}
-
-.pixel-text {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--background);
+  display: block;
 }
 
 .brand-name {

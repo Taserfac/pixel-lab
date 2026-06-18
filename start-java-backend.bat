@@ -10,10 +10,7 @@ if not defined DB_PORT set "DB_PORT=3306"
 if not defined DB_NAME set "DB_NAME=pixel_lab"
 if not defined DB_USER set "DB_USER=root"
 
-if not defined DB_PASSWORD (
-  echo Please set DB_PASSWORD before starting the backend.
-  exit /b 1
-)
+if not defined DB_PASSWORD set "DB_PASSWORD=lvmanyi2006121"
 
 set "WAR_SOURCE=%PROJECT_ROOT%\pixel-lab-java-backend\target\ROOT.war"
 set "WAR_TARGET=%CATALINA_HOME%\webapps\ROOT.war"

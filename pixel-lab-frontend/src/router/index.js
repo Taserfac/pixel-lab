@@ -120,7 +120,7 @@ router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   
   // 设置页面标题
-  document.title = to.meta.title ? `${to.meta.title} - Pixel Lab Pro` : 'Pixel Lab Pro'
+  document.title = to.meta.title ? `${to.meta.title} - Pixel Lab` : 'Pixel Lab'
   
   // 公开路由直接放行
   if (to.meta.public) {
