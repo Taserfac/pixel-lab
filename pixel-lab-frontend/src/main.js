@@ -70,9 +70,20 @@ app.config.globalProperties.$echarts = echarts
 // 挂载应用
 app.mount('#app')
 
-// 注册 Service Worker (PWA)
+// 仅在生产环境启用 PWA。开发环境主动清理旧注册与缓存，避免缓存旧模块造成页面白屏。
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  window.addEventListener('load', async () => {
+    if (import.meta.env.PROD) {
+      await navigator.serviceWorker.register('/sw.js').catch(() => {})
+      return
+    }
+
+    const registrations = await navigator.serviceWorker.getRegistrations().catch(() => [])
+    await Promise.all(registrations.map(registration => registration.unregister()))
+
+    if ('caches' in window) {
+      const cacheNames = await caches.keys().catch(() => [])
+      await Promise.all(cacheNames.filter(name => name.startsWith('pixel-lab-')).map(name => caches.delete(name)))
+    }
   })
 }

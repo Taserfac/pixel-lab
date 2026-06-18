@@ -9,9 +9,10 @@ import request from '@/utils/request'
  * 上传图片
  * @param {File} file - 图片文件
  */
-export const uploadImage = (file) => {
+export const uploadImage = (file, description = '') => {
   const formData = new FormData()
   formData.append('image', file)
+  if (description) formData.append('description', description)
   
   return request.post('/api/images/upload', formData, {
     headers: {
@@ -52,4 +53,13 @@ export const updateImageVisibility = (id, isPublic) => {
  */
 export const updateImageDescription = (id, description) => {
   return request.patch(`/api/images/${id}/description`, { description })
+}
+
+/**
+ * 更新作品发布信息。
+ * @param {number} id - 图片 ID
+ * @param {{title: string, tags: string[], description: string}} metadata
+ */
+export const updateImageMetadata = (id, metadata) => {
+  return request.patch(`/api/images/${id}/metadata`, metadata)
 }

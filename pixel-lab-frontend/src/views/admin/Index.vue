@@ -1,739 +1,329 @@
 <template>
-  <div class="admin-page">
-    <h1>后台管理</h1>
-    
-    <!-- Tab 切换 -->
-    <el-tabs v-model="activeTab" class="admin-tabs">
-      <!-- 平台统计 -->
-      <el-tab-pane label="平台统计" name="stats">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon users">
-              <el-icon :size="24"><User /></el-icon>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ platformStats.users.total }}</span>
-              <span class="stat-label">用户总数</span>
-              <span class="stat-today">今日 +{{ platformStats.users.today }}</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon images">
-              <el-icon :size="24"><Picture /></el-icon>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ platformStats.images.total }}</span>
-              <span class="stat-label">作品总数</span>
-              <span class="stat-today">今日 +{{ platformStats.images.today }}</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon views">
-              <el-icon :size="24"><View /></el-icon>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ formatNumber(platformStats.interactions.views) }}</span>
-              <span class="stat-label">总浏览量</span>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon likes">
-              <el-icon :size="24"><Star /></el-icon>
-            </div>
-            <div class="stat-info">
-              <span class="stat-value">{{ platformStats.interactions.likes }}</span>
-              <span class="stat-label">总点赞数</span>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
+  <div class="dashboard-page page-shell">
+    <header class="dashboard-header">
+      <div>
+        <h1 class="page-heading">Dashboard</h1>
+        <p class="page-description">查看社区增长与内容状态，管理用户和公开作品。</p>
+      </div>
+      <span class="online-status"><i />{{ stats.sessions.online || 0 }} 人在线</span>
+    </header>
 
-      <!-- 用户管理 -->
-      <el-tab-pane label="用户管理" name="users">
-        <div class="search-bar">
-          <el-input
-            v-model="userSearch"
-            placeholder="搜索用户名/昵称"
-            clearable
-            @keyup.enter="fetchUsers"
-            @clear="fetchUsers"
-          />
-          <el-button @click="fetchUsers">搜索</el-button>
-        </div>
-        <el-table :data="users" v-loading="loadingUsers" stripe>
-          <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column label="用户" min-width="150">
-            <template #default="{ row }">
-              <div class="user-cell">
-                <el-avatar :size="32" :src="row.avatar">
-                  {{ row.username?.charAt(0).toUpperCase() }}
-                </el-avatar>
-                <span>{{ row.nickname || row.username }}</span>
-              </div>
-            </template>
+    <section v-if="activeSection === 'overview'">
+      <div class="metric-grid">
+        <UiCard v-for="item in metrics" :key="item.label" padding="lg" class="metric-card">
+          <span class="metric-icon" :class="item.tone"><el-icon><component :is="item.icon" /></el-icon></span>
+          <div><strong>{{ formatNumber(item.value) }}</strong><span>{{ item.label }}</span><small v-if="item.today">今日 +{{ item.today }}</small></div>
+        </UiCard>
+      </div>
+
+      <div class="chart-grid">
+        <UiCard padding="lg" class="chart-card wide">
+          <header><div><h2>用户增长</h2><p>近 30 天新增注册用户</p></div><span>Users</span></header>
+          <div ref="userChartRef" class="chart" />
+        </UiCard>
+        <UiCard padding="lg" class="chart-card wide">
+          <header><div><h2>作品数量</h2><p>近 30 天新增有效作品</p></div><span>Works</span></header>
+          <div ref="imageChartRef" class="chart" />
+        </UiCard>
+        <UiCard padding="lg" class="chart-card tags-chart-card">
+          <header><div><h2>标签分布</h2><p>公开作品常用标签</p></div><span>Tags</span></header>
+          <div v-if="stats.tagDistribution.length" ref="tagChartRef" class="chart" />
+          <EmptyState v-else title="暂无标签数据" description="作品添加标签后会在这里形成分布。" />
+        </UiCard>
+        <UiCard padding="lg" class="interaction-card">
+          <header><div><h2>社区互动</h2><p>平台累计互动</p></div></header>
+          <div class="interaction-list">
+            <div v-for="item in interactionMetrics" :key="item.label"><span><el-icon><component :is="item.icon" /></el-icon>{{ item.label }}</span><strong>{{ formatNumber(item.value) }}</strong></div>
+          </div>
+        </UiCard>
+      </div>
+    </section>
+
+    <section v-else-if="activeSection === 'users'" class="management-section">
+      <div class="management-toolbar">
+        <div><h2>用户管理</h2><p>查看账号状态并执行启用或封禁操作。</p></div>
+        <form class="management-search" @submit.prevent="loadUsers(1)">
+          <UiInput v-model="userSearch" clearable placeholder="搜索用户名或昵称" />
+          <UiButton type="submit">搜索</UiButton>
+        </form>
+      </div>
+      <UiCard padding="none" class="table-card">
+        <el-table v-loading="loadingUsers" :data="users">
+          <el-table-column label="用户" min-width="220">
+            <template #default="{ row }"><div class="user-cell"><el-avatar :size="34" :src="row.avatar">{{ (row.nickname || row.username || '?').charAt(0) }}</el-avatar><span><strong>{{ row.nickname || row.username }}</strong><small>@{{ row.username }}</small></span></div></template>
           </el-table-column>
-          <el-table-column prop="username" label="用户名" width="120" />
-          <el-table-column label="角色" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.role === 'admin' ? 'danger' : 'info'">
-                {{ row.role === 'admin' ? '管理员' : '用户' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="140">
-            <template #default="{ row }">
-              <el-tag v-if="row.status === 1" type="success">正常</el-tag>
-              <el-tag v-else-if="row.ban_end_at" type="danger">
-                封禁至 {{ formatDate(row.ban_end_at) }}
-              </el-tag>
-              <el-tag v-else type="danger">永久封禁</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="注册时间" width="160">
-            <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
-            <template #default="{ row }">
-              <template v-if="row.id === userStore.userInfo?.id">
-                <span class="self-label">当前用户</span>
-              </template>
-              <template v-else>
-                <el-button
-                  v-if="row.status === 1"
-                  type="danger"
-                  size="small"
-                  @click="handleBanUser(row)"
-                >
-                  封禁
-                </el-button>
-                <el-button
-                  v-else
-                  type="success"
-                  size="small"
-                  @click="handleUnbanUser(row)"
-                >
-                  解封
-                </el-button>
-                <el-button
-                  v-if="row.role !== 'admin'"
-                  type="warning"
-                  size="small"
-                  @click="handleSetAdmin(row)"
-                >
-                  设为管理员
-                </el-button>
-              </template>
-            </template>
-          </el-table-column>
+          <el-table-column prop="role" label="角色" width="110"><template #default="{ row }"><UiTag :active="row.role === 'admin'">{{ row.role === 'admin' ? '管理员' : '用户' }}</UiTag></template></el-table-column>
+          <el-table-column label="状态" width="110"><template #default="{ row }"><span class="status-text" :class="{ disabled: Number(row.status) !== 1 }"><i />{{ Number(row.status) === 1 ? '正常' : '已封禁' }}</span></template></el-table-column>
+          <el-table-column label="注册时间" min-width="150"><template #default="{ row }">{{ formatDate(row.created_at) }}</template></el-table-column>
+          <el-table-column label="操作" width="120" align="right"><template #default="{ row }"><UiButton v-if="row.id !== currentUserId" :variant="Number(row.status) === 1 ? 'danger' : 'secondary'" size="sm" @click="toggleUser(row)">{{ Number(row.status) === 1 ? '封禁' : '启用' }}</UiButton><span v-else class="self-label">当前账号</span></template></el-table-column>
         </el-table>
-        <div class="pagination">
-          <el-pagination
-            v-model:current-page="userPage"
-            :page-size="10"
-            :total="userTotal"
-            layout="total, prev, pager, next"
-            @current-change="fetchUsers"
-          />
-        </div>
-      </el-tab-pane>
+      </UiCard>
+      <el-pagination v-model:current-page="userPage" :page-size="12" :total="userTotal" layout="prev, pager, next" @current-change="loadUsers" />
+    </section>
 
-      <!-- 作品管理 -->
-      <el-tab-pane label="作品管理" name="images">
-        <div class="search-bar">
-          <el-input
-            v-model="imageSearch"
-            placeholder="搜索作品名称"
-            clearable
-            @keyup.enter="fetchImages"
-            @clear="fetchImages"
-          />
-          <el-select v-model="imageStatus" placeholder="状态" clearable @change="fetchImages">
-            <el-option label="全部" value="" />
-            <el-option label="正常" value="1" />
-            <el-option label="已封禁" value="2" />
-            <el-option label="已删除" value="0" />
-          </el-select>
-          <el-button @click="fetchImages">搜索</el-button>
-        </div>
-        <el-table :data="images" v-loading="loadingImages" stripe>
-          <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column label="预览" width="100">
-            <template #default="{ row }">
-              <img :src="row.url" class="image-thumb" />
-            </template>
-          </el-table-column>
-          <el-table-column label="作品名称" min-width="150">
-            <template #default="{ row }">
-              {{ row.title || row.original_name || '未命名' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="author_name" label="作者" width="100" />
-          <el-table-column label="数据" width="140">
-            <template #default="{ row }">
-              <span class="data-item">👀 {{ row.view_count || 0 }}</span>
-              <span class="data-item">❤️ {{ row.like_count || 0 }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="80">
-            <template #default="{ row }">
-              <el-tag v-if="row.status === 1" type="success" size="small">正常</el-tag>
-              <el-tag v-else-if="row.status === 2" type="danger" size="small">封禁</el-tag>
-              <el-tag v-else type="info" size="small">已删除</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="公开" width="80">
-            <template #default="{ row }">
-              <el-tag :type="row.is_public ? 'success' : 'info'" size="small">
-                {{ row.is_public ? '是' : '否' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="160">
-            <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
-            <template #default="{ row }">
-              <template v-if="row.status === 1">
-                <el-button type="danger" size="small" @click="handleDeleteImage(row)">删除</el-button>
-                <el-button type="warning" size="small" @click="handleBanImage(row)">封禁</el-button>
-              </template>
-              <template v-else-if="row.status === 2">
-                <el-button type="success" size="small" @click="handleUnbanImage(row)">解封</el-button>
-              </template>
-              <span v-else class="deleted-text">已删除</span>
-            </template>
-          </el-table-column>
+    <section v-else class="management-section">
+      <div class="management-toolbar">
+        <div><h2>作品管理</h2><p>管理公开内容与违规作品。</p></div>
+        <form class="management-search" @submit.prevent="loadImages(1)">
+          <UiInput v-model="imageSearch" clearable placeholder="搜索作品或创作者" />
+          <UiButton type="submit">搜索</UiButton>
+        </form>
+      </div>
+      <UiCard padding="none" class="table-card">
+        <el-table v-loading="loadingImages" :data="images">
+          <el-table-column label="作品" min-width="280"><template #default="{ row }"><div class="work-cell"><img :src="row.thumbnail_url || row.url" alt=""><span><strong>{{ row.title || row.original_name || '未命名作品' }}</strong><small>{{ row.author_name || row.username || '匿名创作者' }}</small></span></div></template></el-table-column>
+          <el-table-column label="数据" min-width="180"><template #default="{ row }"><div class="row-metrics"><span><el-icon><View /></el-icon>{{ formatNumber(row.view_count) }}</span><span><el-icon><Star /></el-icon>{{ formatNumber(row.like_count) }}</span></div></template></el-table-column>
+          <el-table-column label="公开" width="90"><template #default="{ row }"><UiTag :active="Number(row.is_public) === 1">{{ Number(row.is_public) === 1 ? '公开' : '私有' }}</UiTag></template></el-table-column>
+          <el-table-column label="状态" width="100"><template #default="{ row }"><span class="status-text" :class="{ disabled: Number(row.status) !== 1 }"><i />{{ Number(row.status) === 1 ? '正常' : Number(row.status) === 2 ? '已封禁' : '已删除' }}</span></template></el-table-column>
+          <el-table-column label="操作" width="190" align="right"><template #default="{ row }"><div class="row-actions"><UiButton variant="secondary" size="sm" @click="router.push(`/post/${row.id}`)">查看</UiButton><UiButton v-if="Number(row.status) !== 0" :variant="Number(row.status) === 1 ? 'danger' : 'secondary'" size="sm" @click="toggleImage(row)">{{ Number(row.status) === 1 ? '封禁' : '恢复' }}</UiButton></div></template></el-table-column>
         </el-table>
-        <div class="pagination">
-          <el-pagination
-            v-model:current-page="imagePage"
-            :page-size="10"
-            :total="imageTotal"
-            layout="total, prev, pager, next"
-            @current-change="fetchImages"
-          />
-        </div>
-      </el-tab-pane>
-
-      <!-- 作品集管理 -->
-      <el-tab-pane label="作品集管理" name="albums">
-        <div class="search-bar">
-          <el-input
-            v-model="albumSearch"
-            placeholder="搜索作品集标题"
-            clearable
-            @keyup.enter="fetchAlbums"
-            @clear="fetchAlbums"
-          />
-          <el-button @click="fetchAlbums">搜索</el-button>
-        </div>
-        <el-table :data="albums" v-loading="loadingAlbums" stripe>
-          <el-table-column prop="id" label="ID" width="80" />
-          <el-table-column label="标题" min-width="150">
-            <template #default="{ row }">
-              {{ row.title || '未命名' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="author_name" label="作者" width="100" />
-          <el-table-column label="图片数" width="80">
-            <template #default="{ row }">
-              {{ row.image_count || 0 }}
-            </template>
-          </el-table-column>
-          <el-table-column label="公开" width="80">
-            <template #default="{ row }">
-              <el-tag :type="row.is_public ? 'success' : 'info'" size="small">
-                {{ row.is_public ? '是' : '否' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="80">
-            <template #default="{ row }">
-              <el-tag v-if="row.status === 1" type="success" size="small">正常</el-tag>
-              <el-tag v-else-if="row.status === 2" type="danger" size="small">封禁</el-tag>
-              <el-tag v-else type="info" size="small">已删除</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="160">
-            <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
-            <template #default="{ row }">
-              <template v-if="row.status === 1">
-                <el-button type="danger" size="small" @click="handleDeleteAlbum(row)">删除</el-button>
-                <el-button type="warning" size="small" @click="handleBanAlbum(row)">封禁</el-button>
-              </template>
-              <template v-else-if="row.status === 2">
-                <el-button type="success" size="small" @click="handleUnbanAlbum(row)">解封</el-button>
-              </template>
-              <span v-else class="deleted-text">已删除</span>
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="pagination">
-          <el-pagination
-            v-model:current-page="albumPage"
-            :page-size="10"
-            :total="albumTotal"
-            layout="total, prev, pager, next"
-            @current-change="fetchAlbums"
-          />
-        </div>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 封禁用户对话框 -->
-    <el-dialog v-model="banDialogVisible" title="封禁用户" width="420px">
-      <el-form label-position="top">
-        <el-form-item label="封禁天数">
-          <el-radio-group v-model="banDays">
-            <el-radio :value="3">3 天</el-radio>
-            <el-radio :value="7">7 天</el-radio>
-            <el-radio :value="30">30 天</el-radio>
-            <el-radio :value="0">永久</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="封禁原因">
-          <el-input v-model="banReason" type="textarea" :rows="3" placeholder="输入封禁原因（可选）" maxlength="200" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="banDialogVisible = false">取消</el-button>
-        <el-button type="danger" @click="confirmBanUser">确认封禁</el-button>
-      </template>
-    </el-dialog>
+      </UiCard>
+      <el-pagination v-model:current-page="imagePage" :page-size="12" :total="imageTotal" layout="prev, pager, next" @current-change="loadImages" />
+    </section>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { User, Picture, View, Star } from '@element-plus/icons-vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import * as echarts from 'echarts'
+import { ChatDotRound, CollectionTag, Picture, Star, User, View } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import EmptyState from '@/components/common/EmptyState.vue'
+import UiButton from '@/components/ui/UiButton.vue'
+import UiCard from '@/components/ui/UiCard.vue'
+import UiInput from '@/components/ui/UiInput.vue'
+import UiTag from '@/components/ui/UiTag.vue'
+import { banImage, getImages, getStats, getUsers, updateUserStatus } from '@/api/admin'
 import { useUserStore } from '@/store/user'
-import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats, banUser, banImage, getAlbums, banAlbum, deleteAlbum } from '@/api/admin'
 
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
-const activeTab = ref('stats')
-
-// 平台统计
-const platformStats = ref({
+const validSections = ['overview', 'users', 'images']
+const normalizeSection = value => validSections.includes(value) ? value : 'overview'
+const activeSection = ref(normalizeSection(route.query.section))
+const userChartRef = ref(null)
+const imageChartRef = ref(null)
+const tagChartRef = ref(null)
+const charts = []
+const stats = reactive({
   users: { total: 0, today: 0 },
-  images: { total: 0, today: 0 },
-  interactions: { views: 0, likes: 0, collects: 0, comments: 0 }
+  images: { total: 0, today: 0, public: 0 },
+  interactions: { views: 0, likes: 0, collects: 0, comments: 0 },
+  sessions: { online: 0 },
+  userGrowth: [],
+  imageGrowth: [],
+  tagDistribution: []
 })
-
-// 用户管理
 const users = ref([])
+const loadingUsers = ref(false)
 const userSearch = ref('')
 const userPage = ref(1)
 const userTotal = ref(0)
-const loadingUsers = ref(false)
-
-// 作品管理
 const images = ref([])
+const loadingImages = ref(false)
 const imageSearch = ref('')
-const imageStatus = ref('')
 const imagePage = ref(1)
 const imageTotal = ref(0)
-const loadingImages = ref(false)
 
-// 作品集管理
-const albums = ref([])
-const albumSearch = ref('')
-const albumPage = ref(1)
-const albumTotal = ref(0)
-const loadingAlbums = ref(false)
+const currentUserId = computed(() => userStore.userInfo?.id)
+const metrics = computed(() => [
+  { label: '用户总数', value: stats.users.total, today: stats.users.today, icon: User, tone: 'green' },
+  { label: '作品总数', value: stats.images.total, today: stats.images.today, icon: Picture, tone: 'blue' },
+  { label: '公开作品', value: stats.images.public, icon: View, tone: 'violet' },
+  { label: '累计获赞', value: stats.interactions.likes, icon: Star, tone: 'orange' }
+])
+const interactionMetrics = computed(() => [
+  { label: '浏览', value: stats.interactions.views, icon: View },
+  { label: '点赞', value: stats.interactions.likes, icon: Star },
+  { label: '收藏', value: stats.interactions.collects, icon: CollectionTag },
+  { label: '评论', value: stats.interactions.comments, icon: ChatDotRound }
+])
 
-// 封禁对话框
-const banDialogVisible = ref(false)
-const banDays = ref(7)
-const banReason = ref('')
-const banTargetUser = ref(null)
-
-// 格式化数字
-const formatNumber = (num) => {
-  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
-  return num
+const formatNumber = value => {
+  const number = Number(value || 0)
+  if (number >= 10000) return `${(number / 10000).toFixed(1)}w`
+  if (number >= 1000) return `${(number / 1000).toFixed(1)}k`
+  return String(number)
 }
+const formatDate = value => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium' }).format(new Date(value)) : ''
 
-// 格式化日期
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-// 获取平台统计
-const fetchStats = async () => {
-  try {
-    const res = await getStats()
-    platformStats.value = res
-  } catch (error) {
-    console.error('获取统计失败:', error)
+const lineOption = (data, color, name) => {
+  const source = data.length ? data : Array.from({ length: 7 }, (_, index) => ({ label: `第 ${index + 1} 天`, value: 0 }))
+  return {
+    animationDuration: 500,
+    tooltip: { trigger: 'axis' },
+    grid: { top: 24, right: 16, bottom: 28, left: 40 },
+    xAxis: { type: 'category', boundaryGap: false, data: source.map(item => item.label), axisLine: { lineStyle: { color: '#eaeaea' } }, axisTick: { show: false }, axisLabel: { color: '#8b8f8c', fontSize: 10 } },
+    yAxis: { type: 'value', minInterval: 1, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#f0f1f2' } }, axisLabel: { color: '#8b8f8c', fontSize: 10 } },
+    series: [{ name, type: 'line', smooth: true, symbolSize: 6, data: source.map(item => Number(item.value || 0)), lineStyle: { color, width: 3 }, itemStyle: { color }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: `${color}30` }, { offset: 1, color: `${color}02` }]) } }]
   }
 }
 
-// 获取用户列表
-const fetchUsers = async () => {
+const renderCharts = async () => {
+  await nextTick()
+  charts.splice(0).forEach(chart => chart.dispose())
+  if (userChartRef.value) {
+    const chart = echarts.init(userChartRef.value)
+    chart.setOption(lineOption(stats.userGrowth, '#19c37d', '新增用户'))
+    charts.push(chart)
+  }
+  if (imageChartRef.value) {
+    const chart = echarts.init(imageChartRef.value)
+    chart.setOption(lineOption(stats.imageGrowth, '#4f7cff', '新增作品'))
+    charts.push(chart)
+  }
+  if (tagChartRef.value && stats.tagDistribution.length) {
+    const chart = echarts.init(tagChartRef.value)
+    chart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { orient: 'vertical', right: 0, top: 'middle', textStyle: { color: '#666', fontSize: 10 } },
+      color: ['#19c37d', '#4f7cff', '#f0a020', '#9467e8', '#e85d5d', '#36a5a5', '#8fb339', '#7c8798'],
+      series: [{ type: 'pie', radius: ['42%', '70%'], center: ['35%', '50%'], avoidLabelOverlap: true, itemStyle: { borderColor: '#fff', borderWidth: 3, borderRadius: 6 }, label: { show: false }, data: stats.tagDistribution }]
+    })
+    charts.push(chart)
+  }
+}
+
+const loadStats = async () => {
+  try {
+    Object.assign(stats, await getStats())
+    await renderCharts()
+  } catch (error) {
+    console.error('加载 Dashboard 数据失败:', error)
+  }
+}
+
+const loadUsers = async page => {
+  if (page) userPage.value = page
   loadingUsers.value = true
   try {
-    const res = await getUsers({
-      page: userPage.value,
-      pageSize: 10,
-      keyword: userSearch.value
-    })
-    users.value = res.list || []
-    userTotal.value = res.total || 0
-  } catch (error) {
-    console.error('获取用户失败:', error)
+    const data = await getUsers({ page: userPage.value, pageSize: 12, keyword: userSearch.value.trim() })
+    users.value = data?.list || []
+    userTotal.value = Number(data?.total || 0)
   } finally {
     loadingUsers.value = false
   }
 }
 
-// 封禁用户
-const handleBanUser = (user) => {
-  banTargetUser.value = user
-  banDays.value = 7
-  banReason.value = ''
-  banDialogVisible.value = true
-}
-
-const confirmBanUser = async () => {
-  if (!banTargetUser.value) return
-  try {
-    await banUser(banTargetUser.value.id, banDays.value, banReason.value)
-    ElMessage.success('已封禁')
-    banDialogVisible.value = false
-    fetchUsers()
-  } catch (error) {
-    ElMessage.error(error.response?.data?.msg || '操作失败')
-  }
-}
-
-// 解封用户
-const handleUnbanUser = async (user) => {
-  try {
-    await ElMessageBox.confirm(`确定要解封用户 "${user.nickname || user.username}" 吗？`, '确认', { type: 'warning' })
-    await updateUserStatus(user.id, 1)
-    ElMessage.success('已解封')
-    fetchUsers()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
-
-// 设为管理员
-const handleSetAdmin = async (user) => {
-  try {
-    await ElMessageBox.confirm(`确定要将 "${user.nickname || user.username}" 设为管理员吗？`, '确认', { type: 'warning' })
-    await updateUserRole(user.id, 'admin')
-    ElMessage.success('已设为管理员')
-    fetchUsers()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
-
-// 获取作品列表
-const fetchImages = async () => {
+const loadImages = async page => {
+  if (page) imagePage.value = page
   loadingImages.value = true
   try {
-    const res = await getImages({
-      page: imagePage.value,
-      pageSize: 10,
-      keyword: imageSearch.value,
-      status: imageStatus.value
-    })
-    images.value = res.list || []
-    imageTotal.value = res.total || 0
-  } catch (error) {
-    console.error('获取作品失败:', error)
+    const data = await getImages({ page: imagePage.value, pageSize: 12, keyword: imageSearch.value.trim() })
+    images.value = data?.list || []
+    imageTotal.value = Number(data?.total || 0)
   } finally {
     loadingImages.value = false
   }
 }
 
-// 删除作品
-const handleDeleteImage = async (image) => {
+const toggleUser = async row => {
+  const enabling = Number(row.status) !== 1
   try {
-    await ElMessageBox.confirm('确定要删除这个作品吗？', '确认', { type: 'warning' })
-    await deleteImage(image.id)
-    ElMessage.success('已删除')
-    fetchImages()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
+    await ElMessageBox.confirm(`${enabling ? '启用' : '封禁'}用户“${row.nickname || row.username}”？`, '用户状态', { type: 'warning' })
+    await updateUserStatus(row.id, enabling ? 1 : 0)
+    row.status = enabling ? 1 : 0
+    ElMessage.success(enabling ? '用户已启用' : '用户已封禁')
+  } catch {
+    // Cancelled or handled by the request interceptor.
   }
 }
 
-// 封禁作品
-const handleBanImage = async (image) => {
-  try {
-    await ElMessageBox.confirm(`确定要封禁作品 "${image.title || image.original_name || '未命名'}" 吗？`, '确认封禁', { type: 'warning' })
-    await banImage(image.id, 2)
-    ElMessage.success('已封禁')
-    fetchImages()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
+const toggleImage = async row => {
+  const restoring = Number(row.status) !== 1
+  await banImage(row.id, restoring ? 1 : 2)
+  row.status = restoring ? 1 : 2
+  ElMessage.success(restoring ? '作品已恢复' : '作品已封禁')
 }
 
-// 解封作品
-const handleUnbanImage = async (image) => {
-  try {
-    await ElMessageBox.confirm(`确定要解封作品 "${image.title || image.original_name || '未命名'}" 吗？`, '确认解封', { type: 'warning' })
-    await banImage(image.id, 1)
-    ElMessage.success('已解封')
-    fetchImages()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
-
-// 获取作品集列表
-const fetchAlbums = async () => {
-  loadingAlbums.value = true
-  try {
-    const res = await getAlbums({
-      page: albumPage.value,
-      pageSize: 10,
-      keyword: albumSearch.value
-    })
-    albums.value = res.list || []
-    albumTotal.value = res.total || 0
-  } catch (error) {
-    console.error('获取作品集失败:', error)
-  } finally {
-    loadingAlbums.value = false
-  }
-}
-
-// 删除作品集
-const handleDeleteAlbum = async (album) => {
-  try {
-    await ElMessageBox.confirm(`确定要删除作品集 "${album.title}" 吗？`, '确认', { type: 'warning' })
-    await deleteAlbum(album.id)
-    ElMessage.success('已删除')
-    fetchAlbums()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
-
-// 封禁作品集
-const handleBanAlbum = async (album) => {
-  try {
-    await ElMessageBox.confirm(`确定要封禁作品集 "${album.title}" 吗？`, '确认封禁', { type: 'warning' })
-    await banAlbum(album.id, 2)
-    ElMessage.success('已封禁')
-    fetchAlbums()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
-
-// 解封作品集
-const handleUnbanAlbum = async (album) => {
-  try {
-    await ElMessageBox.confirm(`确定要解封作品集 "${album.title}" 吗？`, '确认解封', { type: 'warning' })
-    await banAlbum(album.id, 1)
-    ElMessage.success('已解封')
-    fetchAlbums()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.msg || '操作失败')
-    }
-  }
-}
+const handleResize = () => charts.forEach(chart => chart.resize())
+watch(() => route.query.section, value => {
+  const section = normalizeSection(value)
+  activeSection.value = section
+  if (section === 'overview') nextTick(renderCharts)
+  if (section === 'users' && !users.value.length) loadUsers(1)
+  if (section === 'images' && !images.value.length) loadImages(1)
+})
 
 onMounted(() => {
-  fetchStats()
-  fetchUsers()
-  fetchImages()
-  fetchAlbums()
+  loadStats()
+  if (activeSection.value === 'users') loadUsers(1)
+  if (activeSection.value === 'images') loadImages(1)
+  window.addEventListener('resize', handleResize)
+})
+onBeforeUnmount(() => {
+  charts.forEach(chart => chart.dispose())
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
 <style scoped>
-.admin-page {
-  padding: var(--space-6);
-  max-width: 1400px;
-  margin: 0 auto;
+.dashboard-page { max-width: 1360px; padding-bottom: var(--space-8); }
+.dashboard-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); margin-bottom: var(--space-6); }
+.online-status { display: inline-flex; align-items: center; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-full); padding: 6px 12px; color: var(--text-secondary); background: var(--card); font-size: 11px; }
+.online-status i,
+.status-text i { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); }
+.metric-card { display: flex; align-items: center; gap: var(--space-4); }
+.metric-icon { width: 46px; height: 46px; display: grid; place-items: center; flex: none; border-radius: var(--radius-lg); font-size: 21px; }
+.metric-icon.green { color: var(--primary-active); background: var(--primary-soft); }
+.metric-icon.blue { color: #4f7cff; background: rgba(79,124,255,.1); }
+.metric-icon.violet { color: #9467e8; background: rgba(148,103,232,.1); }
+.metric-icon.orange { color: #d88912; background: rgba(240,160,32,.12); }
+.metric-card > div { display: grid; }
+.metric-card strong { font-size: 23px; line-height: 1.2; }
+.metric-card span { color: var(--text-secondary); font-size: 11px; }
+.metric-card small { color: var(--primary-active); font-size: 10px; }
+
+.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.chart-card header,
+.interaction-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.chart-card h2,
+.interaction-card h2 { margin: 0; font-size: 16px; }
+.chart-card p,
+.interaction-card p { margin: 2px 0 0; color: var(--text-tertiary); font-size: 10px; }
+.chart-card header > span { color: var(--text-tertiary); font: 10px var(--font-mono); text-transform: uppercase; letter-spacing: .1em; }
+.chart { height: 270px; margin-top: var(--space-3); }
+.interaction-list { display: grid; gap: var(--space-3); margin-top: var(--space-6); }
+.interaction-list div { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: var(--space-3); }
+.interaction-list span { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text-secondary); font-size: 12px; }
+.interaction-list strong { font-size: 17px; }
+
+.management-section { display: grid; gap: var(--space-4); }
+.management-toolbar { display: flex; align-items: end; justify-content: space-between; gap: var(--space-6); }
+.management-toolbar h2 { margin: 0; font-size: 20px; }
+.management-toolbar p { margin: 2px 0 0; color: var(--text-secondary); font-size: 11px; }
+.management-search { width: min(460px, 100%); display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); }
+.table-card { overflow: hidden; }
+.table-card :deep(.el-table) { --el-table-border-color: var(--border); --el-table-header-bg-color: var(--surface-muted); --el-table-row-hover-bg-color: var(--primary-soft); color: var(--text-primary); background: var(--card); }
+.user-cell,
+.work-cell,
+.row-metrics,
+.row-actions { display: flex; align-items: center; gap: var(--space-3); }
+.user-cell > span,
+.work-cell > span { min-width: 0; display: grid; }
+.user-cell small,
+.work-cell small { color: var(--text-tertiary); font-size: 10px; }
+.work-cell img { width: 54px; height: 42px; border-radius: var(--radius-sm); object-fit: cover; background: var(--surface-muted); }
+.row-metrics span { display: inline-flex; align-items: center; gap: 3px; color: var(--text-secondary); font-size: 11px; }
+.status-text { display: inline-flex; align-items: center; gap: 5px; color: var(--success); font-size: 11px; }
+.status-text.disabled { color: var(--danger); }
+.status-text.disabled i { background: var(--danger); }
+.self-label { color: var(--text-tertiary); font-size: 11px; }
+.management-section :deep(.el-pagination) { justify-self: end; }
+
+@media (max-width: 980px) {
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-grid { grid-template-columns: 1fr; }
 }
 
-.admin-page h1 {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: var(--space-6);
-}
-
-.admin-tabs {
-  background: var(--background-soft);
-  padding: var(--space-4);
-  border: 3px solid var(--border);
-  box-shadow: 6px 6px 0 var(--border);
-}
-
-/* 统计卡片 */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--background);
-  border: 3px solid var(--border);
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 3px solid var(--border);
-}
-
-.stat-icon.users { background: #39c5bb; color: white; }
-.stat-icon.images { background: #8b5cf6; color: white; }
-.stat-icon.views { background: #f59e0b; color: white; }
-.stat-icon.likes { background: #ef4444; color: white; }
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--foreground-muted);
-}
-
-.stat-today {
-  font-size: 11px;
-  color: var(--primary);
-}
-
-/* 搜索栏 */
-.search-bar {
-  display: flex;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.search-bar .el-input {
-  width: 200px;
-}
-
-/* 表格 */
-.user-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.image-thumb {
-  width: 48px;
-  height: 48px;
-  object-fit: cover;
-  border: 2px solid var(--border);
-}
-
-.data-item {
-  margin-right: var(--space-2);
-  font-size: 12px;
-}
-
-.deleted-text {
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.self-label {
-  display: inline-block;
-  padding: 4px 8px;
-  background: var(--primary-muted);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 4px;
-}
-
-/* 分页 */
-.pagination {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-4);
-}
-
-/* 表格样式修复 */
-:deep(.el-table) {
-  background-color: var(--background-soft) !important;
-  --el-table-bg-color: var(--background-soft);
-  --el-table-tr-bg-color: var(--background-soft);
-  --el-table-header-bg-color: var(--background-muted);
-  --el-table-row-hover-bg-color: var(--background-muted);
-  --el-table-border-color: var(--border);
-  --el-table-text-color: var(--foreground);
-  --el-table-header-text-color: var(--foreground-muted);
-}
-
-:deep(.el-table th.el-table__cell) {
-  background-color: var(--background-muted) !important;
-  color: var(--foreground-muted) !important;
-}
-
-:deep(.el-table td.el-table__cell) {
-  background-color: var(--background-soft) !important;
-  color: var(--foreground) !important;
-}
-
-:deep(.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell) {
-  background-color: var(--background) !important;
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+@media (max-width: 680px) {
+  .dashboard-header,
+  .management-toolbar { align-items: flex-start; flex-direction: column; }
+  .metric-grid { grid-template-columns: 1fr; }
+  .management-search { width: 100%; }
 }
 </style>

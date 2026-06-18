@@ -80,8 +80,14 @@ const loading = ref(false)
 const loadRankings = async () => {
   loading.value = true
   try {
-    const response = await getRankings(activeTab.value)
-    rankings.value = response.data || []
+    const response = await getRankings({ type: activeTab.value, page: 1, pageSize: 20 })
+    rankings.value = (response?.list || response?.data || []).map(item => ({
+      ...item,
+      thumbnail: item.thumbnail || item.thumbnail_url || item.url,
+      title: item.title || item.original_name || '未命名作品',
+      author: item.author || item.author_name || '匿名创作者',
+      likes: Number(item.likes ?? item.like_count ?? 0)
+    }))
   } catch (error) {
     console.error('Failed to load rankings:', error)
     rankings.value = []

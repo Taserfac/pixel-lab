@@ -1,5 +1,8 @@
 <template>
-  <article
+  <UiCard
+    as="article"
+    padding="none"
+    interactive
     class="post-card"
     role="button"
     tabindex="0"
@@ -8,95 +11,52 @@
     @keydown.space.prevent="emit('select', work)"
   >
     <div class="post-cover">
-      <img
-        v-if="coverUrl"
-        :src="coverUrl"
-        :alt="title"
-        loading="lazy"
-        decoding="async"
-      >
-      <div
-        v-else
-        class="post-placeholder"
-      >
-        <el-icon><Picture /></el-icon>
-      </div>
+      <img v-if="coverUrl" :src="coverUrl" :alt="title" loading="lazy" decoding="async">
+      <div v-else class="post-placeholder"><el-icon><Picture /></el-icon></div>
+      <span v-if="work.isLiked" class="liked-mark" aria-label="已点赞"><el-icon><StarFilled /></el-icon></span>
     </div>
 
     <div class="post-body">
-      <h3 :title="title">
-        {{ title }}
-      </h3>
-
-      <div
-        v-if="tags.length"
-        class="post-tags"
-      >
-        <span
-          v-for="tag in tags"
-          :key="tag"
-          class="post-tag"
-          @click.stop="emit('tag-click', tag)"
-        >#{{ tag }}</span>
+      <h3 :title="title">{{ title }}</h3>
+      <div v-if="tags.length" class="post-tags">
+        <UiTag v-for="tag in tags" :key="tag" clickable @click.stop="emit('tag-click', tag)">#{{ tag }}</UiTag>
       </div>
-
-      <div class="post-footer">
+      <footer class="post-footer">
         <div class="post-author">
-          <el-avatar
-            :size="24"
-            :src="work.author_avatar"
-          >
-            {{ authorInitial }}
-          </el-avatar>
+          <el-avatar :size="24" :src="work.author_avatar">{{ authorInitial }}</el-avatar>
           <span>{{ authorName }}</span>
         </div>
-
-        <div class="post-stats">
-          <span>
-            <el-icon><Star /></el-icon>
-            {{ formatNumber(work.like_count) }}
-          </span>
-          <span>
-            <el-icon><ChatDotRound /></el-icon>
-            {{ formatNumber(work.comment_count) }}
-          </span>
-          <span>
-            <el-icon><CollectionTag /></el-icon>
-            {{ formatNumber(work.collect_count) }}
-          </span>
+        <div class="post-stats" aria-label="作品互动数据">
+          <span><el-icon><Star /></el-icon>{{ formatNumber(work.like_count) }}</span>
+          <span><el-icon><ChatDotRound /></el-icon>{{ formatNumber(work.comment_count) }}</span>
         </div>
-      </div>
+      </footer>
     </div>
-  </article>
+  </UiCard>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { ChatDotRound, CollectionTag, Picture, Star } from '@element-plus/icons-vue'
+import { ChatDotRound, Picture, Star, StarFilled } from '@element-plus/icons-vue'
+import UiCard from '@/components/ui/UiCard.vue'
+import UiTag from '@/components/ui/UiTag.vue'
 
 const props = defineProps({
-  work: {
-    type: Object,
-    required: true
-  }
+  work: { type: Object, required: true }
 })
 
 const emit = defineEmits(['select', 'tag-click'])
-
-const title = computed(() => (
-  props.work.title ||
-  props.work.original_name ||
-  props.work.filename ||
-  props.work.name ||
-  '未命名作品'
-))
-
-const coverUrl = computed(() => props.work.url || props.work.image_url || '')
-const tags = computed(() => (props.work.tags || []).slice(0, 3))
+const title = computed(() => props.work.title || props.work.original_name || props.work.filename || '未命名作品')
+const coverUrl = computed(() => props.work.thumbnail_url || props.work.url || props.work.image_url || '')
+const tags = computed(() => {
+  const value = props.work.tags
+  if (Array.isArray(value)) return value.filter(Boolean).slice(0, 3)
+  return String(value || '').split(',').map(tag => tag.trim()).filter(Boolean).slice(0, 3)
+})
 const authorName = computed(() => props.work.author_name || props.work.nickname || '匿名创作者')
 const authorInitial = computed(() => authorName.value.charAt(0).toUpperCase())
 
-const formatNumber = (value) => {
+const formatNumber = value => {
   const number = Number(value || 0)
   if (number >= 10000) return `${(number / 10000).toFixed(1)}w`
   if (number >= 1000) return `${(number / 1000).toFixed(1)}k`
@@ -106,36 +66,21 @@ const formatNumber = (value) => {
 
 <style scoped>
 .post-card {
-  --post-ratio: 4 / 3;
-  display: inline-block;
   width: 100%;
-  margin: 0 0 var(--space-5);
+  display: inline-block;
   overflow: hidden;
-  border-radius: var(--radius-lg);
-  background: var(--background-card);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
+  margin: 0 0 var(--space-4);
   break-inside: avoid;
-  transition:
-    transform var(--transition-base),
-    box-shadow var(--transition-base);
+  cursor: pointer;
 }
 
-.post-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-md);
-}
-
-.post-card:focus-visible {
-  outline: 3px solid var(--primary-muted);
-  outline-offset: 3px;
-}
+.post-card:focus-visible { outline: 3px solid var(--primary-soft); outline-offset: 3px; }
 
 .post-cover {
   position: relative;
-  aspect-ratio: var(--post-ratio);
+  aspect-ratio: var(--post-ratio, 4 / 5);
   overflow: hidden;
-  background: var(--background-muted);
+  background: var(--surface-muted);
 }
 
 .post-cover img {
@@ -146,54 +91,46 @@ const formatNumber = (value) => {
   transition: transform var(--transition-slow);
 }
 
-.post-card:hover .post-cover img {
-  transform: scale(1.045);
-}
+.post-card:hover .post-cover img { transform: scale(1.035); }
 
 .post-placeholder {
   width: 100%;
   height: 100%;
   display: grid;
   place-items: center;
-  color: var(--foreground-subtle);
+  color: var(--text-tertiary);
   font-size: 36px;
 }
 
-.post-body {
-  padding: var(--space-4) var(--space-4) var(--space-5);
+.liked-mark {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  border-radius: 50%;
+  color: var(--primary);
+  background: var(--surface-glass);
+  backdrop-filter: blur(10px);
 }
+
+.post-body { padding: var(--space-3) var(--space-3) var(--space-4); }
 
 .post-body h3 {
   overflow: hidden;
-  color: var(--foreground);
-  font-size: 16px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.post-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: var(--space-2);
-}
-
-.post-tag {
-  border-radius: var(--radius-full);
-  background: var(--primary-muted);
-  color: var(--primary);
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.post-tag:hover {
-  background: color-mix(in srgb, var(--primary) 20%, transparent);
-}
+.post-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-2); }
+.post-tags :deep(.ui-tag) { min-height: 24px; padding: 2px 8px; font-size: 10px; }
 
 .post-footer {
   display: flex;
@@ -201,46 +138,15 @@ const formatNumber = (value) => {
   justify-content: space-between;
   gap: var(--space-3);
   margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 
-.post-author {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--foreground-muted);
-  font-size: 13px;
-}
-
-.post-author span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.post-stats {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.post-stats span {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.post-stats .el-icon {
-  font-size: 13px;
-}
-
-@media (max-width: 640px) {
-  .post-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
+.post-author,
+.post-stats,
+.post-stats span { display: flex; align-items: center; }
+.post-author { min-width: 0; gap: var(--space-2); }
+.post-author span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.post-stats { flex: none; gap: var(--space-2); }
+.post-stats span { gap: 3px; }
 </style>

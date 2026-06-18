@@ -144,6 +144,12 @@ function Install-WarToTomcat {
     Remove-Item -LiteralPath $rootWar -Force
   }
 
+  # 清理 Tomcat work 目录，避免编译缓存导致旧版本残留
+  $workDir = Join-Path $TomcatHome 'work\Catalina'
+  if (Test-Path $workDir) {
+    Remove-Item -LiteralPath $workDir -Recurse -Force
+  }
+
   Copy-Item -LiteralPath $WarPath -Destination $rootWar -Force
 }
 

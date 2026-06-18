@@ -44,15 +44,15 @@ request.interceptors.response.use(
     const silent = response.config?.silent
 
     // 如果响应成功，直接返回数据 (200-299 都是成功)
-    if (data.code >= 200 && data.code < 300) {
+    if (data.code === 0 || (data.code >= 200 && data.code < 300)) {
       return data.data
     }
 
     // 业务错误，显示错误信息
     if (!silent) {
-      ElMessage.error(data.msg || '请求失败')
+      ElMessage.error(data.message || data.msg || '请求失败')
     }
-    return Promise.reject(new Error(data.msg || '请求失败'))
+    return Promise.reject(new Error(data.message || data.msg || '请求失败'))
   },
   (error) => {
     const { response } = error
@@ -60,7 +60,7 @@ request.interceptors.response.use(
 
     if (response) {
       const { status, data } = response
-      const serverMessage = data?.msg
+      const serverMessage = data?.message || data?.msg
 
       if (status === 401) {
         // Session 失效，清除本地用户信息并跳转到登录页

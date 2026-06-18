@@ -105,7 +105,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
@@ -113,6 +113,7 @@ import * as storage from '@/utils/storage'
 import { login } from '@/api/auth'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 // 表单引用
@@ -175,7 +176,10 @@ const handleLogin = async () => {
     }
     
     ElMessage.success('登录成功')
-    router.push('/')
+    const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+      ? route.query.redirect
+      : '/explore'
+    await router.replace(redirect)
   } catch (error) {
     console.error('登录失败:', error)
   } finally {

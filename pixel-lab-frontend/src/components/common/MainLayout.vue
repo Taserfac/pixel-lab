@@ -1,248 +1,88 @@
 <template>
-  <div class="community-layout">
-    <header class="top-bar">
-      <router-link
-        to="/dashboard"
-        class="brand"
-        aria-label="Pixel Lab 首页"
-      >
-        <div class="brand-icon">
-          <span class="pixel-text">PX</span>
-        </div>
-        <span class="brand-name">Pixel Lab</span>
-        <span class="brand-tag">{{ $t('community.communityTag') }}</span>
+  <div class="app-shell" :class="{ 'is-immersive': route.meta.immersive }">
+    <header class="app-header">
+      <router-link class="brand" to="/explore" aria-label="返回 Explore">
+        <span class="brand-mark" aria-hidden="true">
+          <i v-for="index in 7" :key="index" />
+        </span>
+        <span>Pixel Lab</span>
       </router-link>
 
-      <div
-        class="search-bar"
-        @mouseenter="showSearchSuggestions = true"
-        @mouseleave="showSearchSuggestions = false"
-      >
-        <el-input
-          ref="searchInputRef"
-          v-model="searchQuery"
-          :placeholder="$t('community.searchPlaceholderFull')"
-          :prefix-icon="Search"
-          clearable
-          @keyup.enter="handleSearch"
-          @focus="showSearchSuggestions = true"
-        />
-        <div
-          v-if="showSearchSuggestions && (searchHistory.length || hotSearchTags.length)"
-          class="search-suggestions"
-        >
-          <div
-            v-if="searchHistory.length"
-            class="suggestion-section"
-          >
-            <div class="suggestion-header">
-              <span>最近搜索</span>
-              <button
-                type="button"
-                @click="clearSearchHistory"
-              >
-                清除
-              </button>
-            </div>
-            <button
-              v-for="item in searchHistory"
-              :key="item"
-              type="button"
-              class="suggestion-item"
-              @click="quickSearch(item)"
-            >
-              <el-icon><Clock /></el-icon> {{ item }}
-            </button>
-          </div>
-          <div
-            v-if="hotSearchTags.length"
-            class="suggestion-section"
-          >
-            <div class="suggestion-header">
-              <span>热门搜索</span>
-            </div>
-            <div class="hot-tags">
-              <button
-                v-for="tag in hotSearchTags"
-                :key="tag"
-                type="button"
-                class="hot-tag-item"
-                @click="quickSearch(tag)"
-              >
-                #{{ tag }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <form class="global-search" role="search" @submit.prevent="search">
+        <el-icon><Search /></el-icon>
+        <input v-model="searchQuery" type="search" placeholder="搜索作品或标签" aria-label="搜索作品或标签">
+        <kbd>Enter</kbd>
+      </form>
 
-      <div class="top-actions">
-        <el-button
-          type="primary"
-          class="upload-action"
-          :loading="uploading"
-          @click="triggerUpload"
-        >
-          <el-icon><Upload /></el-icon>
-          {{ $t('action.upload') + ' ' + $t('dashboard.uploadWork') }}
-        </el-button>
-        <el-popover
-          placement="bottom-end"
-          :width="360"
-          trigger="click"
-        >
+      <div class="header-actions">
+        <el-popover placement="bottom-end" :width="320" trigger="click">
           <template #reference>
-            <button
-              class="icon-action"
-              type="button"
-              :title="$t('notification.title')"
-              :aria-label="$t('notification.title')"
-            >
+            <button class="header-action" type="button" aria-label="通知">
               <el-icon><Bell /></el-icon>
-              <span
-                v-if="unreadCount > 0"
-                class="notice-badge"
-              >{{ unreadCount }}</span>
+              <span v-if="unreadCount" class="notice-dot" />
             </button>
           </template>
-          <div class="notification-panel">
-            <div class="notification-header">
-              <strong>{{ $t('notification.title') }}</strong>
-              <button
-                type="button"
-                class="mark-read-btn"
-                @click="markAllRead"
-              >
-                {{ $t('notification.markAllRead') }}
-              </button>
+          <div class="notification-popover">
+            <div class="notification-title">
+              <strong>通知</strong>
+              <button type="button" @click="markAllRead">全部已读</button>
             </div>
-            <div class="notification-list">
-              <div
-                v-for="n in notifications"
-                :key="n.id"
-                class="notification-item"
-                :class="{ unread: !n.read }"
-              >
-                <span
-                  class="notification-icon"
-                  :style="{ color: notificationColorMap[n.type] }"
-                >
-                  <el-icon><component :is="notificationIconMap[n.type]" /></el-icon>
-                </span>
-                <div class="notification-content">
-                  <p>{{ n.text }}</p>
-                  <span class="notification-time">{{ n.time }}</span>
-                </div>
-              </div>
-              <div
-                v-if="notifications.length === 0"
-                class="notification-empty"
-              >
-                {{ $t('notification.noNotifications') }}
-              </div>
-            </div>
+            <button
+              v-for="item in notifications"
+              :key="item.id"
+              class="notification-row"
+              :class="{ unread: !item.read }"
+              type="button"
+              @click="item.read = true"
+            >
+              <span>{{ item.text }}</span>
+              <small>{{ item.time }}</small>
+            </button>
           </div>
         </el-popover>
-        <button
-          class="icon-action"
-          type="button"
-          :title="themeToggleLabel"
-          :aria-label="themeToggleLabel"
-          @click="themeStore.toggleTheme"
-        >
-          <el-icon>
-            <Sunny v-if="isDarkTheme" />
-            <Moon v-else />
-          </el-icon>
+
+        <button class="header-action" type="button" :aria-label="themeLabel" :title="themeLabel" @click="themeStore.toggleTheme">
+          <el-icon><Sunny v-if="isDark" /><Moon v-else /></el-icon>
         </button>
-        <el-dropdown @command="handleCommand">
-          <button
-            class="user-avatar"
-            type="button"
-            aria-label="用户菜单"
-          >
-            <el-avatar
-              :size="36"
-              :src="userStore.userInfo?.avatar"
-            >
-              {{ userStore.userInfo?.nickname?.charAt(0) || 'U' }}
+
+        <el-dropdown trigger="click" @command="handleCommand">
+          <button class="account-button" type="button" aria-label="用户菜单">
+            <el-avatar :size="34" :src="userStore.userInfo?.avatar">
+              {{ userInitial }}
             </el-avatar>
-            <el-icon class="avatar-caret"><ArrowDown /></el-icon>
+            <el-icon><ArrowDown /></el-icon>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="profile">
-                <el-icon><User /></el-icon>{{ $t('nav.personal') }}
-              </el-dropdown-item>
-              <el-dropdown-item command="settings">
-                <el-icon><Setting /></el-icon>{{ $t('nav.settings') }}
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-if="userStore.isAdmin"
-                command="admin"
-              >
-                <el-icon><Setting /></el-icon>{{ $t('nav.admin') }}
-              </el-dropdown-item>
-              <el-dropdown-item
-                divided
-                command="logout"
-              >
-                <el-icon><SwitchButton /></el-icon>{{ $t('auth.logout') }}
-              </el-dropdown-item>
+              <el-dropdown-item command="profile"><el-icon><User /></el-icon>个人资料</el-dropdown-item>
+              <el-dropdown-item command="settings"><el-icon><Setting /></el-icon>设置</el-dropdown-item>
+              <el-dropdown-item v-if="userStore.isAdmin" command="dashboard"><el-icon><DataLine /></el-icon>控制台</el-dropdown-item>
+              <el-dropdown-item divided command="logout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
       </div>
     </header>
 
-    <input
-      ref="fileInput"
-      class="visually-hidden"
-      type="file"
-      accept="image/*"
-      @change="onFileSelected"
-    >
-
-    <main class="main-area">
+    <main class="app-main">
       <router-view v-slot="{ Component }">
-        <transition
-          name="fade"
-          mode="out-in"
-        >
+        <transition name="fade" mode="out-in">
           <component :is="Component" />
         </transition>
       </router-view>
     </main>
 
-    <nav class="dock-nav" aria-label="底部导航">
+    <nav class="bottom-nav" aria-label="主导航">
       <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="dock-item"
-        :class="{ active: isMenuActive(item.path) }"
-        :style="{ '--dock-accent': item.accent }"
+        v-for="item in navigation"
+        :key="item.key"
+        :to="item.to"
+        class="nav-item"
+        :class="{ 'nav-item--publish': item.key === 'publish', active: isActive(item) }"
       >
-        <span class="dock-icon">
-          <el-icon :size="22">
-            <component :is="item.icon" />
-          </el-icon>
-        </span>
-        <span class="dock-label">{{ item.label }}</span>
+        <span class="nav-icon"><el-icon><component :is="item.icon" /></el-icon></span>
+        <span>{{ item.label }}</span>
       </router-link>
-
-      <button
-        class="dock-item dock-upload"
-        type="button"
-        :disabled="uploading"
-        style="--dock-accent: var(--primary)"
-        @click="triggerUpload"
-      >
-        <span class="dock-icon">
-          <el-icon :size="22"><Upload /></el-icon>
-        </span>
-        <span class="dock-label">{{ $t('action.upload') }}</span>
-      </button>
     </nav>
   </div>
 </template>
@@ -250,682 +90,359 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowDown,
   Bell,
-  ChatDotRound,
-  Clock,
+  Brush,
   Compass,
-  HomeFilled,
-  InfoFilled,
+  DataLine,
   Moon,
+  Plus,
   Search,
   Setting,
-  Star,
   Sunny,
   SwitchButton,
-  Upload,
-  User,
-  UserFilled
+  User
 } from '@element-plus/icons-vue'
-import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
+import { useUserStore } from '@/store/user'
 import { logout as logoutApi } from '@/api/auth'
-import { uploadImage } from '@/api/image'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
 const themeStore = useThemeStore()
-const { t } = useI18n()
-const searchQuery = ref('')
-const fileInput = ref(null)
-const uploading = ref(false)
-const searchInputRef = ref(null)
-const showSearchSuggestions = ref(false)
-const searchHistory = ref(JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]').slice(0, 5))
-const hotSearchTags = ['插画', '摄影', 'UI设计', '像素艺术', 'AI艺术']
-const showNotifications = ref(false)
+const userStore = useUserStore()
+const searchQuery = ref(String(route.query.keyword || ''))
+
+const navigation = [
+  { key: 'explore', label: '探索', to: '/explore', icon: Compass },
+  { key: 'discover', label: '发现', to: '/discover', icon: Search },
+  { key: 'publish', label: '发布', to: '/publish', icon: Plus },
+  { key: 'studio', label: '创作', to: '/studio', icon: Brush },
+  { key: 'profile', label: '我的', to: '/profile', icon: User }
+]
+
 const notifications = ref([
-  { id: 1, type: 'like', text: '鹿与森 赞了你的作品「雾野织网」', time: '2分钟前', read: false },
-  { id: 2, type: 'comment', text: 'DesignLin 评论了你的作品「垂直城市」', time: '15分钟前', read: false },
-  { id: 3, type: 'follow', text: 'PixelCat 关注了你', time: '1小时前', read: true },
-  { id: 4, type: 'system', text: '你的作品「光环窗口」已通过审核', time: '3小时前', read: true }
+  { id: 1, text: '有人喜欢了你的作品《云端漫游》', time: '2 分钟前', read: false },
+  { id: 2, text: '你的作品已通过社区审核', time: '1 小时前', read: false },
+  { id: 3, text: '本周创作挑战已经开始', time: '昨天', read: true }
 ])
-const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
-const notificationIconMap = { like: Star, comment: ChatDotRound, follow: UserFilled, system: InfoFilled }
-const notificationColorMap = { like: '#FF6B6B', comment: '#5B8DEF', follow: '#16C784', system: '#FFB454' }
+const unreadCount = computed(() => notifications.value.filter(item => !item.read).length)
+const isDark = computed(() => themeStore.theme === 'dark')
+const themeLabel = computed(() => isDark.value ? '切换为浅色模式' : '切换为深色模式')
+const userInitial = computed(() => (userStore.userInfo?.nickname || userStore.userInfo?.username || 'U').charAt(0).toUpperCase())
 
-const navItems = computed(() => {
-  const items = [
-    { path: '/dashboard', label: t('nav.home'), icon: HomeFilled, accent: '#16C784' },
-    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' },
-    { path: '/personal', label: t('nav.personal'), icon: User, accent: '#FF8AB3' }
-  ]
+const isActive = item => route.path === item.to || route.path.startsWith(`${item.to}/`)
 
-  if (userStore.isAdmin) {
-    items.push({ path: '/admin', label: t('nav.admin'), icon: Setting, accent: '#FF4757' })
-  }
-
-  return items
-})
-
-const isDarkTheme = computed(() => themeStore.theme === 'dark')
-const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
-
-const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
-
-const handleSearch = () => {
+const search = () => {
   const keyword = searchQuery.value.trim()
-  if (!keyword) return
-  saveSearchHistory(keyword)
-  router.push({ path: '/community', query: { keyword } })
+  router.push({ path: '/discover', query: keyword ? { keyword } : {} })
 }
 
-const quickSearch = (keyword) => {
-  searchQuery.value = keyword
-  saveSearchHistory(keyword)
-  showSearchSuggestions.value = false
-  router.push({ path: '/community', query: { keyword } })
-}
+const markAllRead = () => notifications.value.forEach(item => { item.read = true })
 
-const saveSearchHistory = (keyword) => {
-  const history = searchHistory.value.filter(h => h !== keyword)
-  history.unshift(keyword)
-  searchHistory.value = history.slice(0, 5)
-  localStorage.setItem('pixel_lab_search_history', JSON.stringify(searchHistory.value))
-}
+const handleCommand = async command => {
+  if (command === 'profile') return router.push('/profile')
+  if (command === 'settings') return router.push('/settings')
+  if (command === 'dashboard') return router.push('/dashboard')
+  if (command !== 'logout') return
 
-const clearSearchHistory = () => {
-  searchHistory.value = []
-  localStorage.removeItem('pixel_lab_search_history')
-}
-
-const handleNotifications = () => {
-  showNotifications.value = !showNotifications.value
-}
-
-const markAllRead = () => {
-  notifications.value.forEach(n => { n.read = true })
-}
-
-const triggerUpload = () => {
-  fileInput.value?.click()
-}
-
-const onFileSelected = async (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-
-  if (!file.type.startsWith('image/')) {
-    ElMessage.error('请选择图片文件')
-    event.target.value = ''
-    return
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error('图片大小不能超过 5MB')
-    event.target.value = ''
-    return
-  }
-
-  uploading.value = true
   try {
-    const res = await uploadImage(file)
-    ElMessage.success('上传成功')
-    const imageUrl = res?.url || res?.data?.url || ''
-    ElMessageBox.confirm('上传成功！是否进入工作台编辑此图片？', '上传完成', {
-      confirmButtonText: '进入工作台',
-      cancelButtonText: '留在个人中心',
-      type: 'success'
-    }).then(() => {
-      if (imageUrl) {
-        localStorage.setItem('pixel_lab_workbench_image', imageUrl)
-      }
-      router.push('/workbench')
-    }).catch(() => {
-      router.push('/personal')
-    })
-  } catch (error) {
-    console.error('上传失败:', error)
-    ElMessage.error('上传失败')
-  } finally {
-    uploading.value = false
-    event.target.value = ''
-  }
-}
-
-const handleCommand = (command) => {
-  switch (command) {
-  case 'profile':
-    router.push('/personal')
-    break
-  case 'settings':
-    router.push('/settings')
-    break
-  case 'admin':
-    router.push('/admin')
-    break
-  case 'logout':
-    ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出登录', {
+      confirmButtonText: '退出',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(async () => {
-      await logoutApi().catch(() => {})
-      userStore.logout()
-      router.push('/login')
-      ElMessage.success('已退出登录')
-    }).catch(() => {})
-    break
+    })
+    await logoutApi().catch(() => {})
+    userStore.logout()
+    await router.push('/login')
+    ElMessage.success('已退出登录')
+  } catch {
+    // User cancelled the confirmation.
   }
 }
 </script>
 
 <style scoped>
-.community-layout {
+.app-shell {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--background);
-  color: var(--foreground);
+  color: var(--text-primary);
+  background: var(--bg);
 }
 
-.top-bar {
+.app-header {
   height: 72px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(280px, 560px) minmax(190px, 1fr);
   align-items: center;
   gap: var(--space-6);
-  padding: 0 clamp(var(--space-4), 4vw, var(--space-10));
   position: sticky;
   top: 0;
-  z-index: 100;
-  background: var(--background-float);
-  box-shadow: 0 1px 0 var(--border), 0 16px 32px rgba(17, 24, 39, 0.04);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-[data-theme='dark'] .top-bar {
-  box-shadow: 0 1px 0 var(--border), 0 16px 32px rgba(0, 0, 0, 0.18);
+  z-index: 110;
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-8));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-glass);
+  backdrop-filter: blur(18px) saturate(1.25);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  color: inherit;
+  gap: var(--space-3);
+  width: max-content;
+  color: var(--text-primary);
   text-decoration: none;
+  font-size: 19px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
 }
 
-.brand-icon {
-  width: 40px;
-  height: 40px;
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 8px);
+  grid-template-rows: repeat(3, 8px);
+  gap: 2px;
+}
+
+.brand-mark i {
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+.brand-mark i:nth-child(2),
+.brand-mark i:nth-child(4) { opacity: 0; }
+
+.global-search {
+  min-height: 42px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--primary);
-  box-shadow: var(--glow-sm);
-}
-
-.pixel-text {
-  color: white;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.brand-name {
-  color: var(--foreground);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.brand-tag {
+  gap: var(--space-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: var(--primary-muted);
-  color: var(--primary);
-  padding: 4px 9px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.search-bar {
-  flex: 1;
-  max-width: 520px;
-  margin: 0 auto;
-  position: relative;
-}
-
-.search-bar :deep(.el-input__wrapper) {
-  min-height: 42px;
   padding: 0 var(--space-4);
-  background: var(--background-muted) !important;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--card) 74%, transparent);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
-.top-actions {
+.global-search:focus-within {
+  border-color: var(--primary-border);
+  background: var(--card);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.global-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.global-search kbd {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  color: var(--text-tertiary);
+  background: var(--card);
+  font: 10px var(--font-mono);
+}
+
+.header-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
-.upload-action {
-  min-width: 108px;
-}
-
-.icon-action,
-.user-avatar {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.header-action,
+.account-button {
   border: 0;
-  border-radius: var(--radius-full);
-  background: var(--background-elevated);
-  color: var(--foreground-muted);
-  box-shadow: var(--shadow-sm);
+  color: var(--text-secondary);
+  background: transparent;
   cursor: pointer;
-  position: relative;
-  transition:
-    color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
 }
 
-.icon-action:hover,
-.user-avatar:hover {
-  color: var(--primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
-.notice-badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  min-width: 18px;
-  height: 18px;
+.header-action {
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--error);
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 0 4px;
+  position: relative;
+  border-radius: var(--radius-md);
+  font-size: 18px;
+  transition: color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
-.search-suggestions {
+.header-action:hover {
+  transform: translateY(-2px);
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.header-action:active { transform: scale(0.98); }
+
+.notice-dot {
+  width: 7px;
+  height: 7px;
   position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 200;
-  border-radius: var(--radius-lg);
-  background: var(--background-card);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border);
-  overflow: hidden;
+  top: 9px;
+  right: 9px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  background: var(--danger);
 }
 
-.suggestion-section {
-  padding: var(--space-3);
-}
-
-.suggestion-section + .suggestion-section {
-  border-top: 1px solid var(--border);
-}
-
-.suggestion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
-
-.suggestion-header span {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--foreground-muted);
-}
-
-.suggestion-header button {
-  border: 0;
-  background: transparent;
-  color: var(--foreground-muted);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.suggestion-header button:hover {
-  color: var(--primary);
-}
-
-.suggestion-item {
+.account-button {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--foreground);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.suggestion-item:hover {
-  background: var(--background-muted);
-}
-
-.suggestion-item .el-icon {
-  color: var(--foreground-muted);
-  font-size: 14px;
-}
-
-.hot-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.hot-tag-item {
-  border: 0;
+  gap: var(--space-1);
+  padding: 3px;
   border-radius: var(--radius-full);
-  background: var(--primary-muted);
-  color: var(--primary);
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast);
 }
 
-.hot-tag-item:hover {
-  background: color-mix(in srgb, var(--primary) 20%, transparent);
-}
+.account-button:hover { background: var(--surface-muted); }
 
-.notification-panel {
-  margin: calc(var(--space-2) * -1);
-}
+.notification-popover { margin: -12px; }
 
-.notification-header {
+.notification-title {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
-.notification-header strong {
-  font-size: 14px;
-}
-
-.mark-read-btn {
+.notification-title button {
   border: 0;
+  color: var(--primary-active);
   background: transparent;
-  color: var(--primary);
   font-size: 12px;
   cursor: pointer;
 }
 
-.notification-list {
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  transition: background var(--transition-fast);
-  cursor: pointer;
-}
-
-.notification-item:hover {
-  background: var(--background-muted);
-}
-
-.notification-item.unread {
-  background: var(--primary-muted);
-}
-
-.notification-icon {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--background-muted);
-  font-size: 16px;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-content p {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--foreground);
-}
-
-.notification-time {
-  font-size: 11px;
-  color: var(--foreground-muted);
-}
-
-.notification-empty {
-  padding: var(--space-8);
-  text-align: center;
-  color: var(--foreground-muted);
-  font-size: 13px;
-}
-
-.user-avatar {
-  width: auto;
-  min-width: 54px;
-  gap: 4px;
-  padding: 0 8px 0 3px;
-}
-
-.avatar-caret {
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.main-area {
-  flex: 1;
+.notification-row {
   width: 100%;
-  padding: clamp(var(--space-5), 4vw, var(--space-10));
-  padding-bottom: 112px;
+  display: grid;
+  gap: 2px;
+  border: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-secondary);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
-.dock-nav {
+.notification-row:hover,
+.notification-row.unread { background: var(--primary-soft); }
+.notification-row.unread span { color: var(--text-primary); font-weight: 620; }
+.notification-row small { color: var(--text-tertiary); }
+
+.app-main {
+  min-height: calc(100vh - 72px);
+  padding: clamp(var(--space-6), 4vw, var(--space-12));
+  padding-bottom: 124px;
+}
+
+.is-immersive .app-main {
+  padding: 0 0 88px;
+}
+
+.is-immersive .app-header {
+  display: none;
+}
+
+.is-immersive .app-main {
+  min-height: 100vh;
+}
+
+.bottom-nav {
+  min-width: min(92vw, 650px);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   position: fixed;
-  bottom: var(--space-6);
   left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
+  bottom: var(--space-6);
   z-index: 100;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.72);
+  transform: translateX(-50%);
+  overflow: visible;
+  border: 1px solid rgba(234, 234, 234, 0.86);
+  border-radius: 18px;
+  padding: var(--space-2);
+  background: var(--surface-glass);
   box-shadow: var(--shadow-md);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(20px) saturate(1.3);
 }
 
-[data-theme='dark'] .dock-nav {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(24, 32, 28, 0.72);
-}
-
-.dock-item {
-  --dock-accent: var(--primary);
-  min-width: 64px;
-  min-height: 58px;
-  display: inline-flex;
+.nav-item {
+  min-height: 54px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  gap: 4px;
+  gap: var(--space-2);
   position: relative;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--foreground-muted);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   text-decoration: none;
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    transform var(--transition-fast),
-    background var(--transition-fast),
-    box-shadow var(--transition-fast);
+  font-size: 12px;
+  font-weight: 620;
+  transition: color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 
-.dock-item:hover {
-  color: var(--dock-accent);
-  transform: translateY(-3px);
-  background: color-mix(in srgb, var(--dock-accent) 12%, transparent);
+.nav-item:hover {
+  transform: translateY(-2px);
+  color: var(--primary-active);
+  background: var(--primary-soft);
 }
 
-.dock-item:active {
-  transform: translateY(0) scale(0.96);
-}
+.nav-item:active { transform: scale(0.98); }
+.nav-item.active { color: var(--primary-active); }
 
-.dock-item.active {
-  color: var(--dock-accent);
-  background: color-mix(in srgb, var(--dock-accent) 14%, white);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent);
-}
-
-[data-theme='dark'] .dock-item.active {
-  background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
-}
-
-.dock-item:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--dock-accent) 24%, transparent);
-  outline-offset: 2px;
-}
-
-.dock-upload {
-  min-width: 70px;
-  color: white;
-  background: var(--primary);
-  box-shadow: var(--glow-sm);
-}
-
-.dock-upload:hover {
-  color: white;
-  background: var(--primary-hover);
-}
-
-.dock-upload:disabled {
-  cursor: wait;
-  opacity: 0.72;
-}
-
-.dock-label {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.visually-hidden {
+.nav-item.active::after {
+  content: '';
+  width: 22px;
+  height: 3px;
   position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+  bottom: 2px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
+.nav-icon {
+  display: inline-flex;
+  font-size: 19px;
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.nav-item--publish .nav-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin-top: -24px;
+  border: 5px solid var(--bg);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--primary);
+  box-shadow: var(--shadow-md);
 }
 
-@media (max-width: 900px) {
-  .top-bar {
-    gap: var(--space-4);
-  }
-
-  .brand-name {
-    display: none;
-  }
-
-  .brand-tag {
-    display: none;
-  }
-
-  .upload-action {
-    display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .top-bar {
-    padding: 0 var(--space-4);
-  }
-
-  .search-bar {
-    display: none;
-  }
-
-  .top-actions {
-    gap: var(--space-2);
-  }
-
-  .icon-action {
-    width: 38px;
-    height: 38px;
-  }
-
-  .dock-nav {
-    left: var(--space-4);
-    right: var(--space-4);
-    bottom: var(--space-4);
-    transform: none;
-    justify-content: space-around;
-  }
-
-  .dock-item {
-    min-width: 0;
-    flex: 1;
-  }
+@media (max-width: 820px) {
+  .app-header { grid-template-columns: 1fr auto; }
+  .global-search { display: none; }
+  .brand { font-size: 17px; }
+  .app-main { padding: var(--space-6) var(--space-4) 112px; }
+  .bottom-nav { min-width: 0; width: calc(100% - 24px); bottom: var(--space-3); }
+  .nav-item { flex-direction: column; gap: 2px; font-size: 10px; }
 }
 
 @media (max-width: 420px) {
-  .dock-label {
-    display: none;
-  }
-
-  .dock-item {
-    min-height: 50px;
-  }
+  .app-header { height: 64px; padding-inline: var(--space-3); }
+  .brand span:last-child { display: none; }
+  .header-action:nth-of-type(2) { display: none; }
 }
 </style>

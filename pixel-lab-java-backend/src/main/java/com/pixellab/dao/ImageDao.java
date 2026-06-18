@@ -116,4 +116,24 @@ public class ImageDao {
       stmt.executeUpdate();
     }
   }
+
+  public void updateMetadata(long id, String title, String tags, String description) throws Exception {
+    String sql = "UPDATE image SET title = ?, tags = ?, description = ? WHERE id = ?";
+    try (Connection conn = dataSource.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, title);
+      if (tags == null || tags.isBlank()) {
+        stmt.setNull(2, java.sql.Types.VARCHAR);
+      } else {
+        stmt.setString(2, tags);
+      }
+      if (description == null || description.isBlank()) {
+        stmt.setNull(3, java.sql.Types.LONGVARCHAR);
+      } else {
+        stmt.setString(3, description);
+      }
+      stmt.setLong(4, id);
+      stmt.executeUpdate();
+    }
+  }
 }

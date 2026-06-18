@@ -1,83 +1,48 @@
-const CACHE_NAME = 'pixel-lab-v1';
+const CACHE_NAME = 'pixel-lab-v3'
+const APP_SHELL = ['/']
 
-const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
-  '/community'
-];
+self.addEventListener('install', event => {
+  // 强制跳过等待，新版 SW 立即接管
+  self.skipWaiting()
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)))
+})
 
-// Install event - precache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Pre-caching static assets');
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
-  self.skipWaiting();
-});
+self.addEventListener('fetch', event => {
+  const { request } = event
+  const url = new URL(request.url)
 
-// Fetch event - cache-first for static assets, network-first for API
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+  if (request.method !== 'GET') return
 
-  // API calls - network-first strategy
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('api')) {
+  // API 与页面导航优先走网络，避免离线缓存污染登录状态或保留旧版 index.html。
+  if (url.pathname.startsWith('/api/') || request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          // Clone the response before caching
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-          return response;
+        .then(response => {
+          if (request.mode === 'navigate' && response.ok) {
+            caches.open(CACHE_NAME).then(cache => cache.put('/', response.clone()))
+          }
+          return response
         })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
-    return;
+        .catch(() => request.mode === 'navigate' ? caches.match('/') : caches.match(request))
+    )
+    return
   }
 
-  // Static assets - cache-first strategy
+  // 带内容哈希的静态资源适合缓存优先。
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
+    caches.match(request).then(cached => cached || fetch(request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
       }
+      return response
+    }))
+  )
+})
 
-      return fetch(request).then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
-
-        return response;
-      });
-    })
-  );
-});
-
-// Activate event - clean old caches
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
-          .map((cacheName) => {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-      );
-    })
-  );
-  self.clients.claim();
-});
+    caches.keys()
+      .then(names => Promise.all(names.filter(name => name.startsWith('pixel-lab-') && name !== CACHE_NAME).map(name => caches.delete(name))))
+      .then(() => self.clients.claim())
+  )
+})

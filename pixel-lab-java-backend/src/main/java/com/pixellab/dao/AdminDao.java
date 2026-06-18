@@ -7,6 +7,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,13 +151,61 @@ public class AdminDao {
       Map<String, Object> sessions = new LinkedHashMap<>();
       sessions.put("online", onlineCount);
 
+      List<Map<String, Object>> userGrowth = query(conn,
+          "SELECT DATE_FORMAT(activity_date, '%m-%d') AS label, value FROM ("
+              + "SELECT DATE(created_at) AS activity_date, COUNT(*) AS value FROM `user` "
+              + "WHERE is_deleted = 0 AND created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) "
+              + "GROUP BY DATE(created_at)) growth ORDER BY activity_date",
+          List.of());
+      List<Map<String, Object>> imageGrowth = query(conn,
+          "SELECT DATE_FORMAT(activity_date, '%m-%d') AS label, value FROM ("
+              + "SELECT DATE(created_at) AS activity_date, COUNT(*) AS value FROM image "
+              + "WHERE status = 1 AND created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY) "
+              + "GROUP BY DATE(created_at)) growth ORDER BY activity_date",
+          List.of());
+      List<Map<String, Object>> tagDistribution = tagDistribution(conn);
+
       Map<String, Object> result = new LinkedHashMap<>();
       result.put("users", users);
       result.put("images", images);
       result.put("interactions", interactions);
       result.put("sessions", sessions);
+      result.put("userGrowth", userGrowth);
+      result.put("imageGrowth", imageGrowth);
+      result.put("tagDistribution", tagDistribution);
       return result;
     }
+  }
+
+  private List<Map<String, Object>> tagDistribution(Connection conn) throws Exception {
+    Map<String, Long> counts = new HashMap<>();
+    try (PreparedStatement stmt = conn.prepareStatement(
+        "SELECT tags FROM image WHERE status = 1 AND is_public = 1 AND tags IS NOT NULL AND tags <> ''");
+         ResultSet rs = stmt.executeQuery()) {
+      while (rs.next()) {
+        String value = rs.getString("tags");
+        if (value == null) {
+          continue;
+        }
+        for (String item : value.split(",")) {
+          String tag = item.trim();
+          if (!tag.isBlank()) {
+            counts.merge(tag, 1L, Long::sum);
+          }
+        }
+      }
+    }
+
+    return counts.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder()))
+        .limit(8)
+        .map(entry -> {
+          Map<String, Object> item = new LinkedHashMap<>();
+          item.put("name", entry.getKey());
+          item.put("value", entry.getValue());
+          return item;
+        })
+        .toList();
   }
 
   private Map<String, Object> pageResult(List<Map<String, Object>> rows, long total, int page, int pageSize) {

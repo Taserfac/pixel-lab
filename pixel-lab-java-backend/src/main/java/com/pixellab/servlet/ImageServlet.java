@@ -107,6 +107,65 @@ public class ImageServlet extends BaseApiServlet {
   protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
     List<String> segments = RequestUtil.pathSegments(request);
     try {
+      if (segments.size() == 2 && "metadata".equals(segments.get(1))) {
+        long id = parseId(segments.get(0));
+        if (id <= 0) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        SessionUser user = currentUser(request);
+        ImageDao imageDao = new ImageDao(dataSource());
+        Map<String, Object> image = imageDao.findById(id);
+        if (image == null) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        if (((Number) image.get("user_id")).longValue() != user.getId()) {
+          Result.forbidden(response, "无权修改该作品");
+          return;
+        }
+
+        Map<String, Object> body = body(request);
+        String title = RequestUtil.string(body, "title");
+        String description = RequestUtil.string(body, "description");
+        if (title == null || title.isBlank()) {
+          Result.badRequest(response, "作品标题不能为空");
+          return;
+        }
+        if (title.length() > 100) {
+          Result.badRequest(response, "作品标题不能超过 100 个字符");
+          return;
+        }
+        if (description != null && description.length() > 1000) {
+          Result.badRequest(response, "作品说明不能超过 1000 个字符");
+          return;
+        }
+
+        Object rawTags = body.get("tags");
+        List<?> tagValues = rawTags instanceof List<?> ? (List<?>) rawTags : List.of();
+        if (tagValues.size() > 5) {
+          Result.badRequest(response, "最多添加 5 个标签");
+          return;
+        }
+        List<String> tags = new java.util.ArrayList<>();
+        for (Object value : tagValues) {
+          String tag = String.valueOf(value).trim().replaceFirst("^#", "");
+          if (tag.isBlank()) {
+            continue;
+          }
+          if (tag.length() > 20) {
+            Result.badRequest(response, "单个标签不能超过 20 个字符");
+            return;
+          }
+          if (!tags.contains(tag)) {
+            tags.add(tag);
+          }
+        }
+
+        imageDao.updateMetadata(id, title, String.join(",", tags), description);
+        ok(response, "作品信息更新成功", null);
+        return;
+      }
       if (segments.size() == 2 && "description".equals(segments.get(1))) {
         long id = parseId(segments.get(0));
         if (id <= 0) {
@@ -188,7 +247,7 @@ public class ImageServlet extends BaseApiServlet {
     data.put("size", target.length());
     data.put("width", width);
     data.put("height", height);
-    Result.write(response, HttpServletResponse.SC_CREATED, 201, "上传成功", data);
+    Result.write(response, HttpServletResponse.SC_CREATED, 0, "上传成功", data);
   }
 
   private void updateVisibility(HttpServletRequest request, HttpServletResponse response, long id) throws Exception {

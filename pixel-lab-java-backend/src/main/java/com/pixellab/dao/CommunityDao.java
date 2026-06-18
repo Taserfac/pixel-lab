@@ -119,10 +119,11 @@ public class CommunityDao {
   public Map<String, Object> comments(long imageId, int page, int pageSize) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     try (Connection conn = dataSource.getConnection()) {
-      long total = count(conn, "SELECT COUNT(*) FROM comments WHERE image_id = ? AND status = 1", List.of(imageId));
+      // 兼容早期数据库：旧 comments 表没有 status 字段，删除操作本身是物理删除。
+      long total = count(conn, "SELECT COUNT(*) FROM comments WHERE image_id = ?", List.of(imageId));
       List<Map<String, Object>> rows = query(conn,
           "SELECT c.*, u.nickname, u.avatar FROM comments c LEFT JOIN `user` u ON c.user_id = u.id "
-              + "WHERE c.image_id = ? AND c.status = 1 ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
+              + "WHERE c.image_id = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
           List.of(imageId, pageSize, offset));
       return pageResult(rows, total, page, pageSize);
     }

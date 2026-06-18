@@ -85,7 +85,7 @@ public class AlbumServlet extends BaseApiServlet {
         long albumId = dao.createAlbum(user.getId(), title, description, coverImageId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", albumId);
-        Result.write(response, HttpServletResponse.SC_CREATED, 201, "创建成功", data);
+        Result.write(response, HttpServletResponse.SC_CREATED, 0, "创建成功", data);
         return;
       }
       // POST /api/albums/{id}/images — add image to album

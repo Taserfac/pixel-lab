@@ -108,7 +108,7 @@ public class AuthServlet extends BaseApiServlet {
     long id = userDao.create(username, PasswordUtil.hash(password), nickname == null || nickname.isBlank() ? username : nickname);
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", id);
-    Result.write(response, HttpServletResponse.SC_CREATED, 201, "注册成功", data);
+    Result.write(response, HttpServletResponse.SC_CREATED, 0, "注册成功", data);
   }
 
   private void login(HttpServletRequest request, HttpServletResponse response) throws Exception {

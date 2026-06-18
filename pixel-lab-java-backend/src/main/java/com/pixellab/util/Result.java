@@ -10,11 +10,11 @@ public final class Result {
   }
 
   public static void ok(HttpServletResponse response, Object data) throws IOException {
-    write(response, HttpServletResponse.SC_OK, 200, "success", data);
+    write(response, HttpServletResponse.SC_OK, 0, "success", data);
   }
 
   public static void ok(HttpServletResponse response, String msg, Object data) throws IOException {
-    write(response, HttpServletResponse.SC_OK, 200, msg, data);
+    write(response, HttpServletResponse.SC_OK, 0, msg, data);
   }
 
   public static void badRequest(HttpServletResponse response, String msg) throws IOException {
@@ -48,7 +48,7 @@ public final class Result {
 
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("code", code);
-    body.put("msg", msg);
+    body.put("message", msg);
     body.put("data", data);
     response.getWriter().write(JsonUtil.stringify(body));
   }
