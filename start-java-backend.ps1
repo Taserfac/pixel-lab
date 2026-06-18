@@ -1,6 +1,7 @@
 param(
   [switch]$Run,
-  [switch]$SkipBuild
+  [switch]$SkipBuild,
+  [switch]$Clean
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,13 +56,14 @@ function Get-TomcatProcessIds {
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction SilentlyContinue
     if ($processInfo -and $processInfo.CommandLine -and $processInfo.CommandLine.Contains($TomcatHome)) {
       $ids.Add($pidValue)
-    } elseif ($processInfo) {
+    }
+    elseif ($processInfo) {
       throw "Port 8080 is already used by PID $pidValue. Stop it first, or change Tomcat's port."
     }
   }
 
   $tomcatProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -and $_.CommandLine.Contains('org.apache.catalina.startup.Bootstrap') -and $_.CommandLine.Contains($TomcatHome) }
+  Where-Object { $_.CommandLine -and $_.CommandLine.Contains('org.apache.catalina.startup.Bootstrap') -and $_.CommandLine.Contains($TomcatHome) }
   foreach ($processInfo in $tomcatProcesses) {
     $ids.Add([int]$processInfo.ProcessId)
   }
@@ -79,7 +81,7 @@ function Stop-ExistingTomcat {
   }
 }
 
-function Normalize-ProcessPath {
+function Set-ProcessPathCase {
   $pathValue = [Environment]::GetEnvironmentVariable('Path', 'Process')
   if ([string]::IsNullOrEmpty($pathValue)) {
     $pathValue = [Environment]::GetEnvironmentVariable('PATH', 'Process')
@@ -91,7 +93,7 @@ function Normalize-ProcessPath {
   }
 }
 
-function Build-War {
+function New-WarPackage {
   if ($SkipBuild) {
     if (!(Test-Path $WarPath)) {
       throw "Missing $WarPath. Run without -SkipBuild first."
@@ -106,7 +108,8 @@ function Build-War {
     if ($LASTEXITCODE -ne 0) {
       throw "Frontend build failed with exit code $LASTEXITCODE."
     }
-  } finally {
+  }
+  finally {
     Pop-Location
   }
 
@@ -115,13 +118,14 @@ function Build-War {
   }
 
   Write-Host 'Building Java backend...'
-  & $MavenCmd "-Dmaven.repo.local=$MavenRepo" -f (Join-Path $JavaBackendDir 'pom.xml') clean package
+  $mavenGoal = if ($Clean) { 'clean package' } else { 'package' }
+  & $MavenCmd "-Dmaven.repo.local=$MavenRepo" -f (Join-Path $JavaBackendDir 'pom.xml') $mavenGoal.Split(' ')
   if ($LASTEXITCODE -ne 0) {
     throw "Maven build failed with exit code $LASTEXITCODE."
   }
 }
 
-function Deploy-War {
+function Install-WarToTomcat {
   if (!(Test-Path $TomcatHome)) {
     throw "Tomcat not found at $TomcatHome."
   }
@@ -150,7 +154,8 @@ function Wait-ForHealth {
       Write-Host "Java backend is ready: $HealthUrl"
       Write-Host $response.Content
       return
-    } catch {
+    }
+    catch {
       Start-Sleep -Seconds 1
     }
   }
@@ -167,20 +172,21 @@ if ($Run) {
   try {
     & (Join-Path $TomcatHome 'bin\catalina.bat') run
     exit $LASTEXITCODE
-  } finally {
+  }
+  finally {
     Pop-Location
   }
 }
 
-Build-War
+New-WarPackage
 Stop-ExistingTomcat
-Deploy-War
+Install-WarToTomcat
 
 Write-Host 'Starting Tomcat in the background...'
 $stdoutLog = Join-Path $ToolsDir 'tomcat-wrapper.out.log'
 $stderrLog = Join-Path $ToolsDir 'tomcat-wrapper.err.log'
 
-Normalize-ProcessPath
+Set-ProcessPathCase
 
 try {
   $process = Start-Process -FilePath 'powershell.exe' `
@@ -191,7 +197,8 @@ try {
     -PassThru
 
   Write-Host "Tomcat wrapper PID: $($process.Id)"
-} catch {
+}
+catch {
   Write-Host "Start-Process failed, falling back to cmd start: $($_.Exception.Message)"
   $scriptPath = $MyInvocation.MyCommand.Path
   $cmdLine = 'start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $scriptPath + '" -Run -SkipBuild'
