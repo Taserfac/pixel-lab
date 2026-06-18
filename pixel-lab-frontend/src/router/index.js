@@ -40,19 +40,19 @@ const routes = [
         component: () => import('@/views/dashboard/Index.vue'),
         meta: { title: '首页', icon: 'HomeFilled' }
       },
-      // 图像处理工作台
+      // 图像工坊
       {
         path: 'workbench',
         name: 'Workbench',
         component: () => import('@/views/workbench/Index.vue'),
-        meta: { title: '工作台', icon: 'Picture' }
+        meta: { title: '图像工坊', icon: 'Picture' }
       },
-      // 手绘板
+      // 创意画布
       {
         path: 'draw',
         name: 'Draw',
         component: () => import('@/views/draw/Index.vue'),
-        meta: { title: '手绘板', icon: 'EditPen' }
+        meta: { title: '创意画布', icon: 'EditPen' }
       },
       // 社区广场
       {
@@ -60,6 +60,18 @@ const routes = [
         name: 'Community',
         component: () => import('@/views/community/Index.vue'),
         meta: { title: '社区广场', icon: 'ChatDotRound' }
+      },
+      {
+        path: 'post/:id',
+        name: 'PostDetail',
+        component: () => import('@/views/post/Index.vue'),
+        meta: { title: '作品详情', hideInMenu: true }
+      },
+      {
+        path: 'user/:id',
+        name: 'UserProfile',
+        component: () => import('@/views/user/Index.vue'),
+        meta: { title: '创作者主页', hideInMenu: true }
       },
       // 个人中心
       {
@@ -131,6 +143,11 @@ router.beforeEach(async (to, from, next) => {
   
   // 公开路由直接放行
   if (to.meta.public) {
+    // 本地缓存只用于快速恢复展示，首次放行前仍需验证服务端会话。
+    if (userStore.isLoggedIn && !userStore.sessionChecked) {
+      await userStore.fetchUserInfo({ silent: true }).catch(() => {})
+    }
+
     // 已登录用户访问登录/注册页，重定向到首页
     if (userStore.isLoggedIn && whiteList.includes(to.path)) {
       next('/')
@@ -140,8 +157,8 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  if (!userStore.isLoggedIn && !userStore.sessionChecked) {
-    await userStore.fetchUserInfo().catch(() => {})
+  if (!userStore.sessionChecked) {
+    await userStore.fetchUserInfo({ silent: true }).catch(() => {})
   }
   
   // 需要登录的路由

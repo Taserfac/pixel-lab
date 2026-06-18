@@ -1,55 +1,38 @@
 <template>
   <div class="home-page">
+    <section class="home-hero">
+      <div class="hero-copy">
+        <h1>{{ $t('dashboard.title') }}</h1>
+        <p>{{ $t('dashboard.subtitle') }}</p>
+      </div>
+
+      <div class="hero-preview" aria-hidden="true">
+        <div
+          v-for="(work, index) in previewWorks"
+          :key="work.id || index"
+          class="preview-card"
+          :class="`preview-card-${index + 1}`"
+        >
+          <img
+            v-if="work.url"
+            :src="work.url"
+            :alt="work.title || work.original_name || $t('dashboard.previewLabel')"
+          >
+        </div>
+        <span
+          v-for="(label, idx) in heroLabels"
+          :key="label"
+          class="hero-label"
+          :class="heroLabelClasses[idx]"
+        >{{ label }}</span>
+        <span class="hero-like">
+          <el-icon><Star /></el-icon>
+        </span>
+      </div>
+    </section>
+
     <div class="home-content">
       <div class="primary-column">
-        <section class="home-hero">
-          <div class="hero-copy">
-            <h1>{{ $t('dashboard.title') }}</h1>
-            <p>{{ $t('dashboard.subtitle') }}</p>
-            <div class="hero-actions">
-              <el-button
-                type="primary"
-                size="large"
-                @click="router.push('/personal')"
-              >
-                <el-icon><Upload /></el-icon>
-                {{ $t('dashboard.uploadWork') }}
-              </el-button>
-              <el-button
-                size="large"
-                @click="router.push('/community')"
-              >
-                <el-icon><Compass /></el-icon>
-                {{ $t('action.browseCommunity') }}
-              </el-button>
-            </div>
-          </div>
-
-          <div class="hero-preview" aria-hidden="true">
-            <div
-              v-for="(work, index) in previewWorks"
-              :key="work.id || index"
-              class="preview-card"
-              :class="`preview-card-${index + 1}`"
-            >
-              <img
-                v-if="work.url"
-                :src="work.url"
-                :alt="work.title || work.original_name || $t('dashboard.previewLabel')"
-              >
-            </div>
-            <span
-              v-for="(label, idx) in heroLabels"
-              :key="label"
-              class="hero-label"
-              :class="heroLabelClasses[idx]"
-            >{{ label }}</span>
-            <span class="hero-like">
-              <el-icon><Star /></el-icon>
-            </span>
-          </div>
-        </section>
-
         <main class="feed-column">
           <div class="section-heading">
             <div>
@@ -94,6 +77,7 @@
                 :work="work"
                 :style="{ '--post-ratio': getCardRatio(index) }"
                 @select="openWork"
+                @author-select="openCreator"
               />
             </template>
           </div>
@@ -110,36 +94,6 @@
       </div>
 
       <aside class="discovery-rail">
-        <section class="rail-card creation-card">
-          <div class="rail-title">
-            <h3>
-              <el-icon><Star /></el-icon>
-              {{ $t('creation.creationCenter') }}
-            </h3>
-          </div>
-          <div class="creation-list">
-            <button
-              v-for="action in creationActions"
-              :key="action.label"
-              type="button"
-              class="creation-action"
-              :class="`creation-${action.tone}`"
-              @click="handleCreationAction(action)"
-            >
-              <span class="creation-icon">
-                <el-icon>
-                  <component :is="action.icon" />
-                </el-icon>
-              </span>
-              <span>
-                <strong>{{ action.label }}</strong>
-                <small>{{ action.description }}</small>
-              </span>
-              <el-icon><ArrowRight /></el-icon>
-            </button>
-          </div>
-        </section>
-
         <section class="rail-card tag-card">
           <div class="rail-title">
             <h3>{{ $t('dashboard.hotTags') }}</h3>
@@ -177,6 +131,8 @@
               v-for="creator in recommendedCreators"
               :key="creator.name"
               class="creator-item"
+              :class="{ clickable: creator.id }"
+              @click="openCreator(creator)"
             >
               <el-avatar
                 :size="46"
@@ -190,9 +146,9 @@
               </div>
               <button
                 type="button"
-                @click="router.push('/community')"
+                @click.stop="openCreator(creator)"
               >
-                {{ $t('action.follow') }}
+                主页
               </button>
             </article>
           </div>
@@ -239,12 +195,7 @@ import {
   ArrowRight,
   ChatDotRound,
   CollectionTag,
-  Compass,
-  EditPen,
-  FolderOpened,
-  Picture,
   Star,
-  Upload,
   User
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -343,14 +294,11 @@ const sampleCreators = [
   { name: 'DesignLin', role: 'UI/UX 设计师', avatar: '/sample-images/test_2.jpg', count: 15 },
   { name: 'PixelCat', role: '像素艺术家', avatar: '/sample-images/test_1.jpg', count: 8 }
 ]
-const creationActions = computed(() => [
-  { label: t('creation.uploadWork'), description: t('creation.uploadWorkDesc'), icon: Upload, tone: 'green', path: '/personal' },
-  { label: t('creation.onlineCreate'), description: t('creation.onlineCreateDesc'), icon: EditPen, tone: 'blue', path: '/draw' },
-  { label: t('creation.workbench'), description: t('creation.workbenchDesc'), icon: Picture, tone: 'purple', path: '/workbench' },
-  { label: t('creation.myWorks'), description: t('creation.myWorksDesc'), icon: FolderOpened, tone: 'orange', path: '/personal' }
-])
-
 const toNumber = (value) => Number(value || 0)
+const normalizeTags = (value) => {
+  if (Array.isArray(value)) return value
+  return String(value || '').split(/[,，]/).map(tag => tag.trim()).filter(Boolean)
+}
 
 const normalizeStats = (stats = {}) => ({
   works: toNumber(stats.works ?? stats.imageCount),
@@ -364,7 +312,7 @@ const feedTabs = computed(() => {
   if (!works.value.length) return defaultFeedTabs
   const tagSet = new Set()
   works.value.forEach(work => {
-    (work.tags || []).forEach(tag => tagSet.add(tag))
+    normalizeTags(work.tags).forEach(tag => tagSet.add(tag))
   })
   const dynamicTabs = [...tagSet]
   return ['推荐', '最新', '关注', ...dynamicTabs.filter(t => !['推荐', '最新', '关注'].includes(t))]
@@ -374,7 +322,7 @@ const popularTags = computed(() => {
   if (!works.value.length) return defaultPopularTags
   const tagCount = {}
   works.value.forEach(work => {
-    (work.tags || []).forEach(tag => {
+    normalizeTags(work.tags).forEach(tag => {
       tagCount[tag] = (tagCount[tag] || 0) + 1
     })
   })
@@ -410,7 +358,7 @@ const feedWorks = computed(() => {
   if (activeFeedTab.value === '关注') return source.slice(0, 4)
 
   const matched = source.filter((work) => {
-    const tags = work.tags || []
+    const tags = normalizeTags(work.tags)
     const haystack = `${work.title || ''} ${work.description || ''} ${work.original_name || ''}`
     return tags.includes(activeFeedTab.value) || haystack.includes(activeFeedTab.value)
   })
@@ -430,11 +378,13 @@ const recommendedCreators = computed(() => {
     const name = work.author_name || work.nickname
     if (!name) return
     const cached = creatorMap.get(name) || {
+      id: work.user_id || work.author_id,
       name,
       avatar: work.author_avatar || '',
       count: 0
     }
     cached.count += 1
+    cached.id ||= work.user_id || work.author_id
     creatorMap.set(name, cached)
   })
 
@@ -442,6 +392,7 @@ const recommendedCreators = computed(() => {
     const name = activity.author_name
     if (!name || creatorMap.has(name)) return
     creatorMap.set(name, {
+      id: activity.author_id,
       name,
       avatar: activity.author_avatar || '',
       role: activity.action || '社区创作者',
@@ -487,15 +438,16 @@ const openWork = (work) => {
     router.push('/community')
     return
   }
-  router.push({ path: '/community', query: { id: work.id } })
+  router.push(`/post/${work.id}`)
+}
+
+const openCreator = (creator) => {
+  const id = creator.user_id || creator.author_id || creator.id
+  if (id) router.push(`/user/${id}`)
 }
 
 const searchTag = (tag) => {
   router.push({ path: '/community', query: { keyword: tag.name || tag } })
-}
-
-const handleCreationAction = (action) => {
-  router.push(action.path)
 }
 
 onMounted(async () => {
@@ -538,6 +490,7 @@ onMounted(async () => {
     var(--background-card);
   box-shadow: var(--shadow);
   padding: clamp(var(--space-8), 5vw, var(--space-12));
+  margin-bottom: var(--space-8);
 }
 
 .hero-copy h1 {
@@ -554,13 +507,6 @@ onMounted(async () => {
   color: var(--foreground-muted);
   font-size: 16px;
   line-height: 1.8;
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-8);
 }
 
 .hero-preview {
@@ -778,83 +724,6 @@ onMounted(async () => {
   padding: var(--space-5);
 }
 
-.creation-list {
-  display: grid;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.creation-action {
-  width: 100%;
-  min-height: 58px;
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 18px;
-  align-items: center;
-  gap: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background-elevated);
-  color: var(--foreground);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  text-align: left;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.creation-action:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-}
-
-.creation-icon {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--primary-muted);
-  color: var(--primary);
-  font-size: 20px;
-}
-
-.creation-blue .creation-icon {
-  background: var(--secondary-muted);
-  color: var(--secondary);
-}
-
-.creation-purple .creation-icon {
-  background: rgba(139, 92, 246, 0.12);
-  color: #7C5AEF;
-}
-
-.creation-orange .creation-icon {
-  background: var(--accent-muted);
-  color: var(--accent);
-}
-
-.creation-action strong,
-.creation-action small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.creation-action strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.creation-action small {
-  margin-top: 2px;
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
 .tag-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1058,10 +927,6 @@ onMounted(async () => {
   .home-hero {
     border-radius: var(--radius-lg);
     padding: var(--space-6);
-  }
-
-  .hero-actions {
-    flex-direction: column;
   }
 
   .masonry-feed {

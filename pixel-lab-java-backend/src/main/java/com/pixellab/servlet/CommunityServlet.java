@@ -62,6 +62,21 @@ public class CommunityServlet extends BaseApiServlet {
         ok(response, dao.activities(RequestUtil.intParam(request, "limit", 10)));
         return;
       }
+      if (segments.size() == 2 && "users".equals(segments.get(0))) {
+        SessionUser user = currentUser(request);
+        Long userId = user == null ? null : user.getId();
+        Map<String, Object> profile = dao.publicProfile(
+            parseId(segments.get(1)),
+            userId,
+            RequestUtil.intParam(request, "page", 1),
+            RequestUtil.intParam(request, "pageSize", 24));
+        if (profile == null) {
+          Result.notFound(response, "用户不存在");
+          return;
+        }
+        ok(response, profile);
+        return;
+      }
       // GET /api/community/images/{id}/similar
       if (segments.size() == 3 && "images".equals(segments.get(0)) && "similar".equals(segments.get(2))) {
         long imageId = parseId(segments.get(1));

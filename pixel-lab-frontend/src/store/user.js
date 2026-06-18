@@ -72,9 +72,9 @@ export const useUserStore = defineStore('user', () => {
    * 获取用户信息
    * @returns {Promise}
    */
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = async (config = {}) => {
     try {
-      const data = await getUserInfo()
+      const data = await getUserInfo(config)
       setUserInfo(data)
       sessionChecked.value = true
       return data

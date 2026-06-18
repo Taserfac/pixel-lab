@@ -8,13 +8,7 @@
 -->
 
 <template>
-  <div class="login-page">
-    <!-- 背景装饰 -->
-    <div class="bg-decoration">
-      <div class="glow-orb glow-orb-1" />
-      <div class="glow-orb glow-orb-2" />
-    </div>
-
+  <AuthLayout>
     <div class="login-card">
       <!-- Logo -->
       <div class="logo">
@@ -71,7 +65,7 @@
           </el-checkbox>
           <el-link
             type="primary"
-            :underline="false"
+            underline="never"
           >
             忘记密码？
           </el-link>
@@ -100,7 +94,7 @@
         </el-link>
       </div>
     </div>
-  </div>
+  </AuthLayout>
 </template>
 
 <script setup>
@@ -108,6 +102,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
+import AuthLayout from '@/components/auth/AuthLayout.vue'
 import { useUserStore } from '@/store/user'
 import * as storage from '@/utils/storage'
 import { login } from '@/api/auth'
@@ -190,81 +185,9 @@ const goRegister = () => {
 </script>
 
 <style scoped>
-.login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--background);
-  padding: var(--space-4);
-  position: relative;
-  overflow: hidden;
-}
-
-/* 背景装饰 */
-.bg-decoration {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-}
-
-.glow-orb-1 {
-  width: 400px;
-  height: 400px;
-  background: var(--primary);
-  top: -100px;
-  right: -100px;
-  animation: float 8s ease-in-out infinite;
-}
-
-.glow-orb-2 {
-  width: 300px;
-  height: 300px;
-  background: var(--secondary);
-  bottom: -50px;
-  left: -50px;
-  animation: float 10s ease-in-out infinite reverse;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(30px, 30px); }
-}
-
-/* 登录卡片 */
 .login-card {
   width: 100%;
   max-width: 400px;
-  padding: var(--space-10);
-  background: var(--background-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  position: relative;
-  z-index: 1;
-}
-
-/* 发光边框效果 */
-.login-card::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, var(--primary-muted), transparent 50%, var(--secondary-muted));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
 }
 
 .logo {
@@ -282,7 +205,7 @@ const goRegister = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 30px var(--primary-glow);
+  box-shadow: 0 10px 24px rgba(22, 199, 132, 0.2);
   flex-shrink: 0;
 }
 
@@ -309,6 +232,12 @@ const goRegister = () => {
 
 .login-form {
   margin-bottom: var(--space-6);
+}
+
+.login-form :deep(.el-input__wrapper) {
+  min-height: 46px;
+  border-radius: 12px;
+  background: #ffffff;
 }
 
 .form-options {
@@ -353,10 +282,6 @@ const goRegister = () => {
 
 /* 响应式 */
 @media (max-width: 480px) {
-  .login-card {
-    padding: var(--space-6);
-  }
-
   .logo-text h1 {
     font-size: 20px;
   }

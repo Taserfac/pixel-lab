@@ -10,6 +10,11 @@ export function getImageDetail(id) {
   return request.get(`/api/community/images/${id}`)
 }
 
+// 获取创作者公开主页
+export function getUserProfile(id, params) {
+  return request.get(`/api/community/users/${id}`, { params })
+}
+
 // 点赞/取消点赞
 export function toggleLike(imageId) {
   return request.post('/api/community/like', { imageId })

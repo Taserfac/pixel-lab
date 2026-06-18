@@ -7,7 +7,7 @@
 -->
 
 <template>
-  <div class="register-page">
+  <AuthLayout>
     <div class="register-box">
       <!-- Logo -->
       <div class="logo">
@@ -120,7 +120,7 @@
         </el-link>
       </div>
     </div>
-  </div>
+  </AuthLayout>
 </template>
 
 <script setup>
@@ -128,6 +128,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Avatar } from '@element-plus/icons-vue'
+import AuthLayout from '@/components/auth/AuthLayout.vue'
 import { register } from '@/api/auth'
 import { checkPasswordStrength } from '@/utils/validate'
 
@@ -227,22 +228,9 @@ const goLogin = () => {
 </script>
 
 <style scoped>
-.register-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  padding: var(--space-4);
-}
-
 .register-box {
   width: 100%;
   max-width: 420px;
-  padding: var(--space-10);
-  background-color: var(--background);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
 }
 
 .logo {
@@ -264,6 +252,12 @@ const goLogin = () => {
 
 .register-form {
   margin-bottom: var(--space-6);
+}
+
+.register-form :deep(.el-input__wrapper) {
+  min-height: 46px;
+  border-radius: 12px;
+  background: #ffffff;
 }
 
 .password-strength {

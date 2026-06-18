@@ -36,8 +36,8 @@ export const register = (data) => {
  * 获取用户信息
  * @returns {Promise}
  */
-export const getUserInfo = () => {
-  return get('/api/auth/userinfo')
+export const getUserInfo = (config = {}) => {
+  return get('/api/auth/userinfo', {}, config)
 }
 
 /**

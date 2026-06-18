@@ -13,7 +13,9 @@ export default {
     personal: 'Profile',
     admin: 'Admin',
     settings: 'Settings',
-    workbench: 'Workbench',
+    workbench: 'Image Studio',
+    draw: 'Creative Canvas',
+    create: 'Create',
     dashboard: 'Discover'
   },
 
@@ -76,11 +78,11 @@ export default {
   creation: {
     uploadWork: 'Upload Work',
     uploadWorkDesc: 'Share your creation with the community',
-    onlineCreate: 'Create Online',
+    onlineCreate: 'Creative Canvas',
     onlineCreateDesc: 'Quickly start creating a new work',
     myWorks: 'My Works',
     myWorksDesc: 'Manage all your works',
-    workbench: 'Workbench',
+    workbench: 'Image Studio',
     workbenchDesc: 'Import images for editing',
     creationCenter: 'Creation Center',
     myWorkFlow: 'My Works Feed',
@@ -117,7 +119,7 @@ export default {
     aiArt: 'AI Art'
   },
 
-  // Workbench
+  // Image Studio
   workbench: {
     import: 'Import',
     filters: 'Filters',

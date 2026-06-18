@@ -84,7 +84,7 @@
       <header class="studio-header">
         <div class="studio-title">
           <span class="eyebrow">Pixel Lab</span>
-          <h1>手绘板</h1>
+          <h1>创意画布</h1>
         </div>
 
         <div class="header-actions">

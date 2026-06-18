@@ -77,15 +77,6 @@
       </div>
 
       <div class="top-actions">
-        <el-button
-          type="primary"
-          class="upload-action"
-          :loading="uploading"
-          @click="triggerUpload"
-        >
-          <el-icon><Upload /></el-icon>
-          {{ $t('action.upload') + ' ' + $t('dashboard.uploadWork') }}
-        </el-button>
         <el-popover
           placement="bottom-end"
           :width="360"
@@ -122,6 +113,7 @@
                 :key="n.id"
                 class="notification-item"
                 :class="{ unread: !n.read }"
+                @click="markNotificationRead(n.id)"
               >
                 <span
                   class="notification-icon"
@@ -216,7 +208,7 @@
 
     <nav class="dock-nav" aria-label="底部导航">
       <router-link
-        v-for="item in navItems"
+        v-for="item in primaryNavItems"
         :key="item.path"
         :to="item.path"
         class="dock-item"
@@ -243,12 +235,54 @@
         </span>
         <span class="dock-label">{{ $t('action.upload') }}</span>
       </button>
+
+      <el-popover
+        v-model:visible="showCreateMenu"
+        placement="top"
+        :width="260"
+        trigger="click"
+        popper-class="creation-entry-popper"
+      >
+        <template #reference>
+          <button
+            class="dock-item"
+            :class="{ active: isCreateRoute }"
+            type="button"
+            style="--dock-accent: #7C5AEF"
+          >
+            <span class="dock-icon">
+              <el-icon :size="22"><EditPen /></el-icon>
+            </span>
+            <span class="dock-label">{{ $t('nav.create') }}</span>
+          </button>
+        </template>
+        <div class="create-menu">
+          <button type="button" @click="openCreation('/draw')">
+            <span class="create-menu-icon canvas-icon"><el-icon><EditPen /></el-icon></span>
+            <span><strong>{{ $t('nav.draw') }}</strong><small>自由绘制，记录灵感</small></span>
+          </button>
+          <button type="button" @click="openCreation('/workbench')">
+            <span class="create-menu-icon studio-icon"><el-icon><Picture /></el-icon></span>
+            <span><strong>{{ $t('nav.workbench') }}</strong><small>编辑图片，轻松出片</small></span>
+          </button>
+        </div>
+      </el-popover>
+
+      <router-link
+        to="/personal"
+        class="dock-item"
+        :class="{ active: isMenuActive('/personal') }"
+        style="--dock-accent: #FF8AB3"
+      >
+        <span class="dock-icon"><el-icon :size="22"><User /></el-icon></span>
+        <span class="dock-label">{{ $t('nav.personal') }}</span>
+      </router-link>
     </nav>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -258,9 +292,11 @@ import {
   ChatDotRound,
   Clock,
   Compass,
+  EditPen,
   HomeFilled,
   InfoFilled,
   Moon,
+  Picture,
   Search,
   Setting,
   Star,
@@ -272,6 +308,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
+import { useNotificationStore } from '@/store/notification'
 import { logout as logoutApi } from '@/api/auth'
 import { uploadImage } from '@/api/image'
 
@@ -279,44 +316,50 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const notificationStore = useNotificationStore()
 const { t } = useI18n()
 const searchQuery = ref('')
 const fileInput = ref(null)
 const uploading = ref(false)
 const searchInputRef = ref(null)
 const showSearchSuggestions = ref(false)
+const showCreateMenu = ref(false)
 const searchHistory = ref(JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]').slice(0, 5))
 const hotSearchTags = ['插画', '摄影', 'UI设计', '像素艺术', 'AI艺术']
-const showNotifications = ref(false)
-const notifications = ref([
-  { id: 1, type: 'like', text: '鹿与森 赞了你的作品「雾野织网」', time: '2分钟前', read: false },
-  { id: 2, type: 'comment', text: 'DesignLin 评论了你的作品「垂直城市」', time: '15分钟前', read: false },
-  { id: 3, type: 'follow', text: 'PixelCat 关注了你', time: '1小时前', read: true },
-  { id: 4, type: 'system', text: '你的作品「光环窗口」已通过审核', time: '3小时前', read: true }
-])
-const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+const notifications = computed(() => notificationStore.notifications.map(item => ({
+  ...item,
+  time: formatNotificationTime(item.time)
+})))
+const unreadCount = computed(() => notificationStore.unreadCount)
 
 const notificationIconMap = { like: Star, comment: ChatDotRound, follow: UserFilled, system: InfoFilled }
 const notificationColorMap = { like: '#FF6B6B', comment: '#5B8DEF', follow: '#16C784', system: '#FFB454' }
 
-const navItems = computed(() => {
-  const items = [
+const primaryNavItems = computed(() => [
     { path: '/dashboard', label: t('nav.home'), icon: HomeFilled, accent: '#16C784' },
-    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' },
-    { path: '/personal', label: t('nav.personal'), icon: User, accent: '#FF8AB3' }
-  ]
-
-  if (userStore.isAdmin) {
-    items.push({ path: '/admin', label: t('nav.admin'), icon: Setting, accent: '#FF4757' })
-  }
-
-  return items
-})
+    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' }
+])
 
 const isDarkTheme = computed(() => themeStore.theme === 'dark')
 const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
 
 const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
+const isCreateRoute = computed(() => ['/draw', '/workbench'].some(isMenuActive))
+
+function formatNotificationTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const diff = Date.now() - date.getTime()
+  const minutes = Math.max(0, Math.floor(diff / 60000))
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}天前`
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
 
 const handleSearch = () => {
   const keyword = searchQuery.value.trim()
@@ -344,12 +387,18 @@ const clearSearchHistory = () => {
   localStorage.removeItem('pixel_lab_search_history')
 }
 
-const handleNotifications = () => {
-  showNotifications.value = !showNotifications.value
+const markAllRead = async () => {
+  await notificationStore.markAllRead().catch(() => {})
 }
 
-const markAllRead = () => {
-  notifications.value.forEach(n => { n.read = true })
+const markNotificationRead = async (id) => {
+  const item = notificationStore.notifications.find(n => n.id === id)
+  if (!item?.read) await notificationStore.markRead(id).catch(() => {})
+}
+
+const openCreation = (path) => {
+  showCreateMenu.value = false
+  router.push(path)
 }
 
 const triggerUpload = () => {
@@ -377,8 +426,8 @@ const onFileSelected = async (event) => {
     const res = await uploadImage(file)
     ElMessage.success('上传成功')
     const imageUrl = res?.url || res?.data?.url || ''
-    ElMessageBox.confirm('上传成功！是否进入工作台编辑此图片？', '上传完成', {
-      confirmButtonText: '进入工作台',
+    ElMessageBox.confirm('上传成功！是否进入图像工坊编辑此图片？', '上传完成', {
+      confirmButtonText: '进入图像工坊',
       cancelButtonText: '留在个人中心',
       type: 'success'
     }).then(() => {
@@ -417,12 +466,21 @@ const handleCommand = (command) => {
     }).then(async () => {
       await logoutApi().catch(() => {})
       userStore.logout()
+      notificationStore.reset()
       router.push('/login')
       ElMessage.success('已退出登录')
     }).catch(() => {})
     break
   }
 }
+
+onMounted(async () => {
+  notificationStore.reset()
+  await Promise.all([
+    notificationStore.fetchNotifications({ page: 1, pageSize: 20 }, { silent: true }),
+    notificationStore.fetchUnreadCount({ silent: true })
+  ]).catch(() => {})
+})
 </script>
 
 <style scoped>
@@ -515,10 +573,6 @@ const handleCommand = (command) => {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-}
-
-.upload-action {
-  min-width: 108px;
 }
 
 .icon-action,
@@ -851,6 +905,79 @@ const handleCommand = (command) => {
   line-height: 1;
 }
 
+.create-menu {
+  display: grid;
+  gap: 8px;
+}
+
+.create-menu button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--foreground);
+  padding: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.create-menu button:hover {
+  background: var(--background-muted);
+  transform: translateY(-1px);
+}
+
+.create-menu-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  font-size: 20px;
+}
+
+.canvas-icon {
+  background: var(--primary-muted);
+  color: var(--primary);
+}
+
+.studio-icon {
+  background: rgba(124, 90, 239, 0.12);
+  color: #7C5AEF;
+}
+
+.create-menu strong,
+.create-menu small {
+  display: block;
+}
+
+.create-menu strong {
+  font-size: 14px;
+}
+
+.create-menu small {
+  margin-top: 3px;
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+:global(.creation-entry-popper.el-popover.el-popper) {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--background-card);
+  box-shadow: var(--shadow-md);
+  padding: 10px;
+}
+
+:global(.creation-entry-popper .el-popper__arrow::before) {
+  border-color: var(--border);
+  background: var(--background-card);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -882,9 +1009,6 @@ const handleCommand = (command) => {
     display: none;
   }
 
-  .upload-action {
-    display: none;
-  }
 }
 
 @media (max-width: 720px) {

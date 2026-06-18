@@ -13,7 +13,9 @@ export default {
     personal: '个人中心',
     admin: '后台管理',
     settings: '设置',
-    workbench: '工作台',
+    workbench: '图像工坊',
+    draw: '创意画布',
+    create: '创作',
     dashboard: '发现'
   },
 
@@ -76,11 +78,11 @@ export default {
   creation: {
     uploadWork: '上传作品',
     uploadWorkDesc: '分享你的创作到社区',
-    onlineCreate: '在线创作',
+    onlineCreate: '创意画布',
     onlineCreateDesc: '快速开始创作新作品',
     myWorks: '我的作品',
     myWorksDesc: '管理你的全部作品',
-    workbench: '工作台',
+    workbench: '图像工坊',
     workbenchDesc: '导入图片进行编辑处理',
     creationCenter: '创作中心',
     myWorkFlow: '我的作品流',
@@ -117,7 +119,7 @@ export default {
     aiArt: 'AI艺术'
   },
 
-  // 工作台
+  // 图像工坊
   workbench: {
     import: '导入',
     filters: '滤镜',

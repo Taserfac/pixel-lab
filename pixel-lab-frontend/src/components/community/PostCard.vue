@@ -41,7 +41,11 @@
       </div>
 
       <div class="post-footer">
-        <div class="post-author">
+        <button
+          type="button"
+          class="post-author"
+          @click.stop="emit('author-select', work)"
+        >
           <el-avatar
             :size="24"
             :src="work.author_avatar"
@@ -49,7 +53,7 @@
             {{ authorInitial }}
           </el-avatar>
           <span>{{ authorName }}</span>
-        </div>
+        </button>
 
         <div class="post-stats">
           <span>
@@ -81,7 +85,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select', 'tag-click'])
+const emit = defineEmits(['select', 'tag-click', 'author-select'])
 
 const title = computed(() => (
   props.work.title ||
@@ -92,7 +96,15 @@ const title = computed(() => (
 ))
 
 const coverUrl = computed(() => props.work.url || props.work.image_url || '')
-const tags = computed(() => (props.work.tags || []).slice(0, 3))
+const tags = computed(() => {
+  const value = props.work.tags
+  if (Array.isArray(value)) return value.slice(0, 3)
+  return String(value || '')
+    .split(/[,，]/)
+    .map(tag => tag.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+})
 const authorName = computed(() => props.work.author_name || props.work.nickname || '匿名创作者')
 const authorInitial = computed(() => authorName.value.charAt(0).toUpperCase())
 
@@ -208,8 +220,16 @@ const formatNumber = (value) => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  border: 0;
+  background: transparent;
   color: var(--foreground-muted);
+  padding: 0;
   font-size: 13px;
+  cursor: pointer;
+}
+
+.post-author:hover {
+  color: var(--primary);
 }
 
 .post-author span {

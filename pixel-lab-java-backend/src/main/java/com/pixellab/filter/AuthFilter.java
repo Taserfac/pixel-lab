@@ -59,6 +59,7 @@ public class AuthFilter implements Filter {
           || path.matches("^/api/community/images/\\d+$")
           || path.matches("^/api/community/images/\\d+/comments$")
           || path.matches("^/api/community/images/\\d+/similar$")
+          || path.matches("^/api/community/users/\\d+$")
           || path.equals("/api/community/activities")
           || path.equals("/api/social/rankings")
           || path.equals("/api/social/templates")

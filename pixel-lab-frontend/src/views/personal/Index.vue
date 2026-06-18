@@ -104,7 +104,7 @@
                       </el-dropdown-item>
                       <el-dropdown-item command="workbench">
                         <el-icon><EditPen /></el-icon>
-                        在工作台中编辑
+                        在图像工坊中编辑
                       </el-dropdown-item>
                       <el-dropdown-item command="delete" divided>
                         <el-icon><Delete /></el-icon>
@@ -306,7 +306,7 @@
       <img v-if="previewImage" :src="previewImage.url" :alt="imageTitle(previewImage)" class="preview-image">
       <template #footer>
         <el-button @click="previewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="openInWorkbench(previewImage)">在工作台打开</el-button>
+        <el-button type="primary" @click="openInWorkbench(previewImage)">在图像工坊打开</el-button>
       </template>
     </el-dialog>
 

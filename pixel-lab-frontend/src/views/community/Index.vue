@@ -50,8 +50,9 @@
         :key="work.id"
         :work="work"
         :style="{ '--post-ratio': getCardRatio(index) }"
-        @select="openLightbox"
+        @select="openPost"
         @tag-click="handleTagClick"
+        @author-select="openCreator"
       />
     </div>
 
@@ -76,12 +77,6 @@
     />
 
     <!-- 图片灯箱 -->
-    <ImageLightbox
-      v-model="lightboxVisible"
-      :url="lightboxUrl"
-      :alt="lightboxAlt"
-    />
-
     <!-- 作品详情弹窗 -->
     <el-dialog
       v-model="detailVisible"
@@ -268,13 +263,12 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Search, View, CollectionTag, FolderOpened, Share } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
 import PostCard from '@/components/community/PostCard.vue'
-import ImageLightbox from '@/components/common/ImageLightbox.vue'
 import {
   getPublicImages,
   getImageDetail,
@@ -287,6 +281,7 @@ import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 
 const loading = ref(false)
@@ -309,11 +304,6 @@ const comments = ref([])
 const commentContent = ref('')
 const replyTo = ref('')
 const similarWorks = ref([])
-
-// 灯箱状态
-const lightboxVisible = ref(false)
-const lightboxUrl = ref('')
-const lightboxAlt = ref('')
 
 // 无限滚动
 const scrollSentinel = ref(null)
@@ -371,10 +361,11 @@ const handleTagClick = (tag) => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const openLightbox = (work) => {
-  lightboxUrl.value = work.url || work.image_url || ''
-  lightboxAlt.value = work.title || work.original_name || ''
-  lightboxVisible.value = true
+const openPost = (work) => router.push(`/post/${work.id}`)
+
+const openCreator = (work) => {
+  const id = work.user_id || work.author_id
+  if (id) router.push(`/user/${id}`)
 }
 
 const getCardRatio = (index) => cardRatios[index % cardRatios.length]
@@ -455,12 +446,14 @@ const handleCollect = async () => {
 }
 
 const handleShare = async () => {
-  const url = window.location.origin + `/community?id=${currentWork.value.id}`
+  const url = window.location.origin + `/post/${currentWork.value.id}`
   const title = currentWork.value.title || 'Pixel Lab 作品'
   if (navigator.share) {
     try {
       await navigator.share({ title, url })
-    } catch {}
+    } catch {
+      // 用户取消系统分享时无需提示错误。
+    }
   } else {
     try {
       await navigator.clipboard.writeText(url)

@@ -4,6 +4,64 @@
 
 ## 2026-06-18
 
+### 全站 UI 改版与功能重构
+
+- **登录优先验证**：应用启动时立即检查登录状态，过期会话直接跳转登录页，而非进入首页后才提示登录超时。修改 `user.js` Store 初始化逻辑和 `main.js` 路由守卫。
+- **登录/注册页固定浅色模式**：登录和注册页面始终使用浅色主题，不受网站日夜模式切换影响。新增 `AuthLayout.vue` 组件，使用 `loginbg.png` 作为左侧装饰图，右侧为登录/注册表单的左右分栏布局。
+- **功能命名更新**：「手绘板」更名为「创意画布」，「工作台」更名为「图像工坊」，同步更新 i18n 语言包（zh-CN / en-US）。
+- **底部导航栏改版**：导航项改为「首页、社区、上传、创作、个人中心」五项。上传保持绿色突出按钮样式；新增「创作」按钮，点击后弹出选择弹层，可进入创意画布或图像工坊。
+- **顶部导航栏精简**：移除顶部导航的上传按钮，上传功能仅保留在底部导航栏。
+- **通知已读状态持久化**：通知改为接入后端 API，已读状态在重新登录后不再显示红点提醒。修改 `notification.js` Store 和 `social.js` API 模块。
+- **首页布局改版**：删除右侧「创作中心」模块，左侧 Hero 横幅扩展为横贯全宽并移除其中的上传和浏览社区按钮。用户滚动时右侧热门标签、推荐创作者、社区动态保持固定吸附，仅横幅和瀑布流内容滑动。移除外部字体依赖。
+
+### 个人主页与帖子详情
+
+- **新增个人主页** `/user/:id`：公开展示用户作品、获赞数、浏览量、粉丝及关注列表，支持关注/取关操作。
+- **新增帖子详情页** `/post/:id`：展示作品大图、作者信息、点赞、收藏、评论功能。首页和社区的图片点击后进入帖子详情页。
+- **社区接口扩展**：`CommunityDao.java` 新增帖子详情查询、用户作品列表、用户信息查询等方法；`CommunityServlet.java` 新增对应路由；`AuthFilter.java` 白名单新增公开端点。
+- **PostCard 组件增强**：作者头像和昵称支持点击跳转个人主页。
+
+### 测试数据灌入
+
+- **新增种子脚本** `test-images/seed_test_data.js`：创建 6 个测试账号（simon_bailly、tiub、yiett、akabane_1999、andrew、fnvlcy），导入 25 张作品，模拟 181,929 浏览、18,944 点赞、4,343 收藏、82 条点赞关系、49 条收藏、48 条评论、12 条关注、12 条通知。脚本可重复执行不会重复创建，测试密码统一为 `Test123456`。
+- **图片文件归档**：`test-images/` 下新增「插画」和「摄影」分类目录，对应图片已复制至 Tomcat 上传目录。
+
+### Tomcat 编码问题诊断
+
+- **问题现象**：首页加载后停在骨架屏，控制台报 ECharts 脚本语法错误。
+- **根因定位**：`CharacterEncodingFilter.java` 对所有 `/*` 响应强制 UTF-8 编码转换，导致已为 UTF-8 的前端构建文件被按 Windows 默认编码读取后再次转换，破坏脚本内容。
+- **建议修复**：将过滤器路径限制为 `/api/*`，清除旧 Service Worker 缓存。
+
+### 修改文件清单
+
+| 文件 | 变更说明 |
+|------|----------|
+| `src/main.js` | 路由守卫增加登录状态预检 |
+| `src/router/index.js` | 新增 `/user/:id`、`/post/:id` 路由 |
+| `src/store/user.js` | 初始化时验证 token 有效性 |
+| `src/store/notification.js` | 接入后端通知 API，持久化已读状态 |
+| `src/api/auth.js` | 新增登录状态检查接口 |
+| `src/api/social.js` | 通知接口改接后端 |
+| `src/api/community.js` | 新增帖子详情、用户信息接口 |
+| `src/components/common/MainLayout.vue` | 底部导航改版、创作弹层、移除顶部上传、通知已读逻辑 |
+| `src/components/auth/AuthLayout.vue` | 新增：登录/注册页固定浅色布局 + loginbg.png |
+| `src/components/community/PostCard.vue` | 作者信息可点击跳转 |
+| `src/views/auth/Login.vue` | 改用 AuthLayout，固定浅色模式 |
+| `src/views/auth/Register.vue` | 改用 AuthLayout，固定浅色模式 |
+| `src/views/dashboard/Index.vue` | 横幅全宽、删除创作中心、右侧内容吸附 |
+| `src/views/community/Index.vue` | 图片点击进入帖子详情 |
+| `src/views/draw/Index.vue` | 命名更新为「创意画布」 |
+| `src/views/personal/Index.vue` | 命名同步更新 |
+| `src/views/post/Index.vue` | 新增：帖子详情页 |
+| `src/views/user/Index.vue` | 新增：个人主页 |
+| `src/i18n/locales/zh-CN.js` | 命名和导航文案更新 |
+| `src/i18n/locales/en-US.js` | 命名和导航文案更新 |
+| `src/assets/css/index.css` | 移除外部字体引用 |
+| `CommunityDao.java` | 新增帖子详情、用户查询方法 |
+| `CommunityServlet.java` | 新增帖子/用户路由 |
+| `AuthFilter.java` | 白名单新增公开端点 |
+| `web.xml` | 编码过滤器路径调整 |
+
 ### 启动脚本优化
 
 - **Maven 增量构建**：`start-java-backend.ps1` 中 `mvn clean package` 改为 `mvn package`，新增 `-Clean` 参数支持全量构建，启动速度显著提升。

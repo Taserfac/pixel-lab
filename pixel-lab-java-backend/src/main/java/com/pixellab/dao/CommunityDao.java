@@ -56,7 +56,8 @@ public class CommunityDao {
     try (Connection conn = dataSource.getConnection()) {
       Map<String, Object> image = queryOne(conn,
           "SELECT i.*, u.nickname AS author_name, u.avatar AS author_avatar "
-              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id WHERE i.id = ? AND i.status = 1",
+              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
+              + "WHERE i.id = ? AND i.is_public = 1 AND i.status = 1",
           List.of(imageId));
       if (image == null) {
         return null;
@@ -238,6 +239,59 @@ public class CommunityDao {
               + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
               + "WHERE i.is_public = 1 AND i.status = 1 ORDER BY i.created_at DESC LIMIT ?",
           List.of(limit));
+    }
+  }
+
+  public Map<String, Object> publicProfile(long profileUserId, Long viewerId, int page, int pageSize) throws Exception {
+    int safePage = Math.max(page, 1);
+    int safePageSize = Math.max(1, Math.min(pageSize, 50));
+    int offset = (safePage - 1) * safePageSize;
+    try (Connection conn = dataSource.getConnection()) {
+      Map<String, Object> user = queryOne(conn,
+          "SELECT id, username, nickname, avatar, created_at FROM `user` "
+              + "WHERE id = ? AND status = 1 AND is_deleted = 0",
+          List.of(profileUserId));
+      if (user == null) {
+        return null;
+      }
+
+      long workCount = count(conn,
+          "SELECT COUNT(*) FROM image WHERE user_id = ? AND is_public = 1 AND status = 1",
+          List.of(profileUserId));
+      long likeCount = count(conn,
+          "SELECT COALESCE(SUM(like_count), 0) FROM image WHERE user_id = ? AND is_public = 1 AND status = 1",
+          List.of(profileUserId));
+      long viewCount = count(conn,
+          "SELECT COALESCE(SUM(view_count), 0) FROM image WHERE user_id = ? AND is_public = 1 AND status = 1",
+          List.of(profileUserId));
+      long followerCount = count(conn,
+          "SELECT COUNT(*) FROM follows WHERE followed_id = ?", List.of(profileUserId));
+      long followingCount = count(conn,
+          "SELECT COUNT(*) FROM follows WHERE follower_id = ?", List.of(profileUserId));
+
+      List<Map<String, Object>> works = query(conn,
+          "SELECT i.*, u.nickname AS author_name, u.avatar AS author_avatar "
+              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
+              + "WHERE i.user_id = ? AND i.is_public = 1 AND i.status = 1 "
+              + "ORDER BY i.created_at DESC LIMIT ? OFFSET ?",
+          List.of(profileUserId, safePageSize, offset));
+      addUserState(conn, works, viewerId);
+
+      Map<String, Object> stats = new LinkedHashMap<>();
+      stats.put("works", workCount);
+      stats.put("likes", likeCount);
+      stats.put("views", viewCount);
+      stats.put("followers", followerCount);
+      stats.put("following", followingCount);
+
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("user", user);
+      result.put("stats", stats);
+      result.put("isFollowing", viewerId != null && viewerId != profileUserId
+          && exists(conn, "SELECT id FROM follows WHERE follower_id = ? AND followed_id = ?",
+              List.of(viewerId, profileUserId)));
+      result.put("works", pageResult(works, workCount, safePage, safePageSize));
+      return result;
     }
   }
 

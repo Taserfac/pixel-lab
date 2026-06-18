@@ -22,20 +22,28 @@ export const useNotificationStore = defineStore('notification', () => {
   const unreadCount = ref(0)
   const loading = ref(false)
 
+  const normalizeNotification = (item) => ({
+    ...item,
+    text: item.text || item.content || '',
+    time: item.time || item.created_at || item.createdAt || '',
+    read: item.read === true || item.read === 1 || item.is_read === true || item.is_read === 1
+  })
+
   // ==================== Actions ====================
 
   /**
    * 获取通知列表
    * @param {object} params - { page, pageSize }
    */
-  const fetchNotifications = async (params) => {
+  const fetchNotifications = async (params, config = {}) => {
     const userStore = useUserStore()
     if (!userStore.isLoggedIn) return
 
     loading.value = true
     try {
-      const data = await fetchNotificationsApi(params)
-      notifications.value = data.list || data.records || data || []
+      const data = await fetchNotificationsApi(params, config)
+      const list = data.list || data.records || data || []
+      notifications.value = list.map(normalizeNotification)
       return data
     } catch (error) {
       console.error('获取通知列表失败:', error)
@@ -48,12 +56,12 @@ export const useNotificationStore = defineStore('notification', () => {
   /**
    * 获取未读数量
    */
-  const fetchUnreadCount = async () => {
+  const fetchUnreadCount = async (config = {}) => {
     const userStore = useUserStore()
     if (!userStore.isLoggedIn) return
 
     try {
-      const data = await fetchUnreadCountApi()
+      const data = await fetchUnreadCountApi(config)
       unreadCount.value = typeof data === 'number' ? data : (data.count || 0)
       return data
     } catch (error) {
@@ -105,10 +113,17 @@ export const useNotificationStore = defineStore('notification', () => {
    * @param {object} notification
    */
   const addNotification = (notification) => {
-    notifications.value.unshift(notification)
-    if (!notification.read) {
+    const normalized = normalizeNotification(notification)
+    notifications.value.unshift(normalized)
+    if (!normalized.read) {
       unreadCount.value++
     }
+  }
+
+  const reset = () => {
+    notifications.value = []
+    unreadCount.value = 0
+    loading.value = false
   }
 
   return {
@@ -122,6 +137,7 @@ export const useNotificationStore = defineStore('notification', () => {
     fetchUnreadCount,
     markRead,
     markAllRead: markAllAsRead,
-    addNotification
+    addNotification,
+    reset
   }
 })

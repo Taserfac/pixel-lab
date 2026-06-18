@@ -30,8 +30,8 @@ export function checkFollowStatus(userId) {
 // ==================== Notifications ====================
 
 // 获取通知列表
-export function getNotifications(params) {
-  return request.get('/api/social/notifications', { params })
+export function getNotifications(params, config = {}) {
+  return request.get('/api/social/notifications', { ...config, params })
 }
 
 // 标记通知已读
@@ -41,12 +41,12 @@ export function markNotificationRead(id) {
 
 // 全部标记已读
 export function markAllRead() {
-  return request.patch('/api/social/notifications/read-all')
+  return request.post('/api/social/notifications/read-all')
 }
 
 // 获取未读数量
-export function getUnreadCount() {
-  return request.get('/api/social/notifications/unread-count')
+export function getUnreadCount(config = {}) {
+  return request.get('/api/social/notifications/unread-count', config)
 }
 
 // ==================== Rankings ====================
