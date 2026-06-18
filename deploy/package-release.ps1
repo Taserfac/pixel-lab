@@ -46,7 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Copy-Item -LiteralPath (Join-Path $JavaBackendDir 'target\ROOT.war') -Destination (Join-Path $ReleaseDir 'release\ROOT.war') -Force
-Copy-Item -LiteralPath (Join-Path $Workspace 'pixel-lab-backend\sql\init.sql') -Destination (Join-Path $ReleaseDir 'sql\init.sql') -Force
+Copy-Item -LiteralPath (Join-Path $JavaBackendDir 'src\main\resources\init.sql') -Destination (Join-Path $ReleaseDir 'sql\init.sql') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'README.md') -Destination (Join-Path $ReleaseDir 'README.md') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'env') -Destination (Join-Path $ReleaseDir 'env') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'nginx') -Destination (Join-Path $ReleaseDir 'nginx') -Recurse -Force

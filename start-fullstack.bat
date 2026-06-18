@@ -78,8 +78,8 @@ if not exist "%TOMCAT_HOME%\bin\catalina.bat" (
   goto :fail
 )
 
-if not exist "%PROJECT_ROOT%\pixel-lab-backend\.env" (
-  echo Warning: "%PROJECT_ROOT%\pixel-lab-backend\.env" was not found.
+if not exist "%PROJECT_ROOT%\.env.local" (
+  echo Warning: "%PROJECT_ROOT%\.env.local" was not found.
   echo The backend may fail if DB_PASSWORD and other settings are not in the environment.
   echo.
 )

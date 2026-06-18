@@ -14,7 +14,7 @@ $MavenRepo = Join-Path $Workspace '.m2repo'
 $JavaBackendDir = Join-Path $Workspace 'pixel-lab-java-backend'
 $FrontendDir = Join-Path $Workspace 'pixel-lab-frontend'
 $WarPath = Join-Path $JavaBackendDir 'target\ROOT.war'
-$EnvFile = Join-Path $Workspace 'pixel-lab-backend\.env'
+$EnvFile = Join-Path $Workspace '.env.local'
 $HealthUrl = 'http://127.0.0.1:8080/api/health'
 
 function Import-DotEnv {

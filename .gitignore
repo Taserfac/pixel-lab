@@ -33,9 +33,20 @@ pixel-lab-frontend/dist/
 pixel-lab-backend/.env
 pixel-lab-frontend/.env.local
 
+# Node.js 后端（已弃用，配置已迁移到项目根目录 .env.local）
+pixel-lab-backend/
+
+# 本地启动脚本
+start-java-backend-local.bat
+stop-java-backend-local.bat
+
 # 不可用的启动文件
 start-fullstack-new.bat
 stop-fullstack-new.bat
+
+# 预览和设计文档
+UI预览.png
+UIUXrebuild.md
 
 # Claude 本地配置
 CLAUDE.md
