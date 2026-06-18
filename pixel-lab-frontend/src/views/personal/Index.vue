@@ -1,1829 +1,395 @@
 <template>
-  <div class="personal-page">
-    <section class="profile-hero">
-      <div class="hero-main">
-        <div class="avatar-ring">
-          <el-avatar :size="104" :src="userInfo.avatar || defaultAvatar">
-            {{ avatarText }}
-          </el-avatar>
+  <div class="profile-page page-shell">
+    <UiCard padding="lg" class="profile-header">
+      <div class="profile-identity">
+        <el-avatar :size="88" :src="user.avatar">{{ userInitial }}</el-avatar>
+        <div>
+          <h1>{{ user.nickname || user.username || 'Pixel Creator' }}</h1>
+          <p>@{{ user.username || 'creator' }}</p>
+          <span>{{ user.bio || '记录灵感，分享作品，也享受每一次创作。' }}</span>
         </div>
+      </div>
+      <div class="profile-stats">
+        <div><strong>{{ formatNumber(stats.works) }}</strong><span>作品</span></div>
+        <div><strong>{{ formatNumber(stats.likes) }}</strong><span>获赞</span></div>
+        <div><strong>{{ formatNumber(stats.collects) }}</strong><span>收藏</span></div>
+      </div>
+      <div class="profile-actions">
+        <UiButton @click="router.push('/publish')"><template #icon><el-icon><Plus /></el-icon></template>发布作品</UiButton>
+        <UiButton variant="secondary" @click="router.push('/settings')"><template #icon><el-icon><Setting /></el-icon></template>编辑资料</UiButton>
+      </div>
+    </UiCard>
 
-        <div class="profile-copy">
-          <h1>{{ userInfo.nickname || userInfo.username || 'Pixel Creator' }}</h1>
-          <p class="username">@{{ userInfo.username || 'creator' }}</p>
-          <p class="profile-desc">
-            记录灵感、整理作品、分享创作，让每一次像素实验都沉淀成你的视觉主页。
-          </p>
+    <nav class="profile-tabs" aria-label="个人内容分类">
+      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="selectTab(tab.value)">
+        <el-icon><component :is="tab.icon" /></el-icon>
+        {{ tab.label }}
+        <span>{{ tab.count }}</span>
+      </button>
+    </nav>
 
-          <div class="hero-actions">
-            <el-button type="primary" @click="handleUpload">
-              <el-icon><Upload /></el-icon>
-              上传图片
-            </el-button>
-            <el-button @click="router.push('/settings')">
-              <el-icon><Setting /></el-icon>
-              编辑资料
-            </el-button>
-          </div>
+    <section v-if="activeTab === 'works'">
+      <div class="works-toolbar">
+        <div>
+          <h2>我的作品</h2>
+          <p>管理公开状态，或继续在 Studio 中编辑。</p>
+        </div>
+        <div class="visibility-filter">
+          <button v-for="item in workFilters" :key="item.value" type="button" :class="{ active: workFilter === item.value }" @click="workFilter = item.value">{{ item.label }}</button>
         </div>
       </div>
 
-      <div class="hero-side">
-        <div class="stat-grid">
-          <div v-for="item in heroStats" :key="item.label" class="hero-stat">
-            <span class="stat-value">{{ formatNumber(item.value) }}</span>
-            <span class="stat-label">{{ item.label }}</span>
-          </div>
-        </div>
+      <div v-if="loadingWorks" class="profile-grid">
+        <SkeletonCard v-for="index in 8" :key="index" />
       </div>
+      <div v-else-if="filteredWorks.length" class="profile-grid">
+        <UiCard v-for="work in filteredWorks" :key="work.id" padding="none" interactive class="profile-work">
+          <button class="work-cover" type="button" @click="router.push(`/post/${work.id}`)">
+            <img :src="work.thumbnail_url || work.url" :alt="workTitle(work)">
+            <span :class="{ public: isPublic(work) }"><el-icon><Unlock v-if="isPublic(work)" /><Lock v-else /></el-icon>{{ isPublic(work) ? '公开' : '私有' }}</span>
+          </button>
+          <div class="work-info">
+            <div>
+              <h3>{{ workTitle(work) }}</h3>
+              <p>{{ formatDate(work.created_at) }}</p>
+            </div>
+            <el-dropdown trigger="click" @command="command => handleWorkCommand(work, command)">
+              <button class="more-button" type="button" aria-label="作品操作"><el-icon><MoreFilled /></el-icon></button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="view"><el-icon><View /></el-icon>查看</el-dropdown-item>
+                  <el-dropdown-item command="studio"><el-icon><EditPen /></el-icon>在 Studio 中编辑</el-dropdown-item>
+                  <el-dropdown-item command="editMeta"><el-icon><EditPen /></el-icon>编辑信息</el-dropdown-item>
+                  <el-dropdown-item command="visibility"><el-icon><Lock /></el-icon>{{ isPublic(work) ? '设为私有' : '公开到社区' }}</el-dropdown-item>
+                  <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+          <div class="work-metrics">
+            <span><el-icon><View /></el-icon>{{ formatNumber(work.view_count) }}</span>
+            <span><el-icon><Star /></el-icon>{{ formatNumber(work.like_count) }}</span>
+            <span><el-icon><CollectionTag /></el-icon>{{ formatNumber(work.collect_count) }}</span>
+          </div>
+        </UiCard>
+      </div>
+      <EmptyState v-else title="这里还没有作品" description="发布第一件作品，开始建立你的创作主页。" action-text="发布作品" show-action @action="router.push('/publish')" />
     </section>
 
-    <input
-      ref="fileInput"
-      type="file"
-      accept="image/*"
-      class="visually-hidden"
-      @change="onFileSelected"
-    >
-
-    <el-tabs v-model="activeTab" class="creator-tabs" @tab-change="handleTabChange">
-      <el-tab-pane name="works">
-        <template #label>
-          <span class="tab-label"><el-icon><Picture /></el-icon>作品</span>
-        </template>
-
-        <section class="toolbar-panel">
-          <div>
-            <h2>我的作品流</h2>
-            <p>{{ filteredImages.length }} 个作品正在展示</p>
-          </div>
-          <el-radio-group v-model="filterType" size="small">
-            <el-radio-button label="all">全部</el-radio-button>
-            <el-radio-button label="public">公开</el-radio-button>
-            <el-radio-button label="private">私有</el-radio-button>
-          </el-radio-group>
-        </section>
-
-        <div v-loading="loadingImages" class="feed-shell">
-          <div v-if="filteredImages.length" class="masonry-grid">
-            <article v-for="image in filteredImages" :key="image.id" class="work-card">
-              <div class="cover-shell">
-                <button class="work-cover" type="button" @click="viewImage(image)">
-                  <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
-                  <span class="visibility-badge" :class="{ public: isPublic(image) }">
-                    {{ isPublic(image) ? '公开' : '私有' }}
-                  </span>
-                </button>
-
-                <el-dropdown
-                  class="card-menu"
-                  trigger="click"
-                  placement="bottom-end"
-                  @command="(command) => handleImageCommand(image, command)"
-                >
-                  <button
-                    class="icon-button"
-                    type="button"
-                    aria-label="作品操作"
-                    @click.stop
-                  >
-                    <el-icon><MoreFilled /></el-icon>
-                  </button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item command="view">
-                        <el-icon><View /></el-icon>
-                        查看
-                      </el-dropdown-item>
-                      <el-dropdown-item command="visibility">
-                        <el-icon>
-                          <Lock v-if="isPublic(image)" />
-                          <Unlock v-else />
-                        </el-icon>
-                        {{ isPublic(image) ? '设为私有' : '设为公开' }}
-                      </el-dropdown-item>
-                      <el-dropdown-item command="workbench">
-                        <el-icon><EditPen /></el-icon>
-                        在工作台中编辑
-                      </el-dropdown-item>
-                      <el-dropdown-item command="delete" divided>
-                        <el-icon><Delete /></el-icon>
-                        删除
-                      </el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
-
-              <div class="work-meta">
-                <div>
-                  <h3 :title="imageTitle(image)">{{ imageTitle(image) }}</h3>
-                  <p v-if="image.description" class="image-desc">{{ image.description }}</p>
-                  <button class="desc-edit-btn" type="button" @click.stop="openDescriptionEdit(image)">
-                    <el-icon><Edit /></el-icon>
-                    {{ image.description ? '编辑说明' : '添加说明' }}
-                  </button>
-                  <p>{{ formatDate(image.created_at) }}</p>
-                </div>
-              </div>
-
-              <div class="metric-row">
-                <span><el-icon><View /></el-icon>{{ formatNumber(image.view_count) }}</span>
-                <span><el-icon><Star /></el-icon>{{ formatNumber(image.like_count) }}</span>
-                <span><el-icon><FolderOpened /></el-icon>{{ formatNumber(image.collect_count) }}</span>
-              </div>
-            </article>
-          </div>
-          <div v-else class="empty-panel">
-            <el-icon><Picture /></el-icon>
-            <h3>还没有作品</h3>
-            <p>上传图片后，作品会自动沉淀到你的个人主页。</p>
-            <el-button type="primary" @click="handleUpload">上传图片</el-button>
-          </div>
+    <section v-else>
+      <div class="works-toolbar">
+        <div>
+          <h2>{{ activeTab === 'collections' ? '我的收藏' : '点赞记录' }}</h2>
+          <p>{{ activeTab === 'collections' ? '保存值得反复回看的作品。' : '回顾曾经点亮过的灵感。' }}</p>
         </div>
-      </el-tab-pane>
-
-      <el-tab-pane name="collections">
-        <template #label>
-          <span class="tab-label"><el-icon><FolderOpened /></el-icon>收藏</span>
-        </template>
-        <content-feed
-          :items="collections"
-          :loading="loadingCollections"
-          empty-title="暂无收藏"
-          empty-desc="去社区发现值得反复看的作品。"
-          action-text="逛逛社区"
-          @item-click="goToCommunity"
-          @empty-action="goToCommunity"
-        />
-      </el-tab-pane>
-
-      <el-tab-pane name="likes">
-        <template #label>
-          <span class="tab-label"><el-icon><Star /></el-icon>点赞</span>
-        </template>
-        <content-feed
-          :items="likes"
-          :loading="loadingLikes"
-          empty-title="暂无点赞"
-          empty-desc="遇到喜欢的作品，点亮它们后会出现在这里。"
-          action-text="发现作品"
-          @item-click="goToCommunity"
-          @empty-action="goToCommunity"
-        />
-      </el-tab-pane>
-
-      <el-tab-pane name="albums">
-        <template #label>
-          <span class="tab-label"><el-icon><Files /></el-icon>作品集</span>
-        </template>
-
-        <section v-if="!selectedAlbum" class="toolbar-panel">
-          <div>
-            <h2>我的作品集</h2>
-            <p>{{ albums.length }} 个作品集</p>
-          </div>
-          <el-button type="primary" @click="showCreateAlbumDialog = true">
-            <el-icon><Plus /></el-icon>
-            新建作品集
-          </el-button>
-        </section>
-        <section v-else class="toolbar-panel">
-          <div>
-            <el-button text @click="selectedAlbum = null">
-              <el-icon><ArrowLeft /></el-icon>
-              返回作品集列表
-            </el-button>
-          </div>
-          <div>
-            <h2>{{ selectedAlbum.title }}</h2>
-            <p>{{ selectedAlbum.images?.length || 0 }} 张图片 · {{ selectedAlbum.description || '暂无描述' }}</p>
-          </div>
-          <el-button type="primary" @click="showAddImageDialog = true">
-            <el-icon><Plus /></el-icon>
-            添加图片
-          </el-button>
-        </section>
-
-        <div v-loading="loadingAlbums" class="feed-shell">
-          <!-- Album list view -->
-          <div v-if="!selectedAlbum">
-            <div v-if="albums.length" class="album-grid">
-              <article v-for="album in albums" :key="album.id" class="album-card" @click="openAlbumDetail(album)">
-                <div class="album-cover">
-                  <img v-if="album.cover_url" :src="album.cover_url" :alt="album.title" loading="lazy">
-                  <div v-else class="album-cover-placeholder">
-                    <el-icon><FolderOpened /></el-icon>
-                  </div>
-                  <span class="album-count">{{ album.image_count || 0 }} 张</span>
-                </div>
-                <div class="album-meta">
-                  <h3 :title="album.title">{{ album.title }}</h3>
-                  <p v-if="album.description" class="album-desc-snippet">{{ album.description }}</p>
-                  <p class="album-date">{{ formatDate(album.created_at) }}</p>
-                </div>
-              </article>
-            </div>
-            <div v-else class="empty-panel">
-              <el-icon><FolderOpened /></el-icon>
-              <h3>还没有作品集</h3>
-              <p>创建作品集，将相关作品整理在一起。</p>
-              <el-button type="primary" @click="showCreateAlbumDialog = true">新建作品集</el-button>
-            </div>
-          </div>
-
-          <!-- Album detail view -->
-          <div v-else>
-            <div v-if="selectedAlbum.images?.length" class="album-image-list">
-              <article v-for="img in selectedAlbum.images" :key="img.id" class="album-image-item">
-                <div class="album-image-cover" @click="viewImage(img)">
-                  <img :src="img.url" :alt="img.title || '图片'" loading="lazy">
-                </div>
-                <div class="album-image-info">
-                  <h4>{{ img.title || img.original_name || '未命名' }}</h4>
-                  <p v-if="img.description" class="album-image-desc">{{ img.description }}</p>
-                  <button class="desc-edit-btn" type="button" @click.stop="openAlbumImageDescEdit(img)">
-                    <el-icon><Edit /></el-icon>
-                    {{ img.description ? '编辑描述' : '添加描述' }}
-                  </button>
-                </div>
-                <el-button type="danger" text size="small" @click.stop="confirmRemoveImage(img)">
-                  <el-icon><Delete /></el-icon>
-                  移除
-                </el-button>
-              </article>
-            </div>
-            <div v-else class="empty-panel">
-              <el-icon><Picture /></el-icon>
-              <h3>作品集为空</h3>
-              <p>添加图片到这个作品集中。</p>
-              <el-button type="primary" @click="showAddImageDialog = true">添加图片</el-button>
-            </div>
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane name="insights">
-        <template #label>
-          <span class="tab-label"><el-icon><TrendCharts /></el-icon>数据</span>
-        </template>
-
-        <section class="insights-grid">
-          <div class="chart-card">
-            <div class="section-title compact">
-              <div>
-                <span class="eyebrow">30 天趋势</span>
-                <h2>互动走势</h2>
-              </div>
-            </div>
-            <div ref="trendChartRef" class="trend-chart" />
-          </div>
-
-          <div class="hot-card">
-            <div class="section-title compact">
-              <div>
-                <span class="eyebrow">Top Works</span>
-                <h2>热门作品</h2>
-              </div>
-            </div>
-            <div v-if="hotWorks.length" class="hot-list">
-              <button v-for="work in hotWorks" :key="work.id" class="hot-item" type="button" @click="viewImage(work)">
-                <img :src="work.url" :alt="imageTitle(work)" loading="lazy">
-                <span class="hot-rank">#{{ hotWorks.indexOf(work) + 1 }}</span>
-                <div>
-                  <strong :title="imageTitle(work)">{{ imageTitle(work) }}</strong>
-                  <small>{{ formatNumber(work.view_count) }} 浏览 · {{ formatNumber(work.like_count) }} 赞</small>
-                </div>
-              </button>
-            </div>
-            <div v-else class="soft-empty small">暂无热门作品数据。</div>
-          </div>
-        </section>
-      </el-tab-pane>
-    </el-tabs>
-
-    <el-dialog v-model="previewVisible" title="图片预览" width="78%" center class="preview-dialog">
-      <img v-if="previewImage" :src="previewImage.url" :alt="imageTitle(previewImage)" class="preview-image">
-      <template #footer>
-        <el-button @click="previewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="openInWorkbench(previewImage)">在工作台打开</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Description edit dialog -->
-    <el-dialog v-model="descDialogVisible" title="编辑说明" width="480px">
-      <el-input
-        v-model="descEditValue"
-        type="textarea"
-        :rows="4"
-        placeholder="输入图片说明..."
-        maxlength="500"
-        show-word-limit
-      />
-      <template #footer>
-        <el-button @click="descDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="descSaving" @click="saveDescription">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Create album dialog -->
-    <el-dialog v-model="showCreateAlbumDialog" title="新建作品集" width="560px">
-      <el-form label-position="top">
-        <el-form-item label="标题" required>
-          <el-input v-model="newAlbum.title" placeholder="作品集标题" maxlength="50" />
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input
-            v-model="newAlbum.description"
-            type="textarea"
-            :rows="3"
-            placeholder="简要描述这个作品集..."
-            maxlength="200"
-          />
-        </el-form-item>
-        <el-form-item label="封面图片">
-          <div v-if="newAlbum.coverImage" class="cover-preview">
-            <img :src="newAlbum.coverImage.url" alt="封面预览">
-            <el-button text type="danger" size="small" @click="newAlbum.coverImage = null">
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </div>
-          <div v-else class="cover-picker">
-            <p>从你的作品中选择封面：</p>
-            <div class="cover-option-grid">
-              <button
-                v-for="img in images"
-                :key="img.id"
-                type="button"
-                class="cover-option"
-                :class="{ active: newAlbum.coverImage?.id === img.id }"
-                @click="newAlbum.coverImage = img"
-              >
-                <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
-              </button>
-            </div>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateAlbumDialog = false">取消</el-button>
-        <el-button type="primary" :loading="albumSaving" :disabled="!newAlbum.title.trim()" @click="handleCreateAlbum">
-          创建
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Album image description edit dialog -->
-    <el-dialog v-model="albumDescDialogVisible" title="编辑作品集图片描述" width="480px">
-      <el-input
-        v-model="albumDescEditValue"
-        type="textarea"
-        :rows="4"
-        placeholder="输入这张图片在作品集中的描述..."
-        maxlength="500"
-        show-word-limit
-      />
-      <template #footer>
-        <el-button @click="albumDescDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="albumDescSaving" @click="saveAlbumImageDescription">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- Add image to album dialog -->
-    <el-dialog v-model="showAddImageDialog" title="添加图片到作品集" width="640px">
-      <p class="add-image-hint">选择要添加到「{{ selectedAlbum?.title }}」的图片：</p>
-      <div class="add-image-grid">
-        <button
-          v-for="img in availableImagesForAlbum"
-          :key="img.id"
-          type="button"
-          class="add-image-option"
-          :class="{ selected: imagesToAdd.includes(img.id) }"
-          @click="toggleImageToAdd(img.id)"
-        >
-          <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
-          <span v-if="imagesToAdd.includes(img.id)" class="add-check">
-            <el-icon><Check /></el-icon>
-          </span>
-        </button>
+        <UiButton variant="secondary" @click="router.push('/discover')">继续发现</UiButton>
       </div>
-      <div v-if="!availableImagesForAlbum.length" class="soft-empty small">
-        没有可添加的图片。
+
+      <div v-if="contentLoading" class="profile-grid">
+        <SkeletonCard v-for="index in 8" :key="index" />
+      </div>
+      <div v-else-if="activeItems.length" class="profile-grid">
+        <PostCard v-for="(item, index) in activeItems" :key="item.id" :work="item" :style="{ '--post-ratio': ratios[index % ratios.length] }" @select="router.push(`/post/${item.id}`)" />
+      </div>
+      <EmptyState v-else :title="activeTab === 'collections' ? '暂无收藏' : '暂无点赞记录'" description="去 Discover 看看大家的新作品吧。" action-text="去 Discover" show-action @action="router.push('/discover')" />
+    </section>
+
+    <!-- 编辑作品信息弹窗 -->
+    <UiModal v-model="editMetaVisible" title="编辑作品信息" max-width="520px">
+      <div class="edit-meta-form">
+        <label><span>标题</span>
+          <el-input v-model="editMetaForm.title" placeholder="作品标题" maxlength="50" />
+        </label>
+        <label><span>说明</span>
+          <el-input v-model="editMetaForm.description" type="textarea" :rows="3" placeholder="添加作品说明..." maxlength="1000" show-word-limit />
+        </label>
+        <label><span>标签</span>
+          <div class="tag-input-area">
+            <el-tag
+              v-for="(tag, i) in editMetaForm.tags"
+              :key="i"
+              closable
+              size="small"
+              @close="removeEditTag(i)"
+            >{{ tag }}</el-tag>
+            <el-input
+              v-model="editMetaTagInput"
+              size="small"
+              style="width: 120px"
+              placeholder="输入标签"
+              @keyup.enter="addEditTag"
+              @blur="addEditTag"
+            />
+          </div>
+        </label>
       </div>
       <template #footer>
-        <el-button @click="showAddImageDialog = false">取消</el-button>
-        <el-button type="primary" :loading="addingImages" :disabled="!imagesToAdd.length" @click="handleAddImages">
-          添加 ({{ imagesToAdd.length }})
-        </el-button>
+        <UiButton variant="secondary" @click="editMetaVisible = false">取消</UiButton>
+        <UiButton :loading="editMetaSaving" @click="saveEditMeta">保存</UiButton>
       </template>
-    </el-dialog>
+    </UiModal>
   </div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElButton, ElIcon, ElMessage, ElMessageBox } from 'element-plus'
-import {
-  ArrowLeft,
-  Check,
-  Delete,
-  Edit,
-  EditPen,
-  Files,
-  FolderOpened,
-  Lock,
-  MoreFilled,
-  Picture,
-  Plus,
-  Setting,
-  Star,
-  TrendCharts,
-  Unlock,
-  Upload,
-  View
-} from '@element-plus/icons-vue'
-import * as echarts from 'echarts'
-import { useUserStore } from '@/store/user'
+import { CollectionTag, Delete, EditPen, Lock, MoreFilled, Picture, Plus, Setting, Star, Unlock, View } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import EmptyState from '@/components/common/EmptyState.vue'
+import SkeletonCard from '@/components/common/SkeletonCard.vue'
+import PostCard from '@/components/community/PostCard.vue'
+import UiButton from '@/components/ui/UiButton.vue'
+import UiCard from '@/components/ui/UiCard.vue'
+import UiModal from '@/components/ui/UiModal.vue'
 import { getUserStats } from '@/api/auth'
-import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription } from '@/api/image'
 import { getUserCollections, getUserLikes } from '@/api/community'
-import {
-  createAlbum,
-  getAlbums,
-  getAlbumDetail,
-  deleteAlbum,
-  addImageToAlbum,
-  removeImageFromAlbum,
-  updateAlbumImageDescription
-} from '@/api/album'
-
-const ContentFeed = defineComponent({
-  name: 'ContentFeed',
-  props: {
-    items: { type: Array, default: () => [] },
-    loading: { type: Boolean, default: false },
-    emptyTitle: { type: String, default: '暂无内容' },
-    emptyDesc: { type: String, default: '' },
-    actionText: { type: String, default: '去看看' }
-  },
-  emits: ['item-click', 'empty-action'],
-  setup(props, { emit }) {
-    const title = (item) => item.title || item.original_name || item.filename || '未命名作品'
-    const format = (value) => Number(value || 0).toLocaleString('zh-CN')
-    return () => h('div', { class: 'feed-shell', directives: [] }, [
-      props.items.length
-        ? h('div', { class: 'masonry-grid' }, props.items.map(item => h('article', {
-            class: 'work-card',
-            key: item.id
-          }, [
-            h('button', {
-              class: 'work-cover',
-              type: 'button',
-              onClick: () => emit('item-click', item.id)
-            }, [
-              h('img', { src: item.url, alt: title(item), loading: 'lazy' })
-            ]),
-            h('div', { class: 'work-meta' }, [
-              h('div', null, [
-                h('h3', { title: title(item) }, title(item)),
-                h('p', null, item.author_name ? `by ${item.author_name}` : '来自社区')
-              ])
-            ]),
-            h('div', { class: 'metric-row' }, [
-              h('span', null, [h(ElIcon, null, () => h(View)), format(item.view_count)]),
-              h('span', null, [h(ElIcon, null, () => h(Star)), format(item.like_count)]),
-              h('span', null, [h(ElIcon, null, () => h(FolderOpened)), format(item.collect_count)])
-            ])
-          ])))
-        : h('div', { class: 'empty-panel' }, [
-            h(ElIcon, null, () => h(Picture)),
-            h('h3', null, props.emptyTitle),
-            h('p', null, props.emptyDesc),
-            h(ElButton, { type: 'primary', onClick: () => emit('empty-action') }, () => props.actionText)
-          ])
-    ])
-  }
-})
+import { deleteImage, getUserImages, updateImageMetadata, updateImageVisibility } from '@/api/image'
+import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const userStore = useUserStore()
-const userInfo = computed(() => userStore.userInfo || {})
-
-const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
-const fileInput = ref(null)
+const user = computed(() => userStore.userInfo || {})
+const userInitial = computed(() => (user.value.nickname || user.value.username || 'P').charAt(0).toUpperCase())
 const activeTab = ref('works')
-const filterType = ref('all')
-
-const images = ref([])
+const workFilter = ref('all')
+const works = ref([])
 const collections = ref([])
 const likes = ref([])
-const hotWorks = ref([])
-const trendData = ref([])
-const insightStats = ref({})
-
-const loadingImages = ref(false)
+const loadingWorks = ref(false)
 const loadingCollections = ref(false)
 const loadingLikes = ref(false)
-const uploading = ref(false)
+const stats = reactive({ works: 0, likes: 0, collects: 0 })
 
-const previewVisible = ref(false)
-const previewImage = ref(null)
-const trendChartRef = ref(null)
-let trendChart = null
+// 编辑元数据弹窗
+const editMetaVisible = ref(false)
+const editMetaWork = ref(null)
+const editMetaForm = reactive({ title: '', description: '', tags: [] })
+const editMetaTagInput = ref('')
+const editMetaSaving = ref(false)
+const ratios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4']
+const workFilters = [
+  { label: '全部', value: 'all' },
+  { label: '公开', value: 'public' },
+  { label: '私有', value: 'private' }
+]
 
-// Description editing
-const descDialogVisible = ref(false)
-const descEditValue = ref('')
-const descSaving = ref(false)
-let descEditTarget = null
-
-// Album state
-const albums = ref([])
-const loadingAlbums = ref(false)
-const selectedAlbum = ref(null)
-const showCreateAlbumDialog = ref(false)
-const albumSaving = ref(false)
-const newAlbum = ref({
-  title: '',
-  description: '',
-  coverImage: null
-})
-
-// Album image description editing
-const albumDescDialogVisible = ref(false)
-const albumDescEditValue = ref('')
-const albumDescSaving = ref(false)
-let albumDescEditTarget = null
-
-// Add image to album
-const showAddImageDialog = ref(false)
-const imagesToAdd = ref([])
-const addingImages = ref(false)
-
-const avatarText = computed(() => {
-  const source = userInfo.value.nickname || userInfo.value.username || 'U'
-  return source.charAt(0).toUpperCase()
-})
-
-const toNumber = (value) => Number(value || 0)
-
-const formatNumber = (value) => {
-  const num = toNumber(value)
-  if (num >= 10000) return `${(num / 10000).toFixed(1)}w`
-  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
-  return String(num)
-}
-
-const imageTitle = (image = {}) => image.title || image.original_name || image.filename || '未命名作品'
-
-const isPublic = (image = {}) => image.is_public === true || image.is_public === 1 || image.is_public === '1'
-
-const normalizeStats = (stats = {}) => ({
-  works: toNumber(stats.works ?? stats.imageCount),
-  publicWorks: toNumber(stats.publicImageCount),
-  receivedLikes: toNumber(stats.likes ?? stats.receivedLikeCount),
-  receivedCollects: toNumber(stats.collects ?? stats.receivedCollectCount),
-  views: toNumber(stats.views ?? stats.viewCount),
-  likedWorks: toNumber(stats.likeCount),
-  collectedWorks: toNumber(stats.collectionCount)
-})
-
-const normalizeTrend = (trend = []) => trend.map(item => ({
-  label: item.label || item.date || '',
-  views: toNumber(item.views),
-  likes: toNumber(item.likes),
-  collects: toNumber(item.collects),
-  works: toNumber(item.works)
+const filteredWorks = computed(() => works.value.filter(item => {
+  if (workFilter.value === 'public') return isPublic(item)
+  if (workFilter.value === 'private') return !isPublic(item)
+  return true
 }))
 
-const heroStats = computed(() => [
-  { label: '作品', value: insightStats.value.works ?? images.value.length },
-  { label: '公开', value: insightStats.value.publicWorks ?? images.value.filter(isPublic).length },
-  { label: '获赞', value: insightStats.value.receivedLikes },
-  { label: '收藏', value: insightStats.value.receivedCollects },
-  { label: '浏览', value: insightStats.value.views }
+const tabs = computed(() => [
+  { label: '我的作品', value: 'works', icon: Picture, count: works.value.length },
+  { label: '收藏', value: 'collections', icon: CollectionTag, count: collections.value.length },
+  { label: '点赞', value: 'likes', icon: Star, count: likes.value.length }
 ])
 
-const filteredImages = computed(() => {
-  if (filterType.value === 'public') return images.value.filter(isPublic)
-  if (filterType.value === 'private') return images.value.filter(image => !isPublic(image))
-  return images.value
-})
+const activeItems = computed(() => activeTab.value === 'collections' ? collections.value : likes.value)
+const contentLoading = computed(() => activeTab.value === 'collections' ? loadingCollections.value : loadingLikes.value)
+const isPublic = work => work.is_public === true || Number(work.is_public) === 1
+const workTitle = work => work.title || work.original_name || work.filename || '未命名作品'
+const formatNumber = value => Number(value || 0).toLocaleString('zh-CN')
+const formatDate = value => value ? new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value)) : ''
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '未知时间'
-  return new Date(dateStr).toLocaleDateString('zh-CN', {
-    month: 'short',
-    day: 'numeric'
-  })
-}
-
-const fetchImages = async () => {
-  loadingImages.value = true
+const loadWorks = async () => {
+  loadingWorks.value = true
   try {
-    const res = await getUserImages({ pageSize: 80 })
-    images.value = res.list || []
-  } catch (error) {
-    console.error('获取图片列表失败:', error)
+    const data = await getUserImages({ page: 1, pageSize: 100 })
+    works.value = data?.list || []
+    stats.works = Number(data?.pagination?.total ?? works.value.length)
+  } catch {
+    works.value = []
   } finally {
-    loadingImages.value = false
+    loadingWorks.value = false
   }
 }
 
-const fetchStats = async () => {
+const loadStats = async () => {
   try {
-    const res = await getUserStats({ days: 30 })
-    insightStats.value = normalizeStats(res)
-    trendData.value = normalizeTrend(res.trend || [])
-    hotWorks.value = res.hotWorks || []
-    await nextTick()
-    renderTrendChart()
-  } catch (error) {
-    console.error('获取统计数据失败:', error)
-    insightStats.value = normalizeStats({})
-    trendData.value = []
-    hotWorks.value = []
+    const data = await getUserStats()
+    stats.works = Number(data?.works ?? data?.imageCount ?? stats.works)
+    stats.likes = Number(data?.receivedLikeCount ?? data?.likes ?? data?.likeCount ?? 0)
+    stats.collects = Number(data?.receivedCollectCount ?? data?.collects ?? data?.collectionCount ?? 0)
+  } catch {
+    // Profile remains useful when stats are temporarily unavailable.
   }
 }
 
-const fetchCollections = async () => {
+const loadCollections = async () => {
+  if (collections.value.length) return
   loadingCollections.value = true
   try {
-    const res = await getUserCollections({ pageSize: 50 })
-    collections.value = res.list || []
-  } catch (error) {
-    console.error('获取收藏列表失败:', error)
+    const data = await getUserCollections({ page: 1, pageSize: 100 })
+    collections.value = data?.list || []
+  } catch {
+    collections.value = []
   } finally {
     loadingCollections.value = false
   }
 }
 
-const fetchLikes = async () => {
+const loadLikes = async () => {
+  if (likes.value.length) return
   loadingLikes.value = true
   try {
-    const res = await getUserLikes({ pageSize: 50 })
-    likes.value = res.list || []
-  } catch (error) {
-    console.error('获取点赞列表失败:', error)
+    const data = await getUserLikes({ page: 1, pageSize: 100 })
+    likes.value = data?.list || []
+  } catch {
+    likes.value = []
   } finally {
     loadingLikes.value = false
   }
 }
 
-const fetchInitialData = async () => {
-  await Promise.all([
-    fetchImages(),
-    fetchStats(),
-    fetchCollections(),
-    fetchLikes(),
-    fetchAlbums()
-  ])
+const selectTab = value => {
+  activeTab.value = value
+  if (value === 'collections') loadCollections()
+  if (value === 'likes') loadLikes()
 }
 
-const handleTabChange = async (tab) => {
-  if (tab === 'insights') {
-    await nextTick()
-    renderTrendChart()
-  } else if (tab === 'albums') {
-    fetchAlbums()
-  }
-}
-
-const handleUpload = () => {
-  fileInput.value?.click()
-}
-
-const onFileSelected = async (event) => {
-  const file = event.target.files?.[0]
-  if (!file) return
-
-  if (!file.type.startsWith('image/')) {
-    ElMessage.error('请选择图片文件')
-    event.target.value = ''
+const handleWorkCommand = async (work, command) => {
+  if (command === 'view') return router.push(`/post/${work.id}`)
+  if (command === 'studio') return router.push(`/studio/${work.id}`)
+  if (command === 'editMeta') return openEditMeta(work)
+  if (command === 'visibility') {
+    const next = !isPublic(work)
+    await updateImageVisibility(work.id, next)
+    work.is_public = next ? 1 : 0
+    ElMessage.success(next ? '作品已公开到社区' : '作品已设为私有')
     return
   }
-
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error('图片大小不能超过 5MB')
-    event.target.value = ''
-    return
-  }
-
-  uploading.value = true
-  try {
-    await uploadImage(file)
-    ElMessage.success('上传成功')
-    await Promise.all([fetchImages(), fetchStats()])
-  } catch (error) {
-    console.error('上传失败:', error)
-    ElMessage.error('上传失败')
-  } finally {
-    uploading.value = false
-    event.target.value = ''
-  }
-}
-
-const viewImage = (image) => {
-  previewImage.value = image
-  previewVisible.value = true
-}
-
-const openInWorkbench = (image) => {
-  if (image?.url) {
-    localStorage.setItem('pixel_lab_workbench_image', image.url)
-  }
-  previewVisible.value = false
-  router.push('/workbench')
-}
-
-const handleImageCommand = (image, command) => {
-  if (command === 'view') viewImage(image)
-  if (command === 'visibility') toggleVisibility(image)
-  if (command === 'workbench') openInWorkbench(image)
-  if (command === 'delete') confirmDelete(image)
-}
-
-const toggleVisibility = async (image) => {
-  try {
-    const nextPublic = !isPublic(image)
-    await updateImageVisibility(image.id, nextPublic)
-    image.is_public = nextPublic ? 1 : 0
-    await fetchStats()
-    ElMessage.success(nextPublic ? '已设为公开' : '已设为私有')
-  } catch (error) {
-    console.error('更新可见性失败:', error)
-    ElMessage.error('操作失败')
-  }
-}
-
-const confirmDelete = (image) => {
-  ElMessageBox.confirm(
-    `确定删除「${imageTitle(image)}」吗？此操作不可恢复。`,
-    '确认删除',
-    {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
+  if (command === 'delete') {
     try {
-      await deleteImage(image.id)
-      ElMessage.success('删除成功')
-      await Promise.all([fetchImages(), fetchStats()])
-    } catch (error) {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
+      await ElMessageBox.confirm(`确定删除《${workTitle(work)}》吗？此操作无法撤销。`, '删除作品', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+      await deleteImage(work.id)
+      works.value = works.value.filter(item => item.id !== work.id)
+      stats.works = Math.max(0, stats.works - 1)
+      ElMessage.success('作品已删除')
+    } catch {
+      // User cancelled or the request interceptor already displayed the error.
     }
-  }).catch(() => {})
-}
-
-const goToCommunity = (imageId) => {
-  if (imageId) {
-    router.push({ path: '/community', query: { id: imageId } })
-  } else {
-    router.push('/community')
   }
 }
 
-// Description editing functions
-const openDescriptionEdit = (image) => {
-  descEditTarget = image
-  descEditValue.value = image.description || ''
-  descDialogVisible.value = true
+// 编辑作品元数据（标题、说明、标签）
+const openEditMeta = work => {
+  editMetaWork.value = work
+  editMetaForm.title = work.title || ''
+  editMetaForm.description = work.description || ''
+  editMetaForm.tags = work.tags ? (typeof work.tags === 'string' ? work.tags.split(',').filter(Boolean) : [...work.tags]) : []
+  editMetaTagInput.value = ''
+  editMetaVisible.value = true
 }
 
-const saveDescription = async () => {
-  if (!descEditTarget) return
-  descSaving.value = true
+const saveEditMeta = async () => {
+  if (!editMetaWork.value) return
+  editMetaSaving.value = true
   try {
-    await updateImageDescription(descEditTarget.id, descEditValue.value)
-    descEditTarget.description = descEditValue.value
-    ElMessage.success('说明已更新')
-    descDialogVisible.value = false
-  } catch (error) {
-    console.error('更新说明失败:', error)
-    ElMessage.error('更新失败')
+    await updateImageMetadata(editMetaWork.value.id, {
+      title: editMetaForm.title,
+      description: editMetaForm.description,
+      tags: editMetaForm.tags
+    })
+    // 更新本地数据
+    editMetaWork.value.title = editMetaForm.title
+    editMetaWork.value.description = editMetaForm.description
+    editMetaWork.value.tags = editMetaForm.tags.join(',')
+    editMetaVisible.value = false
+    ElMessage.success('作品信息已更新')
+  } catch {
+    ElMessage.error('更新失败，请重试')
   } finally {
-    descSaving.value = false
+    editMetaSaving.value = false
   }
 }
 
-// Album functions
-const fetchAlbums = async () => {
-  loadingAlbums.value = true
-  try {
-    const res = await getAlbums({ pageSize: 50 })
-    albums.value = res.list || []
-  } catch (error) {
-    console.error('获取作品集失败:', error)
-  } finally {
-    loadingAlbums.value = false
+const addEditTag = () => {
+  const tag = editMetaTagInput.value.trim()
+  if (tag && !editMetaForm.tags.includes(tag)) {
+    editMetaForm.tags.push(tag)
   }
+  editMetaTagInput.value = ''
 }
 
-const openAlbumDetail = async (album) => {
-  try {
-    const res = await getAlbumDetail(album.id)
-    selectedAlbum.value = res
-  } catch (error) {
-    console.error('获取作品集详情失败:', error)
-    ElMessage.error('获取详情失败')
-  }
+const removeEditTag = index => {
+  editMetaForm.tags.splice(index, 1)
 }
-
-const handleCreateAlbum = async () => {
-  if (!newAlbum.value.title.trim()) return
-  albumSaving.value = true
-  try {
-    const data = {
-      title: newAlbum.value.title.trim(),
-      description: newAlbum.value.description.trim()
-    }
-    if (newAlbum.value.coverImage) {
-      data.cover_image_id = newAlbum.value.coverImage.id
-    }
-    const res = await createAlbum(data)
-    albums.value.unshift(res)
-    ElMessage.success('作品集创建成功')
-    showCreateAlbumDialog.value = false
-    newAlbum.value = { title: '', description: '', coverImage: null }
-  } catch (error) {
-    console.error('创建作品集失败:', error)
-    ElMessage.error('创建失败')
-  } finally {
-    albumSaving.value = false
-  }
-}
-
-const confirmRemoveImage = (img) => {
-  ElMessageBox.confirm(
-    `确定将此图片从作品集中移除吗？`,
-    '确认移除',
-    {
-      confirmButtonText: '移除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(async () => {
-    try {
-      await removeImageFromAlbum(selectedAlbum.value.id, img.id)
-      selectedAlbum.value.images = selectedAlbum.value.images.filter(i => i.id !== img.id)
-      ElMessage.success('已移除')
-    } catch (error) {
-      console.error('移除图片失败:', error)
-      ElMessage.error('移除失败')
-    }
-  }).catch(() => {})
-}
-
-// Album image description editing
-const openAlbumImageDescEdit = (img) => {
-  albumDescEditTarget = img
-  albumDescEditValue.value = img.description || ''
-  albumDescDialogVisible.value = true
-}
-
-const saveAlbumImageDescription = async () => {
-  if (!albumDescEditTarget || !selectedAlbum.value) return
-  albumDescSaving.value = true
-  try {
-    await updateAlbumImageDescription(selectedAlbum.value.id, albumDescEditTarget.id, albumDescEditValue.value)
-    albumDescEditTarget.description = albumDescEditValue.value
-    ElMessage.success('描述已更新')
-    albumDescDialogVisible.value = false
-  } catch (error) {
-    console.error('更新描述失败:', error)
-    ElMessage.error('更新失败')
-  } finally {
-    albumDescSaving.value = false
-  }
-}
-
-// Add images to album
-const availableImagesForAlbum = computed(() => {
-  if (!selectedAlbum.value?.images) return images.value
-  const existingIds = new Set(selectedAlbum.value.images.map(img => img.id))
-  return images.value.filter(img => !existingIds.has(img.id))
-})
-
-const toggleImageToAdd = (id) => {
-  const idx = imagesToAdd.value.indexOf(id)
-  if (idx >= 0) {
-    imagesToAdd.value.splice(idx, 1)
-  } else {
-    imagesToAdd.value.push(id)
-  }
-}
-
-const handleAddImages = async () => {
-  if (!selectedAlbum.value || !imagesToAdd.value.length) return
-  addingImages.value = true
-  try {
-    await addImageToAlbum(selectedAlbum.value.id, { image_ids: imagesToAdd.value })
-    // Refresh album detail
-    const res = await getAlbumDetail(selectedAlbum.value.id)
-    selectedAlbum.value = res
-    imagesToAdd.value = []
-    showAddImageDialog.value = false
-    ElMessage.success('图片已添加')
-  } catch (error) {
-    console.error('添加图片失败:', error)
-    ElMessage.error('添加失败')
-  } finally {
-    addingImages.value = false
-  }
-}
-
-const renderTrendChart = () => {
-  if (!trendChartRef.value) return
-
-  if (trendChart) {
-    trendChart.dispose()
-  }
-
-  trendChart = echarts.init(trendChartRef.value)
-  const labels = trendData.value.map(item => item.label)
-
-  trendChart.setOption({
-    tooltip: {
-      trigger: 'axis',
-      backgroundColor: 'rgba(10, 10, 10, 0.92)',
-      borderColor: 'rgba(255, 255, 255, 0.12)',
-      textStyle: { color: '#fff' }
-    },
-    legend: {
-      top: 0,
-      data: ['浏览', '获赞', '收藏'],
-      textStyle: { color: '#a0a0a0' }
-    },
-    grid: {
-      top: 44,
-      left: 12,
-      right: 16,
-      bottom: 8,
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: false,
-      data: labels,
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.12)' } },
-      axisLabel: { color: '#a0a0a0' }
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.08)' } },
-      axisLabel: { color: '#a0a0a0' }
-    },
-    series: [
-      {
-        name: '浏览',
-        type: 'line',
-        smooth: true,
-        data: trendData.value.map(item => item.views),
-        lineStyle: { color: '#00d4ff', width: 3 },
-        itemStyle: { color: '#00d4ff' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(0, 212, 255, 0.25)' },
-            { offset: 1, color: 'rgba(0, 212, 255, 0.02)' }
-          ])
-        }
-      },
-      {
-        name: '获赞',
-        type: 'line',
-        smooth: true,
-        data: trendData.value.map(item => item.likes),
-        lineStyle: { color: '#ff4f8b', width: 2 },
-        itemStyle: { color: '#ff4f8b' }
-      },
-      {
-        name: '收藏',
-        type: 'line',
-        smooth: true,
-        data: trendData.value.map(item => item.collects),
-        lineStyle: { color: '#00ff88', width: 2 },
-        itemStyle: { color: '#00ff88' }
-      }
-    ]
-  })
-}
-
-const handleResize = () => {
-  trendChart?.resize()
-}
-
-watch(activeTab, async (tab) => {
-  if (tab === 'insights') {
-    await nextTick()
-    renderTrendChart()
-  } else if (tab === 'albums') {
-    fetchAlbums()
-  }
-})
-
-watch(showAddImageDialog, (val) => {
-  if (!val) imagesToAdd.value = []
-})
 
 onMounted(() => {
-  fetchInitialData()
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  trendChart?.dispose()
-  window.removeEventListener('resize', handleResize)
+  loadWorks()
+  loadStats()
 })
 </script>
 
 <style scoped>
-.personal-page {
-  width: min(1440px, 100%);
-  margin: 0 auto;
-  padding: 0;
-}
+.profile-page { max-width: 1240px; padding-bottom: var(--space-8); }
 
-.profile-hero,
-.toolbar-panel,
-.chart-card,
-.hot-card {
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--background-card);
-  box-shadow: var(--shadow-sm);
-}
-
-.profile-hero {
+.profile-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: var(--space-6);
-  padding: clamp(var(--space-6), 4vw, var(--space-10));
-  overflow: hidden;
-}
-
-.hero-main {
-  display: flex;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  min-width: 0;
-  gap: var(--space-6);
-}
-
-.avatar-ring {
-  flex: 0 0 auto;
-  padding: 5px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-}
-
-.avatar-ring :deep(.el-avatar) {
-  border: 5px solid var(--background-card);
-  background: var(--background-muted);
-  color: var(--foreground);
-  font-size: 36px;
-  font-weight: 800;
-}
-
-.profile-copy {
-  min-width: 0;
-}
-
-.eyebrow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.visibility-badge {
-  border: 0;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--foreground-muted);
-  padding: 4px 10px;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.profile-copy h1 {
-  margin: 0;
-  color: var(--foreground);
-  font-size: clamp(30px, 4vw, 44px);
-  line-height: 1.1;
-  letter-spacing: 0;
-}
-
-.username {
-  margin-top: var(--space-2);
-  color: var(--foreground-muted);
-  font-size: 16px;
-}
-
-.profile-desc {
-  max-width: 660px;
-  margin: var(--space-4) 0 0;
-  color: var(--foreground-muted);
-  font-size: 15px;
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-}
-
-.hero-side {
-  display: flex;
-  align-items: stretch;
-}
-
-.stat-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.hero-stat {
-  min-height: 78px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--background-muted);
-  padding: var(--space-4);
-}
-
-.hero-stat:last-child {
-  grid-column: span 2;
-}
-
-.stat-value {
-  color: var(--foreground);
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.stat-label {
-  margin-top: var(--space-2);
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-
-.section-title.compact {
-  margin-bottom: var(--space-4);
-}
-
-.section-title h2,
-.toolbar-panel h2 {
-  margin: 0;
-  color: var(--foreground);
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.work-cover img,
-.hot-item img,
-.preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.creator-tabs {
-  margin-top: var(--space-5);
-}
-
-.creator-tabs :deep(.el-tabs__header) {
-  margin-bottom: var(--space-5);
-}
-
-.tab-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.toolbar-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-  padding: var(--space-5) var(--space-6);
-}
-
-.toolbar-panel p {
-  margin-top: 4px;
-  color: var(--foreground-muted);
-}
-
-.feed-shell {
-  min-height: 320px;
-}
-
-.masonry-grid {
-  column-count: 4;
-  column-gap: var(--space-5);
-}
-
-.work-card {
-  display: inline-block;
-  width: 100%;
-  margin: 0 0 var(--space-5);
-  overflow: hidden;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--background-card);
-  box-shadow: var(--shadow-sm);
-  break-inside: avoid;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.work-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-5px);
-}
-
-.cover-shell {
-  position: relative;
-}
-
-.work-cover {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  overflow: hidden;
-  border: 0;
-  background: var(--background-muted);
-  cursor: pointer;
-}
-
-.work-cover img {
-  transition: transform var(--transition-base);
-}
-
-.work-card:hover .work-cover img {
-  transform: scale(1.05);
-}
-
-.visibility-badge {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--shadow-sm);
-}
-
-.visibility-badge.public {
-  color: var(--primary);
-}
-
-.card-menu {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: 2;
-}
-
-.work-meta {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4);
-}
-
-.work-meta h3 {
-  max-width: 170px;
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 14px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-meta p {
-  margin-top: 4px;
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.icon-button {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--foreground);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.icon-button:hover {
-  color: var(--primary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
-.metric-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-4);
-  color: var(--foreground-muted);
-  font-size: 12px;
-}
-
-.metric-row span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.empty-panel,
-.soft-empty {
-  min-height: 260px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--border-light);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--foreground-muted);
-  padding: var(--space-8);
-  text-align: center;
-}
-
-.empty-panel .el-icon {
-  margin-bottom: var(--space-4);
-  color: var(--foreground-subtle);
-  font-size: 52px;
-}
-
-.empty-panel h3 {
-  color: var(--foreground);
-  font-size: 20px;
-}
-
-.empty-panel p {
-  margin: var(--space-2) 0 var(--space-5);
-}
-
-.soft-empty.small {
-  min-height: 180px;
-}
-
-.insights-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.8fr);
-  gap: var(--space-5);
-}
-
-.chart-card,
-.hot-card {
-  padding: var(--space-6);
-}
-
-.trend-chart {
-  width: 100%;
-  height: 360px;
-}
-
-.hot-list {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.hot-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 84px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--background-muted);
-  color: var(--foreground);
-  padding: var(--space-2);
-  cursor: pointer;
-  text-align: left;
-}
-
-.hot-item img {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--radius);
-}
-
-.hot-rank {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  border-radius: var(--radius-full);
-  background: var(--primary);
-  color: var(--background);
-  padding: 2px 7px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.hot-item strong,
-.hot-item small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hot-item small {
-  margin-top: 4px;
-  color: var(--foreground-muted);
-}
-
-.preview-dialog :deep(.el-dialog__body) {
-  height: min(68vh, 720px);
-}
-
-.preview-image {
-  max-height: 68vh;
-  object-fit: contain;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-}
-
-/* Image description editing */
-.image-desc {
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--foreground-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.desc-edit-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  border: 0;
-  background: none;
-  color: var(--primary);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.desc-edit-btn:hover {
-  text-decoration: underline;
-}
-
-/* Album grid */
-.album-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-5);
-}
-
-.album-card {
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--background-card);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.album-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-3px);
-}
-
-.album-cover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  background: var(--background-muted);
-}
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--foreground-subtle);
-  font-size: 48px;
-}
-
-.album-count {
-  position: absolute;
-  bottom: var(--space-2);
-  right: var(--space-2);
-  border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  padding: 4px 10px;
-  font-size: 12px;
-}
-
-.album-meta {
-  padding: var(--space-4);
-}
-
-.album-meta h3 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.album-desc-snippet {
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--foreground-muted);
-  font-size: 13px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.album-date {
-  margin-top: var(--space-2);
-  color: var(--foreground-subtle);
-  font-size: 12px;
-}
-
-/* Album image list */
-.album-image-list {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.album-image-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  background: var(--background-muted);
-  padding: var(--space-3);
-}
-
-.album-image-cover {
-  flex: 0 0 100px;
-  width: 100px;
-  height: 100px;
-  border-radius: var(--radius);
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.album-image-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.album-image-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.album-image-info h4 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.album-image-desc {
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--foreground-muted);
-  font-size: 13px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-/* Cover picker in album creation */
-.cover-preview {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.cover-preview img {
-  width: 80px;
-  height: 80px;
-  border-radius: var(--radius);
-  object-fit: cover;
-}
-
-.cover-picker p {
-  margin: 0 0 var(--space-2);
-  color: var(--foreground-muted);
-  font-size: 13px;
-}
-
-.cover-option-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: var(--space-2);
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.cover-option {
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px solid transparent;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.cover-option.active {
-  border-color: var(--primary);
-}
-
-.cover-option img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Add image to album */
-.add-image-hint {
-  margin: 0 0 var(--space-4);
-  color: var(--foreground-muted);
-  font-size: 14px;
-}
-
-.add-image-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: var(--space-2);
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.add-image-option {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 2px solid transparent;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.add-image-option.selected {
-  border-color: var(--primary);
-}
-
-.add-image-option img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.add-check {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-full);
-  background: var(--primary);
-  color: #fff;
-  font-size: 12px;
-}
-
-@media (max-width: 1180px) {
-  .profile-hero,
-  .insights-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .personal-page {
-    padding: 0;
-  }
-
-  .profile-hero {
-    padding: var(--space-5);
-  }
-
-  .hero-main {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .masonry-grid {
-    column-count: 2;
-    column-gap: var(--space-3);
-  }
-
-  .hero-stat:last-child {
-    grid-column: span 2;
-  }
-
-  .toolbar-panel,
-  .section-title {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .trend-chart {
-    height: 300px;
-  }
-
-  .album-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .album-image-item {
-    flex-wrap: wrap;
-  }
-}
-
-@media (max-width: 520px) {
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .masonry-grid {
-    column-count: 1;
-  }
-
-  .hero-stat:last-child {
-    grid-column: auto;
-  }
-}
+  gap: var(--space-8);
+}
+.profile-identity { min-width: 0; display: flex; align-items: center; gap: var(--space-4); }
+.profile-identity h1 { margin: 0; font-size: 26px; line-height: 1.25; }
+.profile-identity p { margin: 2px 0; color: var(--primary-active); font-size: 12px; }
+.profile-identity span { display: block; color: var(--text-secondary); font-size: 13px; }
+.profile-stats { display: flex; gap: var(--space-8); }
+.profile-stats div { display: grid; justify-items: center; }
+.profile-stats strong { font-size: 20px; }
+.profile-stats span { color: var(--text-tertiary); font-size: 11px; }
+.profile-actions { display: flex; gap: var(--space-2); }
+
+.profile-tabs { display: flex; gap: var(--space-2); margin: var(--space-8) 0; border-bottom: 1px solid var(--border); }
+.profile-tabs button { min-height: 46px; display: inline-flex; align-items: center; gap: var(--space-2); position: relative; border: 0; padding: 0 var(--space-4); color: var(--text-secondary); background: transparent; font-weight: 650; cursor: pointer; }
+.profile-tabs button:hover,
+.profile-tabs button.active { color: var(--primary-active); }
+.profile-tabs button.active::after { content: ''; height: 3px; position: absolute; right: 10px; bottom: -1px; left: 10px; border-radius: var(--radius-full); background: var(--primary); }
+.profile-tabs button span { min-width: 20px; border-radius: var(--radius-full); padding: 1px 6px; color: var(--text-tertiary); background: var(--surface-muted); font-size: 10px; }
+
+.works-toolbar { display: flex; align-items: end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-6); }
+.works-toolbar h2 { margin: 0; font-size: 20px; }
+.works-toolbar p { margin: 2px 0 0; color: var(--text-secondary); font-size: 12px; }
+.visibility-filter { display: flex; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 3px; background: var(--card); }
+.visibility-filter button { border: 0; border-radius: var(--radius-sm); padding: 6px 12px; color: var(--text-secondary); background: transparent; cursor: pointer; }
+.visibility-filter button.active { color: var(--primary-active); background: var(--primary-soft); }
+
+.profile-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+.profile-work { min-width: 0; overflow: hidden; }
+.work-cover { width: 100%; display: block; position: relative; overflow: hidden; border: 0; padding: 0; background: var(--surface-muted); cursor: pointer; }
+.work-cover img { width: 100%; aspect-ratio: 4 / 3; display: block; object-fit: cover; transition: transform var(--transition-slow); }
+.profile-work:hover .work-cover img { transform: scale(1.035); }
+.work-cover > span { display: inline-flex; align-items: center; gap: 3px; position: absolute; top: var(--space-2); left: var(--space-2); border-radius: var(--radius-full); padding: 3px 8px; color: var(--text-secondary); background: var(--surface-glass); font-size: 10px; backdrop-filter: blur(10px); }
+.work-cover > span.public { color: var(--primary-active); }
+.work-info { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); }
+.work-info > div { min-width: 0; }
+.work-info h3 { overflow: hidden; margin: 0; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.work-info p { margin: 2px 0 0; color: var(--text-tertiary); font-size: 10px; }
+.more-button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); color: var(--text-secondary); background: transparent; cursor: pointer; }
+.more-button:hover { color: var(--primary-active); background: var(--primary-soft); }
+.work-metrics { display: flex; gap: var(--space-3); padding: 0 var(--space-3) var(--space-3); color: var(--text-tertiary); font-size: 10px; }
+.work-metrics span { display: inline-flex; align-items: center; gap: 3px; }
+
+@media (max-width: 1020px) {
+  .profile-header { grid-template-columns: 1fr auto; }
+  .profile-actions { grid-column: 1 / -1; }
+  .profile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .profile-header { grid-template-columns: 1fr; }
+  .profile-stats { justify-content: space-around; }
+  .profile-actions { grid-column: auto; }
+  .profile-tabs { overflow-x: auto; }
+  .profile-tabs button { white-space: nowrap; }
+  .works-toolbar { align-items: flex-start; flex-direction: column; }
+  .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.edit-meta-form { display: grid; gap: var(--space-4); }
+.edit-meta-form label { display: grid; gap: var(--space-2); }
+.edit-meta-form label > span { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.tag-input-area { display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center; padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-md); min-height: 40px; }
 </style>
