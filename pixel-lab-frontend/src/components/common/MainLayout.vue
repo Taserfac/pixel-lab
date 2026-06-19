@@ -6,9 +6,11 @@
         class="brand"
         aria-label="Pixel Lab 首页"
       >
-        <div class="brand-icon">
-          <span class="pixel-text">PX</span>
-        </div>
+        <BrandLogo
+          size="md"
+          tone="panel"
+          shadow
+        />
         <span class="brand-name">Pixel Lab</span>
         <span class="brand-tag">{{ $t('community.communityTag') }}</span>
       </router-link>
@@ -304,13 +306,15 @@ import {
   SwitchButton,
   Upload,
   User,
-  UserFilled
+  UserFilled,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
 import { useNotificationStore } from '@/store/notification'
 import { logout as logoutApi } from '@/api/auth'
 import { uploadImage } from '@/api/image'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -337,7 +341,8 @@ const notificationColorMap = { like: '#FF6B6B', comment: '#5B8DEF', follow: '#16
 
 const primaryNavItems = computed(() => [
     { path: '/dashboard', label: t('nav.home'), icon: HomeFilled, accent: '#16C784' },
-    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' }
+    { path: '/community', label: t('nav.community'), icon: Compass, accent: '#5B8DEF' },
+    { path: '/tutorials', label: '教学', icon: VideoCamera, accent: '#FFB454' }
 ])
 
 const isDarkTheme = computed(() => themeStore.theme === 'dark')
@@ -518,24 +523,6 @@ onMounted(async () => {
   min-width: 0;
   color: inherit;
   text-decoration: none;
-}
-
-.brand-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: var(--primary);
-  box-shadow: var(--glow-sm);
-}
-
-.pixel-text {
-  color: white;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 800;
 }
 
 .brand-name {

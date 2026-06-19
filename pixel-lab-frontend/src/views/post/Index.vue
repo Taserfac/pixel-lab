@@ -67,6 +67,13 @@
               <el-icon><CollectionTag /></el-icon>
               {{ post.isCollected ? '已收藏' : '收藏' }}
             </el-button>
+            <el-button
+              :loading="reporting"
+              @click="handleReport"
+            >
+              <el-icon><Warning /></el-icon>
+              举报
+            </el-button>
           </div>
 
           <section class="comments-section">
@@ -178,10 +185,11 @@ import {
   Edit,
   Star,
   StarFilled,
-  View
+  View,
+  Warning
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { addComment, deleteComment, getComments, getImageDetail, toggleCollect, toggleLike } from '@/api/community'
+import { addComment, deleteComment, getComments, getImageDetail, reportImage, toggleCollect, toggleLike } from '@/api/community'
 import { updateImageMetadata } from '@/api/image'
 import { useUserStore } from '@/store/user'
 
@@ -192,6 +200,7 @@ const userStore = useUserStore()
 const loading = ref(false)
 const liking = ref(false)
 const collecting = ref(false)
+const reporting = ref(false)
 const commenting = ref(false)
 const post = ref(null)
 const comments = ref([])
@@ -259,6 +268,42 @@ const handleCollect = async () => {
     post.value.collect_count = Math.max(0, Number(post.value.collect_count || 0) + (result.collected ? 1 : -1))
   } finally {
     collecting.value = false
+  }
+}
+
+const handleReport = async () => {
+  if (!post.value?.id) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请填写举报原因，管理员会在后台处理。',
+      '举报作品',
+      {
+        confirmButtonText: '提交举报',
+        cancelButtonText: '取消',
+        inputType: 'textarea',
+        inputPlaceholder: '例如：侵权、违规内容、垃圾信息等',
+        inputValidator: (input) => {
+          const text = String(input || '').trim()
+          if (!text) return '请填写举报原因'
+          if (text.length > 500) return '举报原因不能超过 500 字'
+          return true
+        }
+      }
+    )
+    reporting.value = true
+    const detail = String(value || '').trim()
+    await reportImage({
+      imageId: post.value.id,
+      reason: detail.slice(0, 80),
+      detail
+    })
+    ElMessage.success('举报已提交，管理员会尽快处理')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '举报提交失败')
+    }
+  } finally {
+    reporting.value = false
   }
 }
 

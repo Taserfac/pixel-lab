@@ -45,6 +45,15 @@
               <span class="stat-label">总点赞数</span>
             </div>
           </div>
+          <div class="stat-card">
+            <div class="stat-icon reports">
+              <el-icon :size="24"><Warning /></el-icon>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value">{{ platformStats.interactions.reports }}</span>
+              <span class="stat-label">待处理举报</span>
+            </div>
+          </div>
         </div>
       </el-tab-pane>
 
@@ -286,6 +295,76 @@
           />
         </div>
       </el-tab-pane>
+
+      <!-- 举报处理 -->
+      <el-tab-pane label="举报处理" name="reports">
+        <div class="search-bar">
+          <el-select v-model="reportStatus" placeholder="处理状态" clearable @change="fetchReports">
+            <el-option label="全部" value="" />
+            <el-option label="待处理" value="0" />
+            <el-option label="已处理" value="1" />
+            <el-option label="已驳回" value="2" />
+          </el-select>
+          <el-button @click="fetchReports">刷新</el-button>
+        </div>
+        <el-table :data="reports" v-loading="loadingReports" stripe>
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column label="作品" min-width="220">
+            <template #default="{ row }">
+              <div class="report-work">
+                <img :src="row.url" class="image-thumb" />
+                <div>
+                  <strong>{{ row.title || row.original_name || '未命名' }}</strong>
+                  <span>作者：{{ row.author_name || '匿名' }}</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reporter_name" label="举报人" width="120" />
+          <el-table-column label="原因" min-width="220">
+            <template #default="{ row }">
+              <strong>{{ row.reason }}</strong>
+              <p v-if="row.detail" class="report-detail">{{ row.detail }}</p>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag v-if="row.status === 0" type="warning" size="small">待处理</el-tag>
+              <el-tag v-else-if="row.status === 1" type="success" size="small">已处理</el-tag>
+              <el-tag v-else type="info" size="small">已驳回</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="举报时间" width="160">
+            <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="办理人" width="120">
+            <template #default="{ row }">
+              {{ row.handler_name || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="220" fixed="right">
+            <template #default="{ row }">
+              <template v-if="row.status === 0">
+                <el-button type="warning" size="small" @click="handleBanReportedImage(row)">封禁作品</el-button>
+                <el-button type="success" size="small" @click="handleResolveReport(row)">标记处理</el-button>
+                <el-button size="small" @click="handleRejectReport(row)">驳回</el-button>
+              </template>
+              <span v-else class="deleted-text">已办理</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="pagination">
+          <el-pagination
+            v-model:current-page="reportPage"
+            :page-size="10"
+            :total="reportTotal"
+            layout="total, prev, pager, next"
+            @current-change="fetchReports"
+          />
+        </div>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 封禁用户对话框 -->
@@ -313,10 +392,10 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { User, Picture, View, Star } from '@element-plus/icons-vue'
+import { User, Picture, View, Star, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats, banUser, banImage, getAlbums, banAlbum, deleteAlbum } from '@/api/admin'
+import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats, banUser, banImage, getAlbums, banAlbum, deleteAlbum, getReports, updateReportStatus, banReportedImage } from '@/api/admin'
 
 const userStore = useUserStore()
 const activeTab = ref('stats')
@@ -325,7 +404,7 @@ const activeTab = ref('stats')
 const platformStats = ref({
   users: { total: 0, today: 0 },
   images: { total: 0, today: 0 },
-  interactions: { views: 0, likes: 0, collects: 0, comments: 0 }
+  interactions: { views: 0, likes: 0, collects: 0, comments: 0, reports: 0 }
 })
 
 // 用户管理
@@ -349,6 +428,13 @@ const albumSearch = ref('')
 const albumPage = ref(1)
 const albumTotal = ref(0)
 const loadingAlbums = ref(false)
+
+// 举报处理
+const reports = ref([])
+const reportStatus = ref('0')
+const reportPage = ref(1)
+const reportTotal = ref(0)
+const loadingReports = ref(false)
 
 // 封禁对话框
 const banDialogVisible = ref(false)
@@ -572,11 +658,77 @@ const handleUnbanAlbum = async (album) => {
   }
 }
 
+// 获取举报列表
+const fetchReports = async () => {
+  loadingReports.value = true
+  try {
+    const res = await getReports({
+      page: reportPage.value,
+      pageSize: 10,
+      status: reportStatus.value
+    })
+    reports.value = res.list || []
+    reportTotal.value = res.total || 0
+  } catch (error) {
+    console.error('获取举报失败:', error)
+  } finally {
+    loadingReports.value = false
+  }
+}
+
+// 封禁被举报作品
+const handleBanReportedImage = async (report) => {
+  const title = report.title || report.original_name || '未命名'
+  try {
+    await ElMessageBox.confirm(`确定要封禁被举报作品 "${title}" 吗？`, '确认封禁', { type: 'warning' })
+    await banReportedImage(report.id)
+    ElMessage.success('已封禁作品并处理举报')
+    fetchReports()
+    fetchImages()
+    fetchStats()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 标记举报已处理
+const handleResolveReport = async (report) => {
+  try {
+    await ElMessageBox.confirm('确定将该举报标记为已处理吗？', '确认处理', { type: 'warning' })
+    await updateReportStatus(report.id, 1)
+    ElMessage.success('已处理')
+    fetchReports()
+    fetchStats()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
+// 驳回举报
+const handleRejectReport = async (report) => {
+  try {
+    await ElMessageBox.confirm('确定驳回该举报吗？', '确认驳回', { type: 'warning' })
+    await updateReportStatus(report.id, 2)
+    ElMessage.success('已驳回')
+    fetchReports()
+    fetchStats()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.msg || '操作失败')
+    }
+  }
+}
+
 onMounted(() => {
   fetchStats()
   fetchUsers()
   fetchImages()
   fetchAlbums()
+  fetchReports()
 })
 </script>
 
@@ -603,7 +755,7 @@ onMounted(() => {
 /* 统计卡片 */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-4);
   margin-top: var(--space-4);
 }
@@ -630,6 +782,7 @@ onMounted(() => {
 .stat-icon.images { background: #8b5cf6; color: white; }
 .stat-icon.views { background: #f59e0b; color: white; }
 .stat-icon.likes { background: #ef4444; color: white; }
+.stat-icon.reports { background: #f97316; color: white; }
 
 .stat-info {
   display: flex;
@@ -675,6 +828,28 @@ onMounted(() => {
   height: 48px;
   object-fit: cover;
   border: 2px solid var(--border);
+}
+
+.report-work {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.report-work strong,
+.report-work span {
+  display: block;
+}
+
+.report-work span,
+.report-detail {
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.report-detail {
+  margin: 4px 0 0;
+  line-height: 1.5;
 }
 
 .data-item {

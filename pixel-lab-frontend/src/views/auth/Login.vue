@@ -12,9 +12,11 @@
     <div class="login-card">
       <!-- Logo -->
       <div class="logo">
-        <div class="logo-icon">
-          <span class="pixel-text">PX</span>
-        </div>
+        <BrandLogo
+          size="lg"
+          tone="panel"
+          shadow
+        />
         <div class="logo-text">
           <h1>Pixel Lab</h1>
           <p>数字图像创作与管理平台</p>
@@ -103,6 +105,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import AuthLayout from '@/components/auth/AuthLayout.vue'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 import { useUserStore } from '@/store/user'
 import * as storage from '@/utils/storage'
 import { login } from '@/api/auth'
@@ -195,25 +198,6 @@ const goRegister = () => {
   align-items: center;
   gap: var(--space-4);
   margin-bottom: var(--space-8);
-}
-
-.logo-icon {
-  width: 48px;
-  height: 48px;
-  background: var(--primary);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 10px 24px rgba(22, 199, 132, 0.2);
-  flex-shrink: 0;
-}
-
-.pixel-text {
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--background);
 }
 
 .logo-text h1 {

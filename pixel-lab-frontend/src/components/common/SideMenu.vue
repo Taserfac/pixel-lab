@@ -10,9 +10,10 @@
   >
     <!-- Logo -->
     <div class="logo">
-      <div class="logo-icon">
-        <span class="pixel-text">PX</span>
-      </div>
+      <BrandLogo
+        size="lg"
+        tone="panel"
+      />
       <span
         v-if="!menuStore.collapsed"
         class="logo-text"
@@ -58,6 +59,7 @@ import { useRoute } from 'vue-router'
 import { useMenuStore } from '@/store/menu'
 import { useUserStore } from '@/store/user'
 import router from '@/router'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 
 const route = useRoute()
 const menuStore = useMenuStore()
@@ -108,24 +110,6 @@ const menuRoutes = computed(() => {
   padding: 24px;
   border-bottom: 4px solid var(--border);
   background: var(--primary);
-}
-
-.logo-icon {
-  width: 48px;
-  height: 48px;
-  background: var(--accent);
-  border: 4px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.pixel-text {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--foreground);
 }
 
 .logo-text {

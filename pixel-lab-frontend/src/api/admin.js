@@ -57,6 +57,27 @@ export const deleteAlbum = (albumId) => {
 }
 
 /**
+ * 获取举报列表
+ */
+export const getReports = (params) => {
+  return get('/api/admin/reports', params)
+}
+
+/**
+ * 更新举报状态
+ */
+export const updateReportStatus = (reportId, status) => {
+  return patch(`/api/admin/reports/${reportId}/status`, { status })
+}
+
+/**
+ * 封禁被举报作品并标记举报已处理
+ */
+export const banReportedImage = (reportId) => {
+  return patch(`/api/admin/reports/${reportId}/ban-image`, {})
+}
+
+/**
  * 更新用户角色
  */
 export const updateUserRole = (userId, role) => {

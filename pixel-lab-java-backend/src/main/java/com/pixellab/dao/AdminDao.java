@@ -129,6 +129,63 @@ public class AdminDao {
     return update("UPDATE albums SET status = ? WHERE id = ?", List.of(status, albumId)) > 0;
   }
 
+  public Map<String, Object> reports(int page, int pageSize, String status) throws Exception {
+    int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
+    StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
+    List<Object> params = new ArrayList<>();
+    if (status != null && !status.isBlank()) {
+      where.append(" AND r.status = ? ");
+      params.add(Integer.parseInt(status));
+    }
+    try (Connection conn = dataSource.getConnection()) {
+      long total = count(conn,
+          "SELECT COUNT(*) FROM reports r LEFT JOIN image i ON r.image_id = i.id "
+              + "LEFT JOIN `user` reporter ON r.reporter_id = reporter.id " + where,
+          params);
+      List<Object> pageParams = new ArrayList<>(params);
+      pageParams.add(pageSize);
+      pageParams.add(offset);
+      List<Map<String, Object>> rows = query(conn,
+          "SELECT r.*, i.title, i.original_name, i.url, i.status AS image_status, "
+              + "owner.nickname AS author_name, reporter.nickname AS reporter_name, handler.nickname AS handler_name "
+              + "FROM reports r "
+              + "LEFT JOIN image i ON r.image_id = i.id "
+              + "LEFT JOIN `user` owner ON i.user_id = owner.id "
+              + "LEFT JOIN `user` reporter ON r.reporter_id = reporter.id "
+              + "LEFT JOIN `user` handler ON r.handler_id = handler.id "
+              + where + " ORDER BY r.status ASC, r.created_at DESC LIMIT ? OFFSET ?",
+          pageParams);
+      return pageResult(rows, total, page, pageSize);
+    }
+  }
+
+  public boolean updateReportStatus(long reportId, long handlerId, int status) throws Exception {
+    return update("UPDATE reports SET status = ?, handler_id = ?, handled_at = NOW() WHERE id = ?",
+        List.of(status, handlerId, reportId)) > 0;
+  }
+
+  public boolean banReportedImage(long reportId, long handlerId) throws Exception {
+    try (Connection conn = dataSource.getConnection()) {
+      conn.setAutoCommit(false);
+      try {
+        Map<String, Object> report = queryOne(conn, "SELECT image_id FROM reports WHERE id = ?", List.of(reportId));
+        if (report == null) {
+          conn.rollback();
+          return false;
+        }
+        long imageId = ((Number) report.get("image_id")).longValue();
+        execute(conn, "UPDATE image SET status = 2 WHERE id = ?", List.of(imageId));
+        execute(conn, "UPDATE reports SET status = 1, handler_id = ?, handled_at = NOW() WHERE id = ?",
+            List.of(handlerId, reportId));
+        conn.commit();
+        return true;
+      } catch (Exception ex) {
+        conn.rollback();
+        throw ex;
+      }
+    }
+  }
+
   public Map<String, Object> platformStats(int onlineCount) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
       Map<String, Object> users = new LinkedHashMap<>();
@@ -145,6 +202,7 @@ public class AdminDao {
       interactions.put("likes", scalar(conn, "SELECT COUNT(*) FROM likes"));
       interactions.put("collects", scalar(conn, "SELECT COUNT(*) FROM collections"));
       interactions.put("comments", scalar(conn, "SELECT COUNT(*) FROM comments"));
+      interactions.put("reports", scalar(conn, "SELECT COUNT(*) FROM reports WHERE status = 0"));
 
       Map<String, Object> sessions = new LinkedHashMap<>();
       sessions.put("online", onlineCount);
@@ -190,6 +248,22 @@ public class AdminDao {
       try (ResultSet rs = stmt.executeQuery()) {
         return SqlRows.many(rs);
       }
+    }
+  }
+
+  private Map<String, Object> queryOne(Connection conn, String sql, List<Object> params) throws Exception {
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+      bind(stmt, params);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return SqlRows.one(rs);
+      }
+    }
+  }
+
+  private void execute(Connection conn, String sql, List<Object> params) throws Exception {
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+      bind(stmt, params);
+      stmt.executeUpdate();
     }
   }
 

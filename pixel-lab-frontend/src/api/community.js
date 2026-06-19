@@ -25,6 +25,11 @@ export function toggleCollect(imageId) {
   return request.post('/api/community/collect', { imageId })
 }
 
+// 举报作品
+export function reportImage(data) {
+  return request.post('/api/community/reports', data)
+}
+
 // 获取评论列表
 export function getComments(imageId, params) {
   return request.get(`/api/community/images/${imageId}/comments`, { params })

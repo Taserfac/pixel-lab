@@ -41,6 +41,13 @@ public class AdminServlet extends BaseApiServlet {
             request.getParameter("keyword")));
         return;
       }
+      if (segments.size() == 1 && "reports".equals(segments.get(0))) {
+        ok(response, dao.reports(
+            RequestUtil.intParam(request, "page", 1),
+            RequestUtil.intParam(request, "pageSize", 20),
+            request.getParameter("status")));
+        return;
+      }
       if (segments.size() == 1 && "stats".equals(segments.get(0))) {
         ok(response, dao.platformStats(SessionListener.getOnlineCount()));
         return;
@@ -101,6 +108,32 @@ public class AdminServlet extends BaseApiServlet {
           return;
         }
         ok(response, status == 2 ? "已封禁" : "已恢复", null);
+        return;
+      }
+      if (segments.size() == 3 && "reports".equals(segments.get(0)) && "status".equals(segments.get(2))) {
+        long reportId = parseId(segments.get(1));
+        Map<String, Object> body = body(request);
+        int status = Integer.parseInt(String.valueOf(body.get("status")));
+        if (status != 1 && status != 2) {
+          Result.badRequest(response, "举报状态无效");
+          return;
+        }
+        boolean updated = dao.updateReportStatus(reportId, current.getId(), status);
+        if (!updated) {
+          Result.notFound(response, "举报不存在");
+          return;
+        }
+        ok(response, status == 1 ? "已处理" : "已驳回", null);
+        return;
+      }
+      if (segments.size() == 3 && "reports".equals(segments.get(0)) && "ban-image".equals(segments.get(2))) {
+        long reportId = parseId(segments.get(1));
+        boolean updated = dao.banReportedImage(reportId, current.getId());
+        if (!updated) {
+          Result.notFound(response, "举报不存在");
+          return;
+        }
+        ok(response, "已封禁作品并处理举报", null);
         return;
       }
       if (segments.size() == 3 && "users".equals(segments.get(0)) && "role".equals(segments.get(2))) {

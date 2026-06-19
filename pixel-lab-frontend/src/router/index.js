@@ -62,6 +62,12 @@ const routes = [
         meta: { title: '社区广场', icon: 'ChatDotRound' }
       },
       {
+        path: 'tutorials',
+        name: 'Tutorials',
+        component: () => import('@/views/tutorials/Index.vue'),
+        meta: { title: '教学专区', icon: 'VideoCamera' }
+      },
+      {
         path: 'post/:id',
         name: 'PostDetail',
         component: () => import('@/views/post/Index.vue'),

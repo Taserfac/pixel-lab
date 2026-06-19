@@ -121,6 +121,33 @@ public class CommunityServlet extends BaseApiServlet {
         ok(response, dao.toggleCollect(user.getId(), imageId));
         return;
       }
+      if (segments.size() == 1 && "reports".equals(segments.get(0))) {
+        Map<String, Object> body = body(request);
+        Object rawImageId = body.get("imageId");
+        String reason = RequestUtil.string(body, "reason");
+        String detail = RequestUtil.string(body, "detail");
+        if (rawImageId == null || reason == null || reason.isBlank()) {
+          Result.badRequest(response, "缺少必要参数");
+          return;
+        }
+        if (reason.length() > 80 || (detail != null && detail.length() > 500)) {
+          Result.badRequest(response, "举报内容过长");
+          return;
+        }
+        long reportId = dao.reportImage(user.getId(), Long.parseLong(String.valueOf(rawImageId)), reason.trim(), detail == null ? null : detail.trim());
+        if (reportId == -1) {
+          Result.notFound(response, "作品不存在");
+          return;
+        }
+        if (reportId == -2) {
+          Result.badRequest(response, "该作品已有待处理举报");
+          return;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", reportId);
+        ok(response, "举报已提交，管理员会尽快处理", data);
+        return;
+      }
       if (segments.size() == 1 && "comments".equals(segments.get(0))) {
         Map<String, Object> body = body(request);
         Object rawImageId = body.get("imageId");

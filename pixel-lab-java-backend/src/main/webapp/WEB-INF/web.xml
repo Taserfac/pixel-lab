@@ -158,6 +158,15 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>TutorialServlet</servlet-name>
+    <servlet-class>com.pixellab.servlet.TutorialServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>TutorialServlet</servlet-name>
+    <url-pattern>/api/tutorials/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>UploadFileServlet</servlet-name>
     <servlet-class>com.pixellab.servlet.UploadFileServlet</servlet-class>
   </servlet>

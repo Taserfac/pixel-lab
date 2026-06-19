@@ -117,6 +117,38 @@ public class CommunityDao {
     }
   }
 
+  public long reportImage(long userId, long imageId, String reason, String detail) throws Exception {
+    try (Connection conn = dataSource.getConnection()) {
+      Map<String, Object> image = queryOne(conn,
+          "SELECT id FROM image WHERE id = ? AND status = 1 AND is_public = 1",
+          List.of(imageId));
+      if (image == null) {
+        return -1;
+      }
+      if (exists(conn,
+          "SELECT id FROM reports WHERE reporter_id = ? AND image_id = ? AND status = 0",
+          List.of(userId, imageId))) {
+        return -2;
+      }
+      try (PreparedStatement stmt = conn.prepareStatement(
+          "INSERT INTO reports (image_id, reporter_id, reason, detail) VALUES (?, ?, ?, ?)",
+          Statement.RETURN_GENERATED_KEYS)) {
+        stmt.setLong(1, imageId);
+        stmt.setLong(2, userId);
+        stmt.setString(3, reason);
+        if (detail == null || detail.isBlank()) {
+          stmt.setNull(4, java.sql.Types.VARCHAR);
+        } else {
+          stmt.setString(4, detail);
+        }
+        stmt.executeUpdate();
+        try (ResultSet rs = stmt.getGeneratedKeys()) {
+          return rs.next() ? rs.getLong(1) : 0;
+        }
+      }
+    }
+  }
+
   public Map<String, Object> comments(long imageId, int page, int pageSize) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     try (Connection conn = dataSource.getConnection()) {

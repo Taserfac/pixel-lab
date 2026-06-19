@@ -11,6 +11,11 @@
     <div class="register-box">
       <!-- Logo -->
       <div class="logo">
+        <BrandLogo
+          size="lg"
+          tone="panel"
+          shadow
+        />
         <h1>创建账号</h1>
         <p>加入 Pixel Lab Pro 开始创作</p>
       </div>
@@ -129,6 +134,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Avatar } from '@element-plus/icons-vue'
 import AuthLayout from '@/components/auth/AuthLayout.vue'
+import BrandLogo from '@/components/common/BrandLogo.vue'
 import { register } from '@/api/auth'
 import { checkPasswordStrength } from '@/utils/validate'
 
@@ -234,6 +240,10 @@ const goLogin = () => {
 }
 
 .logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
   text-align: center;
   margin-bottom: var(--space-8);
 }
@@ -242,7 +252,7 @@ const goLogin = () => {
   font-size: 28px;
   font-weight: 700;
   color: var(--primary);
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-1);
 }
 
 .logo p {
