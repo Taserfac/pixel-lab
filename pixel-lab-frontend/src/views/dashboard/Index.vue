@@ -1,6 +1,6 @@
 <template>
   <div class="home-page">
-    <section class="home-hero" @mouseenter="stopHeroRotation" @mouseleave="startHeroRotation">
+    <section class="home-hero">
       <div class="hero-copy">
         <h1>{{ $t('dashboard.title') }}</h1>
         <p>{{ $t('dashboard.subtitle') }}</p>
@@ -21,16 +21,19 @@
       </div>
 
       <div class="hero-showcase">
-        <button
-          v-if="currentHeroWork"
-          type="button"
-          class="hero-preview"
-          @click="openWork(currentHeroWork)"
-        >
-          <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
-          <span v-if="primaryTag(currentHeroWork)" class="hero-preview-tag">#{{ primaryTag(currentHeroWork) }}</span>
-          <span class="hero-preview-title">{{ workTitle(currentHeroWork) }}</span>
-        </button>
+        <Transition name="hero-swap" mode="out-in">
+          <button
+            v-if="currentHeroWork"
+            :key="currentHeroWork.id || currentHeroWork.url"
+            type="button"
+            class="hero-preview"
+            @click="openWork(currentHeroWork)"
+          >
+            <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
+            <span v-if="primaryTag(currentHeroWork)" class="hero-preview-tag">#{{ primaryTag(currentHeroWork) }}</span>
+            <span class="hero-preview-title">{{ workTitle(currentHeroWork) }}</span>
+          </button>
+        </Transition>
         <div class="hero-controls" aria-label="热门作品轮播">
           <button type="button" aria-label="上一张" @click="previousHero">
             <el-icon><ArrowLeft /></el-icon>
@@ -652,6 +655,33 @@ onBeforeUnmount(stopHeroRotation)
 
 .hero-preview:hover img {
   transform: scale(1.025);
+}
+
+.hero-swap-enter-active,
+.hero-swap-leave-active {
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+}
+
+.hero-swap-enter-from {
+  opacity: 0;
+  transform: translateX(16px) scale(0.985);
+}
+
+.hero-swap-leave-to {
+  opacity: 0;
+  transform: translateX(-12px) scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-swap-enter-active,
+  .hero-swap-leave-active {
+    transition: opacity 120ms linear;
+  }
+
+  .hero-swap-enter-from,
+  .hero-swap-leave-to {
+    transform: none;
+  }
 }
 
 .hero-preview-tag,

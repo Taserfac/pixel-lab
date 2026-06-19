@@ -118,11 +118,22 @@
               <div class="work-meta">
                 <div>
                   <h3 :title="imageTitle(image)">{{ imageTitle(image) }}</h3>
+                  <div v-if="imageTagList(image).length" class="work-tags">
+                    <span v-for="tag in imageTagList(image)" :key="tag">#{{ tag }}</span>
+                  </div>
+                  <p v-else class="metadata-empty">暂无标签</p>
                   <p v-if="image.description" class="image-desc">{{ image.description }}</p>
-                  <button class="desc-edit-btn" type="button" @click.stop="openDescriptionEdit(image)">
-                    <el-icon><Edit /></el-icon>
-                    {{ image.description ? '编辑说明' : '添加说明' }}
-                  </button>
+                  <p v-else class="metadata-empty">暂无说明</p>
+                  <div class="metadata-actions">
+                    <button class="desc-edit-btn" type="button" @click.stop="openTagsEdit(image)">
+                      <el-icon><Edit /></el-icon>
+                      {{ imageTagList(image).length ? '编辑标签' : '添加标签' }}
+                    </button>
+                    <button class="desc-edit-btn" type="button" @click.stop="openDescriptionEdit(image)">
+                      <el-icon><Edit /></el-icon>
+                      {{ image.description ? '编辑说明' : '添加说明' }}
+                    </button>
+                  </div>
                   <p>{{ formatDate(image.created_at) }}</p>
                 </div>
               </div>
@@ -404,6 +415,35 @@
     </el-tabs>
 
 
+    <!-- Tags edit dialog -->
+    <el-dialog v-model="tagDialogVisible" title="编辑标签" width="480px">
+      <el-form label-position="top">
+        <el-form-item label="当前标签">
+          <el-select
+            v-model="tagEditValue"
+            :loading="tagOptionsLoading"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择已有标签，或输入新标签后按回车添加"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tag in existingTagOptions"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="tagDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="tagSaving" @click="saveTags">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Description edit dialog -->
     <el-dialog v-model="descDialogVisible" title="编辑说明" width="480px">
       <el-input
@@ -588,8 +628,8 @@ import {
 import * as echarts from 'echarts'
 import { useUserStore } from '@/store/user'
 import { getUserStats } from '@/api/auth'
-import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription } from '@/api/image'
-import { getFollowingCreators, getUserCollections, getUserLikes } from '@/api/community'
+import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription, updateImageMetadata } from '@/api/image'
+import { getFollowingCreators, getPublicImages, getUserCollections, getUserLikes } from '@/api/community'
 import { unfollowUser } from '@/api/social'
 import {
   createAlbum,
@@ -679,6 +719,13 @@ const trendChartRef = ref(null)
 let trendChart = null
 
 // Description editing
+const tagDialogVisible = ref(false)
+const tagEditValue = ref([])
+const siteTagOptions = ref([])
+const tagOptionsLoading = ref(false)
+const tagOptionsLoaded = ref(false)
+const tagSaving = ref(false)
+let tagEditTarget = null
 const descDialogVisible = ref(false)
 const descEditValue = ref('')
 const descSaving = ref(false)
@@ -722,6 +769,14 @@ const avatarText = computed(() => {
 })
 
 const toNumber = (value) => Number(value || 0)
+const imageTagList = (image = {}) => (
+  Array.isArray(image.tags)
+    ? image.tags
+    : String(image.tags || '').split(',')
+).map(tag => tag.trim()).filter(Boolean)
+const existingTagOptions = computed(() => (
+  [...siteTagOptions.value].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+))
 
 const formatNumber = (value) => {
   const num = toNumber(value)
@@ -998,7 +1053,59 @@ const handleUnfollowCreator = async (creator) => {
   }
 }
 
-// Description editing functions
+// Tags and description editing functions
+const fetchSiteTagOptions = async () => {
+  if (tagOptionsLoaded.value || tagOptionsLoading.value) return
+  tagOptionsLoading.value = true
+  try {
+    const pageSize = 200
+    const firstPage = await getPublicImages({ page: 1, pageSize }, { silent: true })
+    const works = [...(firstPage.list || [])]
+    const totalPages = Math.max(1, Number(firstPage.totalPages || 1))
+    for (let page = 2; page <= totalPages; page += 1) {
+      const result = await getPublicImages({ page, pageSize }, { silent: true })
+      works.push(...(result.list || []))
+    }
+    siteTagOptions.value = [...new Set(works.flatMap(imageTagList))]
+    tagOptionsLoaded.value = true
+  } catch (error) {
+    console.error('获取全站标签失败:', error)
+    ElMessage.error('获取全站标签失败')
+  } finally {
+    tagOptionsLoading.value = false
+  }
+}
+
+const openTagsEdit = (image) => {
+  tagEditTarget = image
+  tagEditValue.value = imageTagList(image)
+  tagDialogVisible.value = true
+  fetchSiteTagOptions()
+}
+
+const saveTags = async () => {
+  if (!tagEditTarget) return
+  tagSaving.value = true
+  try {
+    const tags = [...new Set(tagEditValue.value.map(tag => tag.trim()).filter(Boolean))]
+    const payload = {
+      title: tagEditTarget.title || '',
+      description: tagEditTarget.description || '',
+      tags: tags.join(',')
+    }
+    await updateImageMetadata(tagEditTarget.id, payload)
+    tagEditTarget.tags = payload.tags
+    siteTagOptions.value = [...new Set([...siteTagOptions.value, ...tags])]
+    ElMessage.success('标签已更新')
+    tagDialogVisible.value = false
+  } catch (error) {
+    console.error('更新标签失败:', error)
+    ElMessage.error('更新失败')
+  } finally {
+    tagSaving.value = false
+  }
+}
+
 const openDescriptionEdit = (image) => {
   descEditTarget = image
   descEditValue.value = image.description || ''
@@ -1547,17 +1654,18 @@ onUnmounted(() => {
 }
 
 .masonry-grid {
-  column-count: 4;
-  column-gap: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 220px));
+  gap: var(--space-4);
 }
 
 .work-card {
-  display: inline-block;
+  display: block;
   width: 100%;
-  margin: 0 0 var(--space-5);
+  margin: 0;
   overflow: hidden;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--background-card);
   box-shadow: var(--shadow-sm);
   break-inside: avoid;
@@ -1579,7 +1687,7 @@ onUnmounted(() => {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   border: 0;
   background: var(--background-muted);
@@ -1689,27 +1797,78 @@ onUnmounted(() => {
   gap: 4px;
 }
 
-.compact-feed .masonry-grid {
+.creator-tabs :deep(.compact-feed .masonry-grid) {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 220px));
   gap: var(--space-4);
 }
 
-.compact-feed .work-card {
+.creator-tabs :deep(.compact-feed .work-card) {
   display: block;
   margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
 }
 
-.compact-feed .work-cover {
+.creator-tabs :deep(.compact-feed .work-cover) {
+  position: relative;
+  display: block;
+  width: 100%;
   aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 0;
+  background: var(--background-muted);
+  cursor: pointer;
 }
 
-.compact-feed .work-meta {
+.creator-tabs :deep(.compact-feed .work-cover img) {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform var(--transition-base);
+}
+
+.creator-tabs :deep(.compact-feed .work-card:hover .work-cover img) {
+  transform: scale(1.04);
+}
+
+.creator-tabs :deep(.compact-feed .work-meta) {
   padding: var(--space-3);
 }
 
-.compact-feed .metric-row {
+.creator-tabs :deep(.compact-feed .work-meta h3) {
+  overflow: hidden;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-tabs :deep(.compact-feed .work-meta p) {
+  overflow: hidden;
+  margin: 5px 0 0;
+  color: var(--foreground-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.creator-tabs :deep(.compact-feed .metric-row) {
+  display: flex;
+  gap: var(--space-3);
   padding: 0 var(--space-3) var(--space-3);
+  color: var(--foreground-muted);
+  font-size: 11px;
+}
+
+.creator-tabs :deep(.compact-feed .metric-row span) {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .following-grid {
@@ -1911,7 +2070,38 @@ onUnmounted(() => {
   clip: rect(0 0 0 0);
 }
 
-/* Image description editing */
+/* Image metadata editing */
+.work-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.work-tags span {
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--primary-muted);
+  color: var(--primary);
+  padding: 2px 6px;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata-empty {
+  margin: 5px 0 0;
+  color: var(--foreground-subtle);
+  font-size: 11px;
+}
+
+.metadata-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .image-desc {
   margin-top: 4px;
   overflow: hidden;
@@ -2260,10 +2450,6 @@ onUnmounted(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .masonry-grid {
-    column-count: 2;
-    column-gap: var(--space-3);
-  }
 
   .hero-stat:last-child {
     grid-column: span 2;
@@ -2315,9 +2501,6 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
-  .masonry-grid {
-    column-count: 1;
-  }
 
   .hero-stat:last-child {
     grid-column: auto;

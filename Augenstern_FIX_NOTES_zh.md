@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-06-20
+
+### 搜索框交互优化
+
+- **点击触发**：搜索历史和热门标签改为仅在点击搜索框时显示，移除鼠标悬停和键盘聚焦触发，避免鼠标经过间隙时意外消失。
+
+### 首页横幅自动轮播
+
+- **持续轮播**：横幅图片改为每 5 秒自动切换，鼠标悬停不再暂停。
+- **保留交互**：手动左右切换按钮和淡入滑动过渡动画保留。
+
+### 个人中心作品列表改版
+
+- **卡片统一**：作品卡片与喜欢/收藏统一为 180–220px 紧凑尺寸，缩略图统一 4:3 比例。
+- **横向优先网格**：排布方式改为横向优先，排满当前行后才换到下一行，移除原瀑布流分栏规则。
+
+### 个人中心作品标签与说明编辑
+
+- **独立编辑**：每张作品卡显示当前标签和说明（为空时显示"暂无标签/说明"），标签和说明分别提供独立的添加/编辑按钮和弹窗。
+- **互不影响**：修改标签不会覆盖说明，修改说明不会影响标签。
+- **全站标签选择**：标签弹窗支持从全站公开作品中的已有标签多选，同时仍可输入新标签创建。标签数据分页加载并缓存。
+
+### 修改文件清单
+
+| 文件                                                                         | 变更说明                                             |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `pixel-lab-frontend/src/components/common/MainLayout.vue`                    | 搜索框改为点击触发                                   |
+| `pixel-lab-frontend/src/views/dashboard/Index.vue`                           | 横幅改为持续自动轮播、每 5 秒切换                    |
+| `pixel-lab-frontend/src/views/personal/Index.vue`                            | 作品卡片统一尺寸、横向优先网格、标签/说明编辑、全站标签选择 |
+| `pixel-lab-frontend/src/views/post/Index.vue`                                | 标签弹窗微调                                         |
+
+---
+
 ## 2026-06-19
 
 ### 删除 Node.js 后端（pixel-lab-backend）
@@ -66,28 +99,28 @@
 
 ### 修改文件清单
 
-| 文件 | 变更说明 |
-|------|----------|
-| `pixel-lab-backend/` (整个目录) | 删除 Node.js 后端 |
-| `pixel-lab-frontend/public/sw.js` | 导航请求改为网络优先，修复白屏 |
-| `pixel-lab-frontend/src/components/community/StableMasonry.vue` | 新增：稳定分栏瀑布流组件 |
-| `pixel-lab-frontend/src/views/creators/` | 新增：创作者列表页面 |
-| `pixel-lab-frontend/src/views/dashboard/Index.vue` | 横幅改版、瀑布流改用 StableMasonry、标签统一 |
-| `pixel-lab-frontend/src/views/community/Index.vue` | 瀑布流改用 StableMasonry、标签样式统一 |
-| `pixel-lab-frontend/src/views/personal/Index.vue` | 收藏/点赞布局调整、过滤已删除作品 |
-| `pixel-lab-frontend/src/views/post/Index.vue` | 详情页增加所有者编辑和评论管理 |
-| `pixel-lab-frontend/src/api/community.js` | 新增已关注创作者接口 |
-| `pixel-lab-frontend/src/api/image.js` | 标签编辑接口适配 |
-| `pixel-lab-frontend/src/main.js` | 路由守卫相关调整 |
-| `pixel-lab-frontend/src/router/index.js` | 新增 `/creators` 路由 |
-| `pixel-lab-java-backend/src/main/java/com/pixellab/dao/CommunityDao.java` | 详情权限、评论权限、过滤删除、已关注查询 |
-| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/CommunityServlet.java` | 新增已关注创作者路由 |
-| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/ImageServlet.java` | 标签编辑适配多选 |
-| `pixel-lab-java-backend/src/main/resources/init.sql` | 新增：从 Node 后端迁移的初始化 SQL |
-| `.env.example` | 新增：环境变量模板 |
-| `start-fullstack.bat` | 移除 Node 后端依赖 |
-| `start-java-backend.ps1` | 读取根目录 .env.local |
-| `deploy/package-release.ps1` | 移除 Node 后端打包 |
+| 文件                                                                              | 变更说明                                     |
+| --------------------------------------------------------------------------------- | -------------------------------------------- |
+| `pixel-lab-backend/` (整个目录)                                                   | 删除 Node.js 后端                            |
+| `pixel-lab-frontend/public/sw.js`                                                 | 导航请求改为网络优先，修复白屏               |
+| `pixel-lab-frontend/src/components/community/StableMasonry.vue`                   | 新增：稳定分栏瀑布流组件                     |
+| `pixel-lab-frontend/src/views/creators/`                                          | 新增：创作者列表页面                         |
+| `pixel-lab-frontend/src/views/dashboard/Index.vue`                                | 横幅改版、瀑布流改用 StableMasonry、标签统一 |
+| `pixel-lab-frontend/src/views/community/Index.vue`                                | 瀑布流改用 StableMasonry、标签样式统一       |
+| `pixel-lab-frontend/src/views/personal/Index.vue`                                 | 收藏/点赞布局调整、过滤已删除作品            |
+| `pixel-lab-frontend/src/views/post/Index.vue`                                     | 详情页增加所有者编辑和评论管理               |
+| `pixel-lab-frontend/src/api/community.js`                                         | 新增已关注创作者接口                         |
+| `pixel-lab-frontend/src/api/image.js`                                             | 标签编辑接口适配                             |
+| `pixel-lab-frontend/src/main.js`                                                  | 路由守卫相关调整                             |
+| `pixel-lab-frontend/src/router/index.js`                                          | 新增 `/creators` 路由                        |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/dao/CommunityDao.java`         | 详情权限、评论权限、过滤删除、已关注查询     |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/CommunityServlet.java` | 新增已关注创作者路由                         |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/ImageServlet.java`     | 标签编辑适配多选                             |
+| `pixel-lab-java-backend/src/main/resources/init.sql`                              | 新增：从 Node 后端迁移的初始化 SQL           |
+| `.env.example`                                                                    | 新增：环境变量模板                           |
+| `start-fullstack.bat`                                                             | 移除 Node 后端依赖                           |
+| `start-java-backend.ps1`                                                          | 读取根目录 .env.local                        |
+| `deploy/package-release.ps1`                                                      | 移除 Node 后端打包                           |
 
 ---
 
@@ -123,33 +156,33 @@
 
 ### 修改文件清单
 
-| 文件 | 变更说明 |
-|------|----------|
-| `src/main.js` | 路由守卫增加登录状态预检 |
-| `src/router/index.js` | 新增 `/user/:id`、`/post/:id` 路由 |
-| `src/store/user.js` | 初始化时验证 token 有效性 |
-| `src/store/notification.js` | 接入后端通知 API，持久化已读状态 |
-| `src/api/auth.js` | 新增登录状态检查接口 |
-| `src/api/social.js` | 通知接口改接后端 |
-| `src/api/community.js` | 新增帖子详情、用户信息接口 |
-| `src/components/common/MainLayout.vue` | 底部导航改版、创作弹层、移除顶部上传、通知已读逻辑 |
-| `src/components/auth/AuthLayout.vue` | 新增：登录/注册页固定浅色布局 + loginbg.png |
-| `src/components/community/PostCard.vue` | 作者信息可点击跳转 |
-| `src/views/auth/Login.vue` | 改用 AuthLayout，固定浅色模式 |
-| `src/views/auth/Register.vue` | 改用 AuthLayout，固定浅色模式 |
-| `src/views/dashboard/Index.vue` | 横幅全宽、删除创作中心、右侧内容吸附 |
-| `src/views/community/Index.vue` | 图片点击进入帖子详情 |
-| `src/views/draw/Index.vue` | 命名更新为「创意画布」 |
-| `src/views/personal/Index.vue` | 命名同步更新 |
-| `src/views/post/Index.vue` | 新增：帖子详情页 |
-| `src/views/user/Index.vue` | 新增：个人主页 |
-| `src/i18n/locales/zh-CN.js` | 命名和导航文案更新 |
-| `src/i18n/locales/en-US.js` | 命名和导航文案更新 |
-| `src/assets/css/index.css` | 移除外部字体引用 |
-| `CommunityDao.java` | 新增帖子详情、用户查询方法 |
-| `CommunityServlet.java` | 新增帖子/用户路由 |
-| `AuthFilter.java` | 白名单新增公开端点 |
-| `web.xml` | 编码过滤器路径调整 |
+| 文件                                    | 变更说明                                           |
+| --------------------------------------- | -------------------------------------------------- |
+| `src/main.js`                           | 路由守卫增加登录状态预检                           |
+| `src/router/index.js`                   | 新增 `/user/:id`、`/post/:id` 路由                 |
+| `src/store/user.js`                     | 初始化时验证 token 有效性                          |
+| `src/store/notification.js`             | 接入后端通知 API，持久化已读状态                   |
+| `src/api/auth.js`                       | 新增登录状态检查接口                               |
+| `src/api/social.js`                     | 通知接口改接后端                                   |
+| `src/api/community.js`                  | 新增帖子详情、用户信息接口                         |
+| `src/components/common/MainLayout.vue`  | 底部导航改版、创作弹层、移除顶部上传、通知已读逻辑 |
+| `src/components/auth/AuthLayout.vue`    | 新增：登录/注册页固定浅色布局 + loginbg.png        |
+| `src/components/community/PostCard.vue` | 作者信息可点击跳转                                 |
+| `src/views/auth/Login.vue`              | 改用 AuthLayout，固定浅色模式                      |
+| `src/views/auth/Register.vue`           | 改用 AuthLayout，固定浅色模式                      |
+| `src/views/dashboard/Index.vue`         | 横幅全宽、删除创作中心、右侧内容吸附               |
+| `src/views/community/Index.vue`         | 图片点击进入帖子详情                               |
+| `src/views/draw/Index.vue`              | 命名更新为「创意画布」                             |
+| `src/views/personal/Index.vue`          | 命名同步更新                                       |
+| `src/views/post/Index.vue`              | 新增：帖子详情页                                   |
+| `src/views/user/Index.vue`              | 新增：个人主页                                     |
+| `src/i18n/locales/zh-CN.js`             | 命名和导航文案更新                                 |
+| `src/i18n/locales/en-US.js`             | 命名和导航文案更新                                 |
+| `src/assets/css/index.css`              | 移除外部字体引用                                   |
+| `CommunityDao.java`                     | 新增帖子详情、用户查询方法                         |
+| `CommunityServlet.java`                 | 新增帖子/用户路由                                  |
+| `AuthFilter.java`                       | 白名单新增公开端点                                 |
+| `web.xml`                               | 编码过滤器路径调整                                 |
 
 ### 启动脚本优化
 

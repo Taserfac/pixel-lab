@@ -428,7 +428,11 @@ watch(() => route.params.id, loadPost, { immediate: true })
   min-height: 720px;
   display: grid;
   place-items: center;
-  background: #111;
+  border-right: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 18% 18%, var(--primary-muted), transparent 34%),
+    radial-gradient(circle at 82% 78%, var(--secondary-muted), transparent 38%),
+    linear-gradient(145deg, var(--background-elevated), var(--background-muted));
   padding: clamp(16px, 3vw, 44px);
 }
 
@@ -437,6 +441,8 @@ watch(() => route.params.id, loadPost, { immediate: true })
   max-height: 78vh;
   display: block;
   object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
 }
 
 .post-panel {
@@ -540,7 +546,7 @@ watch(() => route.params.id, loadPost, { immediate: true })
 
 @media (max-width: 980px) {
   .post-stage:has(.post-visual) { grid-template-columns: 1fr; }
-  .post-visual { min-height: 420px; }
+  .post-visual { min-height: 420px; border-right: 0; border-bottom: 1px solid var(--border); }
   .post-panel { max-height: none; }
 }
 

@@ -17,8 +17,7 @@
 
       <div
         class="search-bar"
-        @mouseenter="showSearchSuggestions = true"
-        @mouseleave="showSearchSuggestions = false"
+        @mouseleave="scheduleSearchSuggestionsClose"
       >
         <el-input
           ref="searchInputRef"
@@ -27,7 +26,7 @@
           :prefix-icon="Search"
           clearable
           @keyup.enter="handleSearch"
-          @focus="showSearchSuggestions = true"
+          @click="openSearchSuggestions"
         />
         <div
           v-if="showSearchSuggestions && (searchHistory.length || hotSearchTags.length)"
@@ -284,7 +283,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -327,6 +326,7 @@ const fileInput = ref(null)
 const uploading = ref(false)
 const searchInputRef = ref(null)
 const showSearchSuggestions = ref(false)
+let searchSuggestionsCloseTimer
 const showCreateMenu = ref(false)
 const searchHistory = ref(JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]').slice(0, 5))
 const hotSearchTags = ['插画', '摄影', 'UI设计', '像素艺术', 'AI艺术']
@@ -350,6 +350,20 @@ const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模�
 
 const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 const isCreateRoute = computed(() => ['/draw', '/workbench'].some(isMenuActive))
+
+const openSearchSuggestions = () => {
+  if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
+  searchSuggestionsCloseTimer = undefined
+  showSearchSuggestions.value = true
+}
+
+const scheduleSearchSuggestionsClose = () => {
+  if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
+  searchSuggestionsCloseTimer = window.setTimeout(() => {
+    showSearchSuggestions.value = false
+    searchSuggestionsCloseTimer = undefined
+  }, 160)
+}
 
 function formatNotificationTime(value) {
   if (!value) return ''
@@ -486,6 +500,10 @@ onMounted(async () => {
     notificationStore.fetchUnreadCount({ silent: true })
   ]).catch(() => {})
 })
+
+onBeforeUnmount(() => {
+  if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
+})
 </script>
 
 <style scoped>
@@ -613,7 +631,7 @@ onMounted(async () => {
 
 .search-suggestions {
   position: absolute;
-  top: calc(100% + 4px);
+  top: 100%;
   left: 0;
   right: 0;
   z-index: 200;
