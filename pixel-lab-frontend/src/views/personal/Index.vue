@@ -263,6 +263,41 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane name="following">
+        <template #label>
+          <span class="tab-label"><el-icon><UserFilled /></el-icon>关注</span>
+        </template>
+
+        <div v-loading="loadingFollowing" class="feed-shell">
+          <div v-if="followingCreators.length" class="following-grid">
+            <article
+              v-for="creator in followingCreators"
+              :key="creator.id"
+              class="following-card"
+              @click="router.push(`/user/${creator.id}`)"
+            >
+              <div class="following-avatar">
+                <el-avatar :size="48" :src="creator.avatar">{{ (creator.nickname || creator.username || '?').charAt(0) }}</el-avatar>
+              </div>
+              <div class="following-info">
+                <h3>{{ creator.nickname || creator.username }}</h3>
+                <p>@{{ creator.username }}</p>
+              </div>
+              <div class="following-stats">
+                <span><el-icon><Picture /></el-icon>{{ creator.work_count ?? 0 }}</span>
+                <span><el-icon><Star /></el-icon>{{ formatNumber(creator.like_count) }}</span>
+              </div>
+            </article>
+          </div>
+          <div v-else class="empty-panel">
+            <el-icon><UserFilled /></el-icon>
+            <h3>还没有关注的创作者</h3>
+            <p>去社区发现喜欢的创作者并关注他们。</p>
+            <el-button type="primary" @click="router.push('/community')">逛逛社区</el-button>
+          </div>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane name="insights">
         <template #label>
           <span class="tab-label"><el-icon><TrendCharts /></el-icon>数据</span>
@@ -434,13 +469,14 @@ import {
   TrendCharts,
   Unlock,
   Upload,
+  UserFilled,
   View
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '@/store/user'
 import { getUserStats } from '@/api/auth'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription } from '@/api/image'
-import { getUserCollections, getUserLikes } from '@/api/community'
+import { getUserCollections, getUserLikes, getFollowingCreators } from '@/api/community'
 import {
   createAlbum,
   getAlbums,
@@ -519,6 +555,10 @@ const loadingImages = ref(false)
 const loadingCollections = ref(false)
 const loadingLikes = ref(false)
 const uploading = ref(false)
+
+// Following creators
+const followingCreators = ref([])
+const loadingFollowing = ref(false)
 
 const trendChartRef = ref(null)
 let trendChart = null
@@ -662,13 +702,26 @@ const fetchLikes = async () => {
   }
 }
 
+const fetchFollowingCreators = async () => {
+  loadingFollowing.value = true
+  try {
+    const res = await getFollowingCreators()
+    followingCreators.value = Array.isArray(res) ? res : (res.list || [])
+  } catch (error) {
+    console.error('获取已关注创作者失败:', error)
+  } finally {
+    loadingFollowing.value = false
+  }
+}
+
 const fetchInitialData = async () => {
   await Promise.all([
     fetchImages(),
     fetchStats(),
     fetchCollections(),
     fetchLikes(),
-    fetchAlbums()
+    fetchAlbums(),
+    fetchFollowingCreators()
   ])
 }
 
@@ -1358,8 +1411,8 @@ onUnmounted(() => {
 
 .compact-feed .masonry-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
 }
 
 .compact-feed .work-card {
@@ -1368,15 +1421,25 @@ onUnmounted(() => {
 }
 
 .compact-feed .work-cover {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
 }
 
 .compact-feed .work-meta {
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.compact-feed .work-meta h3 {
+  max-width: none;
+  font-size: 13px;
+}
+
+.compact-feed .work-meta p {
+  font-size: 11px;
 }
 
 .compact-feed .metric-row {
-  padding: 0 var(--space-3) var(--space-3);
+  padding: 0 var(--space-3) var(--space-2);
+  font-size: 11px;
 }
 
 .empty-panel,
@@ -1718,6 +1781,71 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Following creators grid */
+.following-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.following-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.following-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.following-avatar {
+  flex: 0 0 auto;
+}
+
+.following-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.following-info h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.following-info p {
+  margin: 2px 0 0;
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.following-stats {
+  display: flex;
+  gap: var(--space-3);
+  color: var(--foreground-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.following-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 /* Add image to album */
