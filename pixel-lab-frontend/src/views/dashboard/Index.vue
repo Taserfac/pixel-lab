@@ -1,33 +1,71 @@
 <template>
   <div class="home-page">
     <section class="home-hero" @mouseenter="stopHeroRotation" @mouseleave="startHeroRotation">
+      <!-- 左侧装饰底纹 -->
+      <div class="hero-deco" aria-hidden="true">
+        <svg class="deco-circle deco-c1" viewBox="0 0 200 200"><circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.12"/></svg>
+        <svg class="deco-circle deco-c2" viewBox="0 0 120 120"><circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="1" opacity="0.08"/></svg>
+        <svg class="deco-dots" viewBox="0 0 80 80"><circle cx="10" cy="10" r="2" fill="currentColor" opacity="0.1"/><circle cx="30" cy="10" r="2" fill="currentColor" opacity="0.07"/><circle cx="50" cy="10" r="2" fill="currentColor" opacity="0.1"/><circle cx="70" cy="10" r="2" fill="currentColor" opacity="0.07"/><circle cx="10" cy="30" r="2" fill="currentColor" opacity="0.07"/><circle cx="30" cy="30" r="2" fill="currentColor" opacity="0.1"/><circle cx="50" cy="30" r="2" fill="currentColor" opacity="0.07"/><circle cx="70" cy="30" r="2" fill="currentColor" opacity="0.1"/><circle cx="10" cy="50" r="2" fill="currentColor" opacity="0.1"/><circle cx="30" cy="50" r="2" fill="currentColor" opacity="0.07"/><circle cx="50" cy="50" r="2" fill="currentColor" opacity="0.1"/><circle cx="70" cy="50" r="2" fill="currentColor" opacity="0.07"/><circle cx="10" cy="70" r="2" fill="currentColor" opacity="0.07"/><circle cx="30" cy="70" r="2" fill="currentColor" opacity="0.1"/><circle cx="50" cy="70" r="2" fill="currentColor" opacity="0.07"/><circle cx="70" cy="70" r="2" fill="currentColor" opacity="0.1"/></svg>
+        <svg class="deco-wave" viewBox="0 0 300 60"><path d="M0,30 Q30,0 60,30 Q90,60 120,30 Q150,0 180,30 Q210,60 240,30 Q270,0 300,30" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.08"/></svg>
+      </div>
+
+      <!-- 左侧文字区 -->
       <div class="hero-copy">
         <h1>{{ $t('dashboard.title') }}</h1>
         <p>{{ $t('dashboard.subtitle') }}</p>
-        <div v-if="currentHeroWork" class="hero-feature">
-          <strong>{{ workTitle(currentHeroWork) }}</strong>
-          <span>
-            <el-icon><View /></el-icon>
-            {{ formatNumber(currentHeroWork.view_count) }} 次浏览
-          </span>
-          <button type="button" @click="openWork(currentHeroWork)">
-            查看热门作品 <el-icon><ArrowRight /></el-icon>
-          </button>
-        </div>
+        <Transition name="hero-text" mode="out-in">
+          <div v-if="currentHeroWork" :key="currentHeroWork.id" class="hero-feature">
+            <span class="hero-pill hero-pill--title">{{ workTitle(currentHeroWork) }}</span>
+          </div>
+        </Transition>
       </div>
 
-      <div class="hero-showcase">
-        <button
-          v-if="currentHeroWork"
-          type="button"
-          class="hero-preview"
-          @click="openWork(currentHeroWork)"
-        >
-          <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
-        </button>
+      <!-- 右侧叠放卡片画廊 -->
+      <div class="hero-gallery">
+        <Transition name="hero-cards" mode="out-in">
+          <div :key="activeHeroIndex" class="hero-card-stack">
+            <!-- 后层卡片 3（最右） -->
+            <button
+              v-if="heroBackCard3"
+              type="button"
+              class="hero-card hero-card--back3"
+              @click="switchToHero(heroBackCard3)"
+            >
+              <img :src="heroBackCard3.url" :alt="workTitle(heroBackCard3)">
+            </button>
+            <!-- 后层卡片 2 -->
+            <button
+              v-if="heroBackCard2"
+              type="button"
+              class="hero-card hero-card--back2"
+              @click="switchToHero(heroBackCard2)"
+            >
+              <img :src="heroBackCard2.url" :alt="workTitle(heroBackCard2)">
+            </button>
+            <!-- 后层卡片 1 -->
+            <button
+              v-if="heroBackCard1"
+              type="button"
+              class="hero-card hero-card--back1"
+              @click="switchToHero(heroBackCard1)"
+            >
+              <img :src="heroBackCard1.url" :alt="workTitle(heroBackCard1)">
+            </button>
+            <!-- 前层主卡片（点击进详情） -->
+            <button
+              v-if="currentHeroWork"
+              type="button"
+              class="hero-card hero-card--front"
+              @click="openWork(currentHeroWork)"
+            >
+              <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
+            </button>
+          </div>
+        </Transition>
+
         <div class="hero-controls" aria-label="热门作品轮播">
           <button type="button" aria-label="上一张" @click="previousHero">‹</button>
-          <span>{{ activeHeroIndex + 1 }} / {{ featuredWorks.length }}</span>
+          <span>{{ activeHeroIndex + 1 }} / {{ Math.min(featuredWorks.length, 4) }}</span>
           <button type="button" aria-label="下一张" @click="nextHero">›</button>
         </div>
       </div>
@@ -183,8 +221,7 @@ import {
   ChatDotRound,
   CollectionTag,
   Star,
-  User,
-  View
+  User
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StableMasonry from '@/components/community/StableMasonry.vue'
@@ -298,11 +335,32 @@ const sourceWorks = computed(() => works.value.length ? works.value : sampleWork
 const featuredWorks = computed(() => (
   [...sourceWorks.value]
     .sort((a, b) => toNumber(b.view_count) - toNumber(a.view_count))
-    .slice(0, 4)
+    .slice(0, 5)
 ))
 const currentHeroWork = computed(() => (
   featuredWorks.value[activeHeroIndex.value % Math.max(featuredWorks.value.length, 1)] || null
 ))
+const heroBackCard1 = computed(() => {
+  const len = featuredWorks.value.length
+  if (len < 2) return null
+  return featuredWorks.value[(activeHeroIndex.value + 1) % len]
+})
+const heroBackCard2 = computed(() => {
+  const len = featuredWorks.value.length
+  if (len < 3) return null
+  return featuredWorks.value[(activeHeroIndex.value + 2) % len]
+})
+const heroBackCard3 = computed(() => {
+  const len = featuredWorks.value.length
+  if (len < 4) return null
+  return featuredWorks.value[(activeHeroIndex.value + 3) % len]
+})
+
+/* 点击非首图 → 切换为首图 */
+const switchToHero = (work) => {
+  const idx = featuredWorks.value.findIndex(w => w.id === work.id)
+  if (idx >= 0) activeHeroIndex.value = idx
+}
 
 const feedTabs = computed(() => {
   if (!works.value.length) return defaultFeedTabs
@@ -483,113 +541,278 @@ onBeforeUnmount(stopHeroRotation)
   margin: 0 auto;
 }
 
+/* ===== 横幅整体 ===== */
 .home-hero {
-  height: 280px;
-  min-height: 280px;
-  max-height: 280px;
+  height: 320px;
+  min-height: 320px;
+  max-height: 320px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
   align-items: stretch;
-  gap: clamp(var(--space-6), 4vw, var(--space-10));
+  gap: clamp(var(--space-4), 3vw, var(--space-8));
   overflow: hidden;
   position: relative;
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(circle at 18% 20%, rgba(22, 199, 132, 0.16), transparent 42%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(91, 141, 239, 0.1)),
+    radial-gradient(circle at 18% 20%, rgba(22, 199, 132, 0.12), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(91, 141, 239, 0.08), transparent 35%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(240, 244, 255, 0.92)),
     var(--background-card);
   box-shadow: var(--shadow);
-  padding: clamp(var(--space-7), 4vw, var(--space-10));
+  padding: clamp(var(--space-6), 3.5vw, var(--space-9));
   margin-bottom: var(--space-8);
 }
 
+/* ===== 左侧装饰底纹 ===== */
+.hero-deco {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.deco-circle {
+  position: absolute;
+  color: var(--primary);
+}
+
+.deco-c1 {
+  width: 260px;
+  height: 260px;
+  top: -40px;
+  left: -30px;
+  animation: decoSpin 40s linear infinite;
+}
+
+.deco-c2 {
+  width: 140px;
+  height: 140px;
+  bottom: 20px;
+  left: 45%;
+  color: var(--secondary);
+  animation: decoSpin 30s linear infinite reverse;
+}
+
+.deco-dots {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  top: 15px;
+  left: 35%;
+  color: var(--foreground);
+}
+
+.deco-wave {
+  position: absolute;
+  width: 240px;
+  bottom: 10px;
+  left: 5%;
+  color: var(--primary);
+}
+
+@keyframes decoSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===== 左侧文字区 ===== */
 .hero-copy {
   align-self: center;
+  position: relative;
+  z-index: 1;
+  padding-left: clamp(var(--space-4), 3vw, var(--space-8));
 }
 
 .hero-copy h1 {
   color: var(--foreground);
-  font-size: clamp(34px, 4vw, 54px);
+  font-size: clamp(32px, 3.8vw, 52px);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
 }
 
 .hero-copy > p {
-  max-width: 460px;
+  max-width: 380px;
   margin-top: var(--space-3);
   color: var(--foreground-muted);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.7;
 }
 
+/* ===== 作品标题胶囊 ===== */
 .hero-feature {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  margin-top: var(--space-6);
+  margin-top: var(--space-5);
 }
 
-.hero-feature strong {
-  width: 100%;
-  color: var(--foreground);
-  font-size: 20px;
-}
-
-.hero-feature span,
-.hero-feature button {
+.hero-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-}
-
-.hero-feature span {
-  color: var(--foreground-muted);
-}
-
-.hero-feature button {
-  border: 0;
+  font-size: 14px;
   border-radius: var(--radius-full);
-  background: var(--primary);
-  color: white;
-  padding: 9px 16px;
+  padding: 7px 16px;
   font-weight: 700;
+  white-space: nowrap;
+  border: 0;
   cursor: pointer;
+  background: rgba(22, 199, 132, 0.1);
+  color: var(--primary);
+  transition: background var(--transition-fast);
 }
 
-.hero-showcase {
+.hero-pill:hover {
+  background: rgba(22, 199, 132, 0.18);
+}
+
+/* ===== 左侧文字切换动画 ===== */
+.hero-text-enter-active {
+  transition: all 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.hero-text-leave-active {
+  transition: all 0.2s cubic-bezier(0.55, 0, 1, 0.45);
+}
+.hero-text-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.hero-text-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ===== 右侧叠放卡片画廊 ===== */
+.hero-gallery {
+  position: relative;
+  z-index: 1;
   min-width: 0;
-  display: grid;
-  grid-template-rows: 190px auto;
-  gap: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-left: -120px;
 }
 
-.hero-preview {
+.hero-card-stack {
+  position: relative;
   width: 100%;
-  height: 190px;
-  min-height: 0;
+  height: 250px;
+}
+
+/* ===== 卡片切换动画 ===== */
+.hero-cards-enter-active {
+  transition: all 0.45s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.hero-cards-leave-active {
+  transition: all 0.25s cubic-bezier(0.55, 0, 1, 0.45);
+}
+.hero-cards-enter-from {
+  opacity: 0;
+  transform: translateX(30px) scale(0.96);
+}
+.hero-cards-leave-to {
+  opacity: 0;
+  transform: translateX(-30px) scale(0.96);
+}
+
+.hero-card {
+  position: absolute;
   overflow: hidden;
   border: 0;
   border-radius: var(--radius-lg);
   background: var(--background-muted);
-  box-shadow: var(--shadow-md);
   padding: 0;
   cursor: pointer;
+  transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-.hero-preview img {
+.hero-card img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
-  transition: transform var(--transition-slow);
 }
 
-.hero-preview:hover img {
-  transform: scale(1.025);
+/* 前层主卡片（左侧） */
+.hero-card--front {
+  width: 320px;
+  height: 220px;
+  z-index: 4;
+  bottom: 40px;
+  left: 0;
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  transform: rotate(1deg);
 }
 
+.hero-card--front:hover {
+  transform: rotate(0deg) translateY(-4px) scale(1.02);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.18),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 中层卡片 1 */
+.hero-card--back1 {
+  width: 270px;
+  height: 188px;
+  z-index: 3;
+  bottom: 50px;
+  left: 140px;
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.08),
+    0 2px 6px rgba(0, 0, 0, 0.04);
+  transform: rotate(-2deg) translateY(4px);
+  opacity: 0.92;
+}
+
+.hero-card--back1:hover {
+  transform: rotate(-1deg) translateY(0) scale(1.01);
+  opacity: 1;
+}
+
+/* 中层卡片 2 */
+.hero-card--back2 {
+  width: 225px;
+  height: 158px;
+  z-index: 2;
+  bottom: 62px;
+  left: 245px;
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.06);
+  transform: rotate(3deg) translateY(8px);
+  opacity: 0.82;
+}
+
+.hero-card--back2:hover {
+  transform: rotate(1.5deg) translateY(4px) scale(1.01);
+  opacity: 0.95;
+}
+
+/* 后层卡片 3（最右） */
+.hero-card--back3 {
+  width: 185px;
+  height: 132px;
+  z-index: 1;
+  bottom: 72px;
+  left: 330px;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.05);
+  transform: rotate(-4deg) translateY(12px);
+  opacity: 0.7;
+}
+
+.hero-card--back3:hover {
+  transform: rotate(-3deg) translateY(10px) scale(1.01);
+  opacity: 0.9;
+}
+
+/* ===== 轮播控制 ===== */
 .hero-controls {
   display: flex;
   align-items: center;
@@ -610,6 +833,12 @@ onBeforeUnmount(stopHeroRotation)
   color: var(--foreground);
   font-size: 20px;
   cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.hero-controls button:hover {
+  background: var(--primary-muted);
+  color: var(--primary);
 }
 
 .home-content {
@@ -893,18 +1122,23 @@ onBeforeUnmount(stopHeroRotation)
 @media (max-width: 900px) {
   .home-hero {
     grid-template-columns: 1fr;
-  }
-
-  .home-hero {
     height: auto;
-    min-height: 240px;
+    min-height: 260px;
     max-height: none;
+    padding: var(--space-6);
   }
 
-  .hero-showcase {
+  .hero-gallery {
     display: none;
   }
 
+  .hero-deco {
+    opacity: 0.5;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(26px, 6vw, 38px);
+  }
 
   .discovery-rail {
     grid-template-columns: 1fr;
@@ -914,8 +1148,16 @@ onBeforeUnmount(stopHeroRotation)
 @media (max-width: 640px) {
   .home-hero {
     border-radius: var(--radius-lg);
-    padding: var(--space-6);
+    padding: var(--space-5);
   }
 
+  .hero-copy > p {
+    font-size: 13px;
+  }
+
+  .hero-pill {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
 }
 </style>
