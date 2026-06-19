@@ -36,6 +36,13 @@
             </div>
           </div>
 
+          <div v-if="isOwner" class="owner-row">
+            <el-button plain @click="openEditor">
+              <el-icon><Edit /></el-icon>
+              编辑标题、标签与描述
+            </el-button>
+          </div>
+
           <div class="metric-row">
             <span><el-icon><View /></el-icon>{{ formatNumber(post.view_count) }} 浏览</span>
             <span><el-icon><Star /></el-icon>{{ formatNumber(post.like_count) }} 点赞</span>
@@ -101,7 +108,15 @@
                     <button type="button" @click="openCommentAuthor(comment)">
                       {{ comment.nickname || '匿名用户' }}
                     </button>
-                    <span>{{ formatDate(comment.created_at) }}</span>
+                    <div class="comment-tools">
+                      <span>{{ formatDate(comment.created_at) }}</span>
+                      <button
+                        v-if="canDeleteComment(comment)"
+                        type="button"
+                        class="delete-comment"
+                        @click="removeComment(comment)"
+                      >删除</button>
+                    </div>
                   </div>
                   <p>{{ comment.content }}</p>
                 </div>
@@ -121,23 +136,53 @@
         @action="router.push('/community')"
       />
     </div>
+
+    <el-dialog v-model="editVisible" title="编辑作品信息" width="min(520px, 92vw)">
+      <el-form label-position="top">
+        <el-form-item label="标题">
+          <el-input v-model="editForm.title" maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-select
+            v-model="editForm.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入标签"
+            style="width: 100%"
+          >
+            <el-option v-for="option in tagOptions" :key="option" :label="option" :value="option" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="editForm.description" type="textarea" :rows="5" maxlength="2000" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveMetadata">保存修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
   ChatDotRound,
   CollectionTag,
+  Edit,
   Star,
   StarFilled,
   View
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { addComment, getComments, getImageDetail, toggleCollect, toggleLike } from '@/api/community'
+import { addComment, deleteComment, getComments, getImageDetail, toggleCollect, toggleLike } from '@/api/community'
+import { updateImageMetadata } from '@/api/image'
 import { useUserStore } from '@/store/user'
 
 const route = useRoute()
@@ -151,8 +196,13 @@ const commenting = ref(false)
 const post = ref(null)
 const comments = ref([])
 const commentContent = ref('')
+const editVisible = ref(false)
+const saving = ref(false)
+const editForm = ref({ title: '', tags: [], description: '' })
+const tagOptions = ['插画', '摄影', '设计', 'UI设计', '概念艺术', '动漫', '像素艺术', 'AI艺术', '人像摄影', '风景', '治愈系']
 
 const postTitle = computed(() => post.value?.title || post.value?.original_name || '未命名作品')
+const isOwner = computed(() => Number(post.value?.user_id) === Number(userStore.userInfo?.id))
 const authorName = computed(() => post.value?.author_name || '匿名创作者')
 const currentUserInitial = computed(() => (
   userStore.userInfo?.nickname || userStore.userInfo?.username || '我'
@@ -209,6 +259,50 @@ const handleCollect = async () => {
     post.value.collect_count = Math.max(0, Number(post.value.collect_count || 0) + (result.collected ? 1 : -1))
   } finally {
     collecting.value = false
+  }
+}
+
+const canDeleteComment = (comment) => (
+  isOwner.value || Number(comment.user_id) === Number(userStore.userInfo?.id)
+)
+
+const removeComment = async (comment) => {
+  await ElMessageBox.confirm('确定删除这条评论吗？', '删除评论', {
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+  await deleteComment(comment.id)
+  comments.value = comments.value.filter(item => item.id !== comment.id)
+  post.value.comment_count = Math.max(0, Number(post.value.comment_count || 0) - 1)
+  ElMessage.success('评论已删除')
+}
+
+const openEditor = () => {
+  editForm.value = {
+    title: post.value.title || '',
+    tags: Array.isArray(post.value.tags)
+      ? [...post.value.tags]
+      : String(post.value.tags || '').split(/[,，]/).map(tag => tag.trim()).filter(Boolean),
+    description: post.value.description || ''
+  }
+  editVisible.value = true
+}
+
+const saveMetadata = async () => {
+  saving.value = true
+  try {
+    const payload = {
+      title: editForm.value.title.trim(),
+      tags: editForm.value.tags.map(tag => tag.trim()).filter(Boolean).join(','),
+      description: editForm.value.description.trim()
+    }
+    await updateImageMetadata(post.value.id, payload)
+    Object.assign(post.value, payload)
+    editVisible.value = false
+    ElMessage.success('作品信息已更新')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -380,6 +474,24 @@ watch(() => route.params.id, loadPost, { immediate: true })
 .comment-meta span { color: var(--foreground-subtle); font-size: 12px; }
 .comment-item p { margin: 6px 0 0; color: var(--foreground-muted); line-height: 1.6; white-space: pre-wrap; }
 .empty-comments { clear: both; padding: var(--space-8) 0; color: var(--foreground-muted); text-align: center; }
+
+.owner-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+
+.comment-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comment-tools .delete-comment {
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 600;
+}
 
 @media (max-width: 980px) {
   .post-stage:has(.post-visual) { grid-template-columns: 1fr; }

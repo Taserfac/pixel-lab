@@ -302,13 +302,6 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="previewVisible" title="图片预览" width="78%" center class="preview-dialog">
-      <img v-if="previewImage" :src="previewImage.url" :alt="imageTitle(previewImage)" class="preview-image">
-      <template #footer>
-        <el-button @click="previewVisible = false">关闭</el-button>
-        <el-button type="primary" @click="openInWorkbench(previewImage)">在图像工坊打开</el-button>
-      </template>
-    </el-dialog>
 
     <!-- Description edit dialog -->
     <el-dialog v-model="descDialogVisible" title="编辑说明" width="480px">
@@ -471,7 +464,7 @@ const ContentFeed = defineComponent({
   setup(props, { emit }) {
     const title = (item) => item.title || item.original_name || item.filename || '未命名作品'
     const format = (value) => Number(value || 0).toLocaleString('zh-CN')
-    return () => h('div', { class: 'feed-shell', directives: [] }, [
+    return () => h('div', { class: 'feed-shell compact-feed', directives: [] }, [
       props.items.length
         ? h('div', { class: 'masonry-grid' }, props.items.map(item => h('article', {
             class: 'work-card',
@@ -527,8 +520,6 @@ const loadingCollections = ref(false)
 const loadingLikes = ref(false)
 const uploading = ref(false)
 
-const previewVisible = ref(false)
-const previewImage = ref(null)
 const trendChartRef = ref(null)
 let trendChart = null
 
@@ -725,15 +716,13 @@ const onFileSelected = async (event) => {
 }
 
 const viewImage = (image) => {
-  previewImage.value = image
-  previewVisible.value = true
+  if (image?.id) router.push(`/post/${image.id}`)
 }
 
 const openInWorkbench = (image) => {
   if (image?.url) {
     localStorage.setItem('pixel_lab_workbench_image', image.url)
   }
-  previewVisible.value = false
   router.push('/workbench')
 }
 
@@ -780,7 +769,7 @@ const confirmDelete = (image) => {
 
 const goToCommunity = (imageId) => {
   if (imageId) {
-    router.push({ path: '/community', query: { id: imageId } })
+    router.push(`/post/${imageId}`)
   } else {
     router.push('/community')
   }
@@ -1365,6 +1354,29 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.compact-feed .masonry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+
+.compact-feed .work-card {
+  display: block;
+  margin: 0;
+}
+
+.compact-feed .work-cover {
+  aspect-ratio: 4 / 3;
+}
+
+.compact-feed .work-meta {
+  padding: var(--space-3);
+}
+
+.compact-feed .metric-row {
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .empty-panel,

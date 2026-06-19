@@ -21,8 +21,8 @@ The WAR is built as `target/ROOT.war` so Tomcat exposes APIs at `/api/...`.
 
 ## Local Tomcat Run
 
-1. Make sure MySQL has been initialized with the existing `pixel_lab` schema.
-2. Configure `pixel-lab-backend/.env` with your local database and DeepSeek values.
+1. Initialize MySQL with `src/main/resources/init.sql`.
+2. Copy `.env.example` to `.env.local` in the project root, then configure your local database and DeepSeek values.
 3. From the project root, start the backend:
 
 ```powershell
@@ -30,7 +30,7 @@ cd F:\project\pixel-lab
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\start-java-backend.ps1
 ```
 
-The script builds the Vue frontend, packages it into `target/ROOT.war`, deploys it to local Tomcat, loads `pixel-lab-backend/.env`, and waits for `http://127.0.0.1:8080/api/health`.
+The script builds the Vue frontend, packages it into `target/ROOT.war`, deploys it to local Tomcat, loads `.env.local` from the project root, and waits for `http://127.0.0.1:8080/api/health`.
 
 Open the site directly at:
 

@@ -40,6 +40,11 @@ export function deleteComment(id) {
   return request.delete(`/api/community/comments/${id}`)
 }
 
+// 获取已关注创作者
+export function getFollowingCreators() {
+  return request.get('/api/community/following')
+}
+
 // 获取用户收藏列表
 export function getUserCollections(params) {
   return request.get('/api/community/collections', { params })

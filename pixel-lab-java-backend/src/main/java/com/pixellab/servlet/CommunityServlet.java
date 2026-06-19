@@ -48,6 +48,11 @@ public class CommunityServlet extends BaseApiServlet {
             RequestUtil.intParam(request, "pageSize", 20)));
         return;
       }
+      if (segments.size() == 1 && "following".equals(segments.get(0))) {
+        SessionUser user = currentUser(request);
+        ok(response, dao.followingCreators(user.getId()));
+        return;
+      }
       if (segments.size() == 1 && "collections".equals(segments.get(0))) {
         SessionUser user = currentUser(request);
         ok(response, dao.userCollections(user.getId(), RequestUtil.intParam(request, "page", 1), RequestUtil.intParam(request, "pageSize", 20)));

@@ -1,12 +1,12 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-const mysql = require('../pixel-lab-backend/node_modules/mysql2/promise')
-const bcrypt = require('../pixel-lab-backend/node_modules/bcryptjs')
-const sharp = require('../pixel-lab-backend/node_modules/sharp')
+const mysql = require('mysql2/promise')
+const bcrypt = require('bcryptjs')
+const sharp = require('sharp')
 
-const projectRoot = path.resolve(__dirname, '..')
-const envPath = path.join(projectRoot, 'pixel-lab-backend', '.env')
+const projectRoot = path.resolve(__dirname, '..', '..')
+const envPath = path.join(projectRoot, '.env.local')
 const seedPassword = 'Test123456'
 const publicBaseUrl = 'http://localhost:8080'
 

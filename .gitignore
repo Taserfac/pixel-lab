@@ -30,7 +30,6 @@ pixel-lab-frontend/dist/
 # Environment files
 .env
 .env.local
-pixel-lab-backend/.env
 pixel-lab-frontend/.env.local
 
 # 不可用的启动文件

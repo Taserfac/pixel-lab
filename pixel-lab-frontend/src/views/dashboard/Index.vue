@@ -1,33 +1,35 @@
 <template>
   <div class="home-page">
-    <section class="home-hero">
+    <section class="home-hero" @mouseenter="stopHeroRotation" @mouseleave="startHeroRotation">
       <div class="hero-copy">
         <h1>{{ $t('dashboard.title') }}</h1>
         <p>{{ $t('dashboard.subtitle') }}</p>
+        <div v-if="currentHeroWork" class="hero-feature">
+          <strong>{{ workTitle(currentHeroWork) }}</strong>
+          <span>
+            <el-icon><View /></el-icon>
+            {{ formatNumber(currentHeroWork.view_count) }} 次浏览
+          </span>
+          <button type="button" @click="openWork(currentHeroWork)">
+            查看热门作品 <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
       </div>
 
-      <div class="hero-preview" aria-hidden="true">
-        <div
-          v-for="(work, index) in previewWorks"
-          :key="work.id || index"
-          class="preview-card"
-          :class="`preview-card-${index + 1}`"
+      <div class="hero-showcase">
+        <button
+          v-if="currentHeroWork"
+          type="button"
+          class="hero-preview"
+          @click="openWork(currentHeroWork)"
         >
-          <img
-            v-if="work.url"
-            :src="work.url"
-            :alt="work.title || work.original_name || $t('dashboard.previewLabel')"
-          >
+          <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
+        </button>
+        <div class="hero-controls" aria-label="热门作品轮播">
+          <button type="button" aria-label="上一张" @click="previousHero">‹</button>
+          <span>{{ activeHeroIndex + 1 }} / {{ featuredWorks.length }}</span>
+          <button type="button" aria-label="下一张" @click="nextHero">›</button>
         </div>
-        <span
-          v-for="(label, idx) in heroLabels"
-          :key="label"
-          class="hero-label"
-          :class="heroLabelClasses[idx]"
-        >{{ label }}</span>
-        <span class="hero-like">
-          <el-icon><Star /></el-icon>
-        </span>
       </div>
     </section>
 
@@ -53,34 +55,19 @@
               :key="tab"
               type="button"
               :class="{ active: activeFeedTab === tab }"
-              @click="activeFeedTab = tab"
+              @click="selectFeedTab(tab)"
             >
               {{ tab }}
             </button>
           </div>
 
-          <div
-            v-loading="loading"
+          <StableMasonry
             class="masonry-feed"
-          >
-            <template v-if="loading && !works.length">
-              <SkeletonCard
-                v-for="i in 8"
-                :key="'skeleton-' + i"
-                :style="{ '--post-ratio': getCardRatio(i - 1) }"
-              />
-            </template>
-            <template v-else>
-              <PostCard
-                v-for="(work, index) in feedWorks"
-                :key="work.id"
-                :work="work"
-                :style="{ '--post-ratio': getCardRatio(index) }"
-                @select="openWork"
-                @author-select="openCreator"
-              />
-            </template>
-          </div>
+            :works="feedWorks"
+            :loading="loading"
+            @select="openWork"
+            @author-select="openCreator"
+          />
 
           <EmptyState
             v-if="!loading && works.length > 0 && feedWorks.length === 0"
@@ -119,7 +106,7 @@
         <section class="rail-card creator-card">
           <div class="rail-title">
             <h3>{{ $t('dashboard.recommendedCreators') }}</h3>
-            <button type="button" @click="router.push('/community')">
+            <button type="button" @click="router.push('/creators')">
               {{ $t('dashboard.more') }} <el-icon><ArrowRight /></el-icon>
             </button>
           </div>
@@ -135,7 +122,7 @@
               @click="openCreator(creator)"
             >
               <el-avatar
-                :size="46"
+                :size="40"
                 :src="creator.avatar"
               >
                 {{ creator.name.charAt(0) }}
@@ -188,7 +175,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -196,11 +183,11 @@ import {
   ChatDotRound,
   CollectionTag,
   Star,
-  User
+  User,
+  View
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import SkeletonCard from '@/components/common/SkeletonCard.vue'
-import PostCard from '@/components/community/PostCard.vue'
+import StableMasonry from '@/components/community/StableMasonry.vue'
 import { getUserStats } from '@/api/auth'
 import { getActivities, getPublicImages } from '@/api/community'
 
@@ -210,6 +197,8 @@ const loading = ref(false)
 const works = ref([])
 const activities = ref([])
 const activeFeedTab = ref('推荐')
+const activeHeroIndex = ref(0)
+let heroTimer
 const userStats = ref({
   works: 0,
   likes: 0,
@@ -225,7 +214,6 @@ const defaultPopularTags = [
   { name: 'AI艺术', count: '4.2万', tone: 'orange' }
 ]
 const tagTones = ['green', 'purple', 'blue', 'rose', 'orange']
-const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
 const sampleWorks = [
   {
     id: 'sample-1',
@@ -307,6 +295,14 @@ const normalizeStats = (stats = {}) => ({
 })
 
 const sourceWorks = computed(() => works.value.length ? works.value : sampleWorks)
+const featuredWorks = computed(() => (
+  [...sourceWorks.value]
+    .sort((a, b) => toNumber(b.view_count) - toNumber(a.view_count))
+    .slice(0, 4)
+))
+const currentHeroWork = computed(() => (
+  featuredWorks.value[activeHeroIndex.value % Math.max(featuredWorks.value.length, 1)] || null
+))
 
 const feedTabs = computed(() => {
   if (!works.value.length) return defaultFeedTabs
@@ -336,21 +332,6 @@ const popularTags = computed(() => {
     }))
 })
 
-const heroLabelClasses = ['hero-label-illustration', 'hero-label-photo', 'hero-label-pixel']
-const heroLabels = computed(() => {
-  const labels = []
-  const seen = new Set()
-  for (const work of previewWorks.value) {
-    for (const tag of (work.tags || [])) {
-      if (!seen.has(tag)) {
-        seen.add(tag)
-        labels.push(tag)
-        if (labels.length >= 3) return labels
-      }
-    }
-  }
-  return labels.length ? labels : ['插画', '摄影', '像素艺术']
-})
 const feedWorks = computed(() => {
   const source = sourceWorks.value
   if (activeFeedTab.value === '推荐') return source
@@ -364,11 +345,6 @@ const feedWorks = computed(() => {
   })
 
   return matched.length ? matched : source
-})
-const previewWorks = computed(() => {
-  const source = sourceWorks.value.slice(0, 4)
-  if (source.length) return source
-  return sampleWorks.slice(0, 4)
 })
 
 const recommendedCreators = computed(() => {
@@ -424,7 +400,35 @@ const communityStatItems = computed(() => {
   ]
 })
 
-const getCardRatio = (index) => cardRatios[index % cardRatios.length]
+const workTitle = (work) => work?.title || work?.original_name || work?.filename || '未命名作品'
+
+const stopHeroRotation = () => {
+  if (heroTimer) window.clearInterval(heroTimer)
+  heroTimer = undefined
+}
+
+const nextHero = () => {
+  if (featuredWorks.value.length < 2) return
+  activeHeroIndex.value = (activeHeroIndex.value + 1) % featuredWorks.value.length
+}
+
+const previousHero = () => {
+  if (featuredWorks.value.length < 2) return
+  activeHeroIndex.value = (activeHeroIndex.value - 1 + featuredWorks.value.length) % featuredWorks.value.length
+}
+
+const startHeroRotation = () => {
+  stopHeroRotation()
+  if (featuredWorks.value.length > 1) heroTimer = window.setInterval(nextHero, 5000)
+}
+
+const selectFeedTab = (tab) => {
+  if (tab === '关注') {
+    router.push({ path: '/creators', query: { tab: 'following' } })
+    return
+  }
+  activeFeedTab.value = tab
+}
 
 const formatNumber = (value) => {
   const number = toNumber(value)
@@ -466,8 +470,11 @@ onMounted(async () => {
     console.error('获取首页数据失败:', error)
   } finally {
     loading.value = false
+    startHeroRotation()
   }
 })
+
+onBeforeUnmount(stopHeroRotation)
 </script>
 
 <style scoped>
@@ -477,142 +484,132 @@ onMounted(async () => {
 }
 
 .home-hero {
+  height: 280px;
   min-height: 280px;
+  max-height: 280px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
-  align-items: center;
-  gap: clamp(var(--space-6), 5vw, var(--space-12));
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  align-items: stretch;
+  gap: clamp(var(--space-6), 4vw, var(--space-10));
   overflow: hidden;
   position: relative;
   border-radius: var(--radius-xl);
   background:
-    linear-gradient(135deg, rgba(22, 199, 132, 0.14), rgba(91, 141, 239, 0.1)),
+    radial-gradient(circle at 18% 20%, rgba(22, 199, 132, 0.16), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(91, 141, 239, 0.1)),
     var(--background-card);
   box-shadow: var(--shadow);
-  padding: clamp(var(--space-8), 5vw, var(--space-12));
+  padding: clamp(var(--space-7), 4vw, var(--space-10));
   margin-bottom: var(--space-8);
+}
+
+.hero-copy {
+  align-self: center;
 }
 
 .hero-copy h1 {
   color: var(--foreground);
-  font-size: clamp(34px, 5vw, 56px);
+  font-size: clamp(34px, 4vw, 54px);
   font-weight: 800;
   line-height: 1.05;
-  letter-spacing: 0;
 }
 
-.hero-copy p {
+.hero-copy > p {
   max-width: 460px;
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   color: var(--foreground-muted);
   font-size: 16px;
   line-height: 1.8;
 }
 
+.hero-feature {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: var(--space-6);
+}
+
+.hero-feature strong {
+  width: 100%;
+  color: var(--foreground);
+  font-size: 20px;
+}
+
+.hero-feature span,
+.hero-feature button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.hero-feature span {
+  color: var(--foreground-muted);
+}
+
+.hero-feature button {
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: white;
+  padding: 9px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hero-showcase {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 190px auto;
+  gap: var(--space-3);
+}
+
 .hero-preview {
-  min-height: 230px;
-  position: relative;
-}
-
-.preview-card {
-  position: absolute;
+  width: 100%;
+  height: 190px;
+  min-height: 0;
   overflow: hidden;
+  border: 0;
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(135deg, rgba(22, 199, 132, 0.24), rgba(91, 141, 239, 0.2)),
-    var(--background-muted);
+  background: var(--background-muted);
   box-shadow: var(--shadow-md);
-  transform: rotate(var(--preview-rotate, 0deg));
-  transition: transform var(--transition-base);
+  padding: 0;
+  cursor: pointer;
 }
 
-.preview-card img {
+.hero-preview img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
+  transition: transform var(--transition-slow);
 }
 
-.preview-card-1 {
-  --preview-rotate: -4deg;
-  width: 32%;
-  aspect-ratio: 4 / 5;
-  left: 0;
-  bottom: 5%;
-  z-index: 2;
+.hero-preview:hover img {
+  transform: scale(1.025);
 }
 
-.preview-card-2 {
-  --preview-rotate: 2deg;
-  width: 56%;
-  aspect-ratio: 4 / 3;
-  left: 26%;
-  top: 3%;
-  z-index: 3;
-}
-
-.preview-card-3 {
-  --preview-rotate: 4deg;
-  width: 34%;
-  aspect-ratio: 5 / 4;
-  right: 0;
-  top: 0;
-  z-index: 2;
-}
-
-.preview-card-4 {
-  --preview-rotate: 5deg;
-  width: 38%;
-  aspect-ratio: 5 / 4;
-  right: 3%;
-  bottom: 0;
-  z-index: 4;
-}
-
-.hero-label,
-.hero-like {
-  position: absolute;
-  z-index: 5;
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
+.hero-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  color: var(--foreground-muted);
   font-size: 12px;
-  font-weight: 700;
 }
 
-.hero-label {
-  padding: 6px 12px;
-}
-
-.hero-label-illustration {
-  top: 26%;
-  left: 28%;
-  background: rgba(22, 199, 132, 0.22);
-  color: var(--primary);
-}
-
-.hero-label-photo {
-  top: 16%;
-  right: 0;
-  background: rgba(91, 141, 239, 0.2);
-  color: var(--secondary);
-}
-
-.hero-label-pixel {
-  right: 10%;
-  bottom: -4px;
-  background: rgba(255, 138, 179, 0.24);
-  color: #D94980;
-}
-
-.hero-like {
-  left: 34%;
-  bottom: 1%;
-  width: 42px;
-  height: 42px;
+.hero-controls button {
+  width: 30px;
+  height: 30px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--error);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--foreground);
+  font-size: 20px;
+  cursor: pointer;
 }
 
 .home-content {
@@ -701,13 +698,6 @@ onMounted(async () => {
 
 .masonry-feed {
   min-height: 360px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-5);
-}
-
-.masonry-feed :deep(.post-card) {
-  margin: 0;
 }
 
 .discovery-rail {
@@ -721,7 +711,7 @@ onMounted(async () => {
   border-radius: var(--radius-lg);
   background: var(--background-card);
   box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 
 .tag-list {
@@ -899,24 +889,22 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 1540px) {
-  .masonry-feed {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 
 @media (max-width: 900px) {
   .home-hero {
     grid-template-columns: 1fr;
   }
 
-  .hero-preview {
+  .home-hero {
+    height: auto;
+    min-height: 240px;
+    max-height: none;
+  }
+
+  .hero-showcase {
     display: none;
   }
 
-  .masonry-feed {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 
   .discovery-rail {
     grid-template-columns: 1fr;
@@ -929,8 +917,5 @@ onMounted(async () => {
     padding: var(--space-6);
   }
 
-  .masonry-feed {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

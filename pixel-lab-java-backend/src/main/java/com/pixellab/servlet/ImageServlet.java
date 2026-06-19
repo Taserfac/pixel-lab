@@ -107,6 +107,39 @@ public class ImageServlet extends BaseApiServlet {
   protected void doPatch(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
     List<String> segments = RequestUtil.pathSegments(request);
     try {
+      if (segments.size() == 2 && "metadata".equals(segments.get(1))) {
+        long id = parseId(segments.get(0));
+        if (id <= 0) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        SessionUser user = currentUser(request);
+        ImageDao imageDao = new ImageDao(dataSource());
+        Map<String, Object> image = imageDao.findById(id);
+        if (image == null) {
+          Result.notFound(response, "图片不存在");
+          return;
+        }
+        if (((Number) image.get("user_id")).longValue() != user.getId()) {
+          Result.forbidden(response, "无权修改");
+          return;
+        }
+        Map<String, Object> body = body(request);
+        String title = RequestUtil.string(body, "title");
+        String description = RequestUtil.string(body, "description");
+        String tags = RequestUtil.string(body, "tags");
+        if (title != null && title.length() > 100) {
+          Result.badRequest(response, "标题不能超过 100 个字符");
+          return;
+        }
+        if (tags != null && tags.length() > 255) {
+          Result.badRequest(response, "标签不能超过 255 个字符");
+          return;
+        }
+        imageDao.updateMetadata(id, title, description, tags);
+        ok(response, "更新成功", null);
+        return;
+      }
       if (segments.size() == 2 && "description".equals(segments.get(1))) {
         long id = parseId(segments.get(0));
         if (id <= 0) {

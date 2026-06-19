@@ -1,83 +1,59 @@
-const CACHE_NAME = 'pixel-lab-v1';
+const CACHE_NAME = 'pixel-lab-v2'
 
-const STATIC_ASSETS = [
-  '/',
-  '/dashboard',
-  '/community'
-];
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
 
-// Install event - precache static assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Pre-caching static assets');
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
-  self.skipWaiting();
-});
-
-// Fetch event - cache-first for static assets, network-first for API
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+  const { request } = event
+  const url = new URL(request.url)
 
-  // API calls - network-first strategy
-  if (url.pathname.startsWith('/api/') || url.hostname.includes('api')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone the response before caching
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
-    return;
+  if (url.origin !== self.location.origin) return
+
+  // Never cache authenticated API responses.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(request))
+    return
   }
 
-  // Static assets - cache-first strategy
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  // A deployed index.html may reference a completely new set of hashed assets,
+  // so navigation must always prefer the current server response.
+  if (request.mode === 'navigate') {
+    event.respondWith(fetch(request, { cache: 'no-store' }))
+    return
+  }
 
-      return fetch(request).then((response) => {
-        // Don't cache non-successful responses
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
+  // Hashed Vite assets are safe to cache; a new build produces new URLs.
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) return cachedResponse
 
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
+        return fetch(request).then((response) => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response
+          }
+          const responseClone = response.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(request, responseClone))
+          return response
+        })
+      })
+    )
+  }
+})
 
-        return response;
-      });
-    })
-  );
-});
-
-// Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
-          .map((cacheName) => {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-      );
-    })
-  );
-  self.clients.claim();
-});
+  event.waitUntil((async () => {
+    const cacheNames = await caches.keys()
+    await Promise.all(
+      cacheNames
+        .filter(cacheName => cacheName !== CACHE_NAME)
+        .map(cacheName => caches.delete(cacheName))
+    )
+    await self.clients.claim()
+
+    // Recover tabs that were opened through the old cache-first worker.
+    const clients = await self.clients.matchAll({ type: 'window' })
+    await Promise.all(clients.map(client => client.navigate(client.url)))
+  })())
+})

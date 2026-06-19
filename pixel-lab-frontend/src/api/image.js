@@ -53,3 +53,9 @@ export const updateImageVisibility = (id, isPublic) => {
 export const updateImageDescription = (id, description) => {
   return request.patch(`/api/images/${id}/description`, { description })
 }
+
+
+/** 更新作品标题、说明与标签 */
+export const updateImageMetadata = (id, data) => {
+  return request.patch(`/api/images/${id}/metadata`, data)
+}

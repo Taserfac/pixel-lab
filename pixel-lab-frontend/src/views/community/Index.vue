@@ -41,20 +41,15 @@
     </div>
 
     <!-- 作品列表 -->
-    <div
-      v-loading="loading"
+    <StableMasonry
       class="works-grid"
-    >
-      <PostCard
-        v-for="(work, index) in works"
-        :key="work.id"
-        :work="work"
-        :style="{ '--post-ratio': getCardRatio(index) }"
-        @select="openPost"
-        @tag-click="handleTagClick"
-        @author-select="openCreator"
-      />
-    </div>
+      :works="works"
+      :loading="loading"
+      :skeleton-count="12"
+      @select="openPost"
+      @tag-click="handleTagClick"
+      @author-select="openCreator"
+    />
 
     <!-- 无限滚动哨兵 -->
     <div
@@ -268,7 +263,7 @@ import { useI18n } from 'vue-i18n'
 import { Search, View, CollectionTag, FolderOpened, Share } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
-import PostCard from '@/components/community/PostCard.vue'
+import StableMasonry from '@/components/community/StableMasonry.vue'
 import {
   getPublicImages,
   getImageDetail,
@@ -292,9 +287,15 @@ const works = ref([])
 const page = ref(1)
 const pageSize = ref(12)
 const total = ref(0)
-const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
 const activeTag = ref('')
-const tagList = ['全部', '插画', '摄影', '设计', 'UI设计', '像素艺术', 'AI艺术']
+const normalizeTags = (value) => (
+  Array.isArray(value) ? value : String(value || '').split(/[,，]/)
+).map(tag => tag.trim()).filter(Boolean)
+const tagList = computed(() => {
+  const defaults = ['插画', '摄影', '设计', '像素艺术', 'AI艺术']
+  const discovered = works.value.flatMap(work => normalizeTags(work.tags))
+  return ['全部', ...new Set([...defaults, ...discovered])]
+})
 
 const hasMore = computed(() => works.value.length < total.value)
 
@@ -367,8 +368,6 @@ const openCreator = (work) => {
   const id = work.user_id || work.author_id
   if (id) router.push(`/user/${id}`)
 }
-
-const getCardRatio = (index) => cardRatios[index % cardRatios.length]
 
 const openDetail = async (work) => {
   detailVisible.value = true
@@ -593,34 +592,25 @@ onUnmounted(() => {
 .tag-filter-chip {
   border: 0;
   border-radius: var(--radius-full);
-  background: var(--background-muted);
+  background: transparent;
   color: var(--foreground-muted);
-  padding: 8px 16px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition:
     color var(--transition-fast),
-    background var(--transition-fast),
-    transform var(--transition-fast);
+    background var(--transition-fast);
 }
 
-.tag-filter-chip:hover {
+.tag-filter-chip:hover,
+.tag-filter-chip.active {
   color: var(--primary);
   background: var(--primary-muted);
-  transform: translateY(-1px);
-}
-
-.tag-filter-chip.active {
-  color: white;
-  background: var(--primary);
-  box-shadow: var(--glow-sm);
 }
 
 .works-grid {
   min-height: 360px;
-  column-count: 4;
-  column-gap: var(--space-5);
 }
 
 .load-more {
@@ -890,11 +880,6 @@ onUnmounted(() => {
     font-size: 12px;
   }
 
-  .works-grid {
-    column-count: 2;
-    column-gap: var(--space-3);
-  }
-
   .detail-content {
     flex-direction: column;
   }
@@ -904,9 +889,4 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 520px) {
-  .works-grid {
-    column-count: 1;
-  }
-}
 </style>

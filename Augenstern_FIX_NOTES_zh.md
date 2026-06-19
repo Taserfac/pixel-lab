@@ -2,6 +2,95 @@
 
 ---
 
+## 2026-06-19
+
+### 删除 Node.js 后端（pixel-lab-backend）
+
+- **删除整个 `pixel-lab-backend/` 目录**：约 40 个文件，包括 Express 服务、路由、控制器、中间件、数据库初始化脚本等。Java 后端已成为唯一后端。
+- **Java 启动脚本适配**：`start-java-backend.ps1`、`start-fullstack.bat` 等启动脚本改为读取根目录 `.env.local`，移除对 Node 后端的依赖。
+- **初始化 SQL 迁移**：原 `pixel-lab-backend/db/sql/init.sql` 迁移至 `pixel-lab-java-backend/src/main/resources/init.sql`。
+- **测试数据脚本独立化**：`test-images/seed_test_data.js` 改为独立 npm 依赖，新增 `package-lock.json`。
+- **新增 `.env.example`**：在项目根目录提供环境变量模板（MySQL、CORS、上传目录、AI 配置）。
+- **部署脚本更新**：`deploy/package-release.ps1` 同步更新，不再打包 Node 后端。
+
+### Service Worker 白屏修复
+
+- **问题现象**：首次启动或部署后出现白屏，需 Ctrl+Shift+R 强制刷新才能恢复。
+- **根因定位**：旧 Service Worker 对 HTML 采用 cache-first 策略，部署后会返回缓存的旧入口文件和已删除的旧 hash 资源。
+- **修复方案**：`sw.js` 重写——导航请求（`request.mode === 'navigate'`）改为始终网络优先（`cache: 'no-store'`），仅对 `/assets/` 下的 hash 静态资源保留缓存策略。
+
+### 首页横幅改造
+
+- **热门作品轮播**：横幅改为展示浏览量最高的作品轮播，左侧显示标题和浏览量，右侧为固定尺寸画框（380×190px）。
+- **固定高度**：桌面端横幅锁定 280px 高度，不随图片尺寸变化；窄屏断点也锁定为固定高度，使用 `object-fit: cover` 统一裁切。
+- **交互**：支持左右切换按钮、自动轮播、鼠标悬停暂停。
+- **移除标签**：横幅右侧图片上的标签全部删除。
+
+### 首页瀑布流改版
+
+- **新增 `StableMasonry` 组件**：`src/components/community/StableMasonry.vue`，使用稳定分栏布局替代原有 CSS 多栏布局，避免无限滚动追加数据时的列重排闪动。
+- **不对称卡片**：首页瀑布流改为与社区一致的不对称形状，左右宽度相同，高度根据图片真实比例自适应。
+- **首页和社区统一**：两处均使用 `StableMasonry` 组件，视觉风格一致。
+
+### 社区页面标签统一
+
+- **标签样式**：社区页面标签改为与首页一致的轻量胶囊样式，移除原有实心按钮风格。
+- **标签来源**：首页和社区使用相同的标签来源与选中态逻辑。
+
+### 新增创作者页面
+
+- **新路由** `/creators`：新增 `src/views/creators/` 目录，展示推荐创作者和已关注创作者。
+- **双栏切换**：页面顶部支持「推荐创作者」和「已关注」两个标签页切换。
+- **数据展示**：每位创作者展示点赞量、收藏量、评论量及代表作品。
+- **首页入口**：首页右侧推荐创作者的「更多」按钮跳转至创作者页面。
+- **后端支持**：`CommunityDao.java` 新增 `followingCreators()` 方法查询已关注创作者列表。
+
+### 个人中心作品详情
+
+- **作品详情页**：个人中心自己上传的图片点击后进入统一的帖子详情页（`/post/:id`），与社区作品详情共用同一页面。
+- **所有者编辑**：作品所有者可在详情页编辑标签（改为多选搜索选择器，支持自定义新标签）和描述。
+- **评论管理**：作品所有者可删除自己作品下的评论。
+- **后端权限调整**：`CommunityDao` 帖子详情查询改为 `is_public = 1 OR user_id = ?`，允许作品所有者查看自己的私有作品；评论删除权限扩展为评论者或作品所有者均可删除。
+
+### 收藏/点赞列表优化
+
+- **布局调整**：个人中心的收藏和点赞页面改为紧凑瀑布流布局，缩小图片展示尺寸。
+- **过滤已删除作品**：后端查询时添加 `i.status = 1` 条件，不再返回已删除的作品数据。
+- **同步影响**：收藏计数和点赞计数的总数查询也同步过滤，确保数据一致性。
+
+### 后端 API 变更
+
+- **CommunityDao.java**：帖子详情查询支持作品所有者可见私有作品；评论删除权限扩展；收藏/点赞列表及计数过滤已删除作品；新增 `followingCreators()` 方法。
+- **CommunityServlet.java**：新增已关注创作者路由。
+- **ImageServlet.java**：标签编辑接口适配多选标签更新。
+
+### 修改文件清单
+
+| 文件 | 变更说明 |
+|------|----------|
+| `pixel-lab-backend/` (整个目录) | 删除 Node.js 后端 |
+| `pixel-lab-frontend/public/sw.js` | 导航请求改为网络优先，修复白屏 |
+| `pixel-lab-frontend/src/components/community/StableMasonry.vue` | 新增：稳定分栏瀑布流组件 |
+| `pixel-lab-frontend/src/views/creators/` | 新增：创作者列表页面 |
+| `pixel-lab-frontend/src/views/dashboard/Index.vue` | 横幅改版、瀑布流改用 StableMasonry、标签统一 |
+| `pixel-lab-frontend/src/views/community/Index.vue` | 瀑布流改用 StableMasonry、标签样式统一 |
+| `pixel-lab-frontend/src/views/personal/Index.vue` | 收藏/点赞布局调整、过滤已删除作品 |
+| `pixel-lab-frontend/src/views/post/Index.vue` | 详情页增加所有者编辑和评论管理 |
+| `pixel-lab-frontend/src/api/community.js` | 新增已关注创作者接口 |
+| `pixel-lab-frontend/src/api/image.js` | 标签编辑接口适配 |
+| `pixel-lab-frontend/src/main.js` | 路由守卫相关调整 |
+| `pixel-lab-frontend/src/router/index.js` | 新增 `/creators` 路由 |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/dao/CommunityDao.java` | 详情权限、评论权限、过滤删除、已关注查询 |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/CommunityServlet.java` | 新增已关注创作者路由 |
+| `pixel-lab-java-backend/src/main/java/com/pixellab/servlet/ImageServlet.java` | 标签编辑适配多选 |
+| `pixel-lab-java-backend/src/main/resources/init.sql` | 新增：从 Node 后端迁移的初始化 SQL |
+| `.env.example` | 新增：环境变量模板 |
+| `start-fullstack.bat` | 移除 Node 后端依赖 |
+| `start-java-backend.ps1` | 读取根目录 .env.local |
+| `deploy/package-release.ps1` | 移除 Node 后端打包 |
+
+---
+
 ## 2026-06-18
 
 ### 全站 UI 改版与功能重构

@@ -57,8 +57,8 @@ public class CommunityDao {
       Map<String, Object> image = queryOne(conn,
           "SELECT i.*, u.nickname AS author_name, u.avatar AS author_avatar "
               + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
-              + "WHERE i.id = ? AND i.is_public = 1 AND i.status = 1",
-          List.of(imageId));
+              + "WHERE i.id = ? AND i.status = 1 AND (i.is_public = 1 OR i.user_id = ?)",
+          List.of(imageId, userId == null ? -1L : userId));
       if (image == null) {
         return null;
       }
@@ -164,7 +164,10 @@ public class CommunityDao {
     try (Connection conn = dataSource.getConnection()) {
       conn.setAutoCommit(false);
       try {
-        Map<String, Object> comment = queryOne(conn, "SELECT * FROM comments WHERE id = ? AND user_id = ?", List.of(commentId, userId));
+        Map<String, Object> comment = queryOne(conn,
+            "SELECT c.* FROM comments c JOIN image i ON c.image_id = i.id "
+                + "WHERE c.id = ? AND (c.user_id = ? OR i.user_id = ?)",
+            List.of(commentId, userId, userId));
         if (comment == null) {
           conn.rollback();
           return false;
@@ -183,11 +186,13 @@ public class CommunityDao {
   public Map<String, Object> userCollections(long userId, int page, int pageSize) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     try (Connection conn = dataSource.getConnection()) {
-      long total = count(conn, "SELECT COUNT(*) FROM collections WHERE user_id = ?", List.of(userId));
+      long total = count(conn,
+          "SELECT COUNT(*) FROM collections c JOIN image i ON c.image_id = i.id WHERE c.user_id = ? AND i.status = 1",
+          List.of(userId));
       List<Map<String, Object>> rows = query(conn,
           "SELECT i.*, u.nickname AS author_name, c.created_at AS collected_at "
               + "FROM collections c LEFT JOIN image i ON c.image_id = i.id LEFT JOIN `user` u ON i.user_id = u.id "
-              + "WHERE c.user_id = ? ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
+              + "WHERE c.user_id = ? AND i.status = 1 ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
           List.of(userId, pageSize, offset));
       return pageResult(rows, total, page, pageSize);
     }
@@ -196,11 +201,13 @@ public class CommunityDao {
   public Map<String, Object> userLikes(long userId, int page, int pageSize) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     try (Connection conn = dataSource.getConnection()) {
-      long total = count(conn, "SELECT COUNT(*) FROM likes WHERE user_id = ?", List.of(userId));
+      long total = count(conn,
+          "SELECT COUNT(*) FROM likes l JOIN image i ON l.image_id = i.id WHERE l.user_id = ? AND i.status = 1",
+          List.of(userId));
       List<Map<String, Object>> rows = query(conn,
           "SELECT i.*, u.nickname AS author_name, l.created_at AS liked_at "
               + "FROM likes l LEFT JOIN image i ON l.image_id = i.id LEFT JOIN `user` u ON i.user_id = u.id "
-              + "WHERE l.user_id = ? ORDER BY l.created_at DESC LIMIT ? OFFSET ?",
+              + "WHERE l.user_id = ? AND i.status = 1 ORDER BY l.created_at DESC LIMIT ? OFFSET ?",
           List.of(userId, pageSize, offset));
       return pageResult(rows, total, page, pageSize);
     }
@@ -239,6 +246,22 @@ public class CommunityDao {
               + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
               + "WHERE i.is_public = 1 AND i.status = 1 ORDER BY i.created_at DESC LIMIT ?",
           List.of(limit));
+    }
+  }
+
+  public List<Map<String, Object>> followingCreators(long userId) throws Exception {
+    try (Connection conn = dataSource.getConnection()) {
+      return query(conn,
+          "SELECT u.id, u.username, u.nickname, u.avatar, "
+              + "COUNT(i.id) AS work_count, COALESCE(SUM(i.like_count), 0) AS like_count, "
+              + "COALESCE(SUM(i.collect_count), 0) AS collect_count, COALESCE(SUM(i.comment_count), 0) AS comment_count, "
+              + "(SELECT cover.url FROM image cover WHERE cover.user_id = u.id AND cover.is_public = 1 AND cover.status = 1 "
+              + "ORDER BY cover.like_count DESC, cover.created_at DESC LIMIT 1) AS representative_url "
+              + "FROM follows f JOIN `user` u ON f.followed_id = u.id "
+              + "LEFT JOIN image i ON i.user_id = u.id AND i.is_public = 1 AND i.status = 1 "
+              + "WHERE f.follower_id = ? AND u.status = 1 AND u.is_deleted = 0 "
+              + "GROUP BY u.id, u.username, u.nickname, u.avatar, f.created_at ORDER BY f.created_at DESC",
+          List.of(userId));
     }
   }
 

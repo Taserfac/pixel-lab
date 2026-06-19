@@ -73,6 +73,12 @@ const routes = [
         component: () => import('@/views/user/Index.vue'),
         meta: { title: '创作者主页', hideInMenu: true }
       },
+      {
+        path: 'creators',
+        name: 'Creators',
+        component: () => import('@/views/creators/Index.vue'),
+        meta: { title: '发现创作者', hideInMenu: true }
+      },
       // 个人中心
       {
         path: 'personal',

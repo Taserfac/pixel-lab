@@ -1,0 +1,12 @@
+{
+  "name": "pixel-lab-test-data",
+  "private": true,
+  "scripts": {
+    "seed": "node seed_test_data.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "mysql2": "^3.7.0",
+    "sharp": "^0.34.5"
+  }
+}
