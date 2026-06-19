@@ -832,24 +832,25 @@ onBeforeUnmount(() => {
   position: fixed;
   bottom: var(--space-6);
   left: 50%;
+  width: min(540px, calc(100vw - var(--space-8)));
   transform: translateX(-50%);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-around;
   gap: var(--space-1);
-  padding: var(--space-2);
+  padding: 30px var(--space-3) var(--space-2);
   z-index: 100;
-  border: 1px solid rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: var(--shadow-md);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 44px rgba(17, 24, 39, 0.14);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
-  max-width: calc(100vw - var(--space-8));
 }
 
 [data-theme='dark'] .dock-nav {
   border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(24, 32, 28, 0.72);
+  background: rgba(24, 32, 28, 0.9);
 }
 
 .dock-item {
@@ -888,12 +889,12 @@ onBeforeUnmount(() => {
 
 .dock-item.active {
   color: var(--dock-accent);
-  background: color-mix(in srgb, var(--dock-accent) 14%, white);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 [data-theme='dark'] .dock-item.active {
-  background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
+  background: transparent;
 }
 
 .dock-item:focus-visible {
@@ -902,15 +903,30 @@ onBeforeUnmount(() => {
 }
 
 .dock-upload {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 2;
+  width: 70px;
+  height: 70px;
   min-width: 70px;
+  min-height: 70px;
+  transform: translate(-50%, -50%);
+  border: 4px solid rgba(255, 255, 255, 0.92);
+  border-radius: var(--radius-full);
   color: white;
   background: var(--primary);
-  box-shadow: var(--glow-sm);
+  box-shadow: var(--glow), 0 12px 28px rgba(17, 24, 39, 0.2);
 }
 
 .dock-upload:hover {
   color: white;
   background: var(--primary-hover);
+  transform: translate(-50%, -54%);
+}
+
+.dock-upload:active {
+  transform: translate(-50%, -48%) scale(0.96);
 }
 
 .dock-upload:disabled {
@@ -1059,9 +1075,9 @@ onBeforeUnmount(() => {
     left: var(--space-4);
     right: var(--space-4);
     bottom: var(--space-4);
+    width: auto;
     transform: none;
     justify-content: space-around;
-    max-width: none;
   }
 
   .dock-item {
@@ -1073,6 +1089,10 @@ onBeforeUnmount(() => {
 @media (max-width: 420px) {
   .dock-label {
     display: none;
+  }
+
+  .dock-upload .dock-label {
+    display: block;
   }
 
   .dock-item {
