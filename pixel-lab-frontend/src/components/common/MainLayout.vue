@@ -515,6 +515,7 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   color: inherit;
   text-decoration: none;
 }
@@ -538,10 +539,13 @@ onMounted(async () => {
 }
 
 .brand-name {
+  overflow: hidden;
   color: var(--foreground);
   font-size: 18px;
   font-weight: 800;
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .brand-tag {
@@ -573,6 +577,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .icon-action,
@@ -678,6 +683,13 @@ onMounted(async () => {
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+}
+
+.suggestion-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .suggestion-item:hover {
@@ -827,6 +839,7 @@ onMounted(async () => {
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
+  max-width: calc(100vw - var(--space-8));
 }
 
 [data-theme='dark'] .dock-nav {
@@ -850,6 +863,7 @@ onMounted(async () => {
   color: var(--foreground-muted);
   text-decoration: none;
   cursor: pointer;
+  overflow: hidden;
   transition:
     color var(--transition-fast),
     transform var(--transition-fast),
@@ -900,9 +914,13 @@ onMounted(async () => {
 }
 
 .dock-label {
+  max-width: 72px;
+  overflow: hidden;
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .create-menu {
@@ -961,8 +979,11 @@ onMounted(async () => {
 
 .create-menu small {
   margin-top: 3px;
+  overflow: hidden;
   color: var(--foreground-muted);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 :global(.creation-entry-popper.el-popover.el-popper) {
@@ -1035,6 +1056,7 @@ onMounted(async () => {
     bottom: var(--space-4);
     transform: none;
     justify-content: space-around;
+    max-width: none;
   }
 
   .dock-item {

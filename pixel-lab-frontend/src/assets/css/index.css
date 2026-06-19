@@ -42,6 +42,20 @@ body::before {
   color: var(--background);
 }
 
+:where(button, a, input, textarea, [role='button'], .el-button):focus-visible {
+  outline: 3px solid var(--primary-muted);
+  outline-offset: 2px;
+}
+
+button:disabled,
+.el-button.is-disabled,
+.el-button.is-disabled:hover {
+  transform: none !important;
+  opacity: 0.58;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
 /* ============================================
    Bento Grid 布局系统
    ============================================ */
@@ -113,6 +127,8 @@ body::before {
   border: 0 !important;
   font-weight: 500;
   font-size: 13px !important;
+  min-height: 34px;
+  padding-inline: 14px !important;
   transition: all var(--transition-fast) !important;
   background: var(--background-elevated) !important;
   color: var(--foreground) !important;
@@ -170,6 +186,31 @@ body::before {
 
 .el-input__inner::placeholder {
   color: var(--foreground-subtle) !important;
+}
+
+.el-textarea__inner {
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--background-muted) !important;
+  box-shadow: none !important;
+  color: var(--foreground) !important;
+  line-height: 1.65 !important;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast) !important;
+}
+
+.el-textarea__inner:hover {
+  border-color: var(--border-hover) !important;
+}
+
+.el-textarea__inner:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-muted) !important;
+}
+
+.el-form-item__label {
+  color: var(--foreground-muted) !important;
+  font-size: 13px !important;
+  font-weight: 650;
 }
 
 /* 卡片 */
@@ -260,6 +301,7 @@ body::before {
 /* 标签页 */
 .el-tabs__item {
   color: var(--foreground-muted) !important;
+  font-weight: 650;
   transition: all var(--transition-fast) !important;
 }
 
@@ -273,6 +315,11 @@ body::before {
 
 .el-tabs__active-bar {
   background-color: var(--primary) !important;
+}
+
+.el-tabs__nav-wrap::after {
+  height: 1px !important;
+  background-color: var(--border) !important;
 }
 
 /* 对话框 */
@@ -299,6 +346,11 @@ body::before {
   padding: var(--space-6) !important;
 }
 
+.el-dialog__footer {
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-6) !important;
+}
+
 /* 消息提示 */
 .el-message {
   border-radius: var(--radius) !important;
@@ -317,9 +369,11 @@ body::before {
 }
 
 .el-dropdown-menu__item {
+  min-height: 34px !important;
   border-radius: var(--radius) !important;
   color: var(--foreground) !important;
   background: transparent !important;
+  gap: 8px;
 }
 
 .el-dropdown-menu__item:hover,

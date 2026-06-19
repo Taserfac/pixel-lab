@@ -6,12 +6,16 @@
         <p>{{ $t('dashboard.subtitle') }}</p>
         <div v-if="currentHeroWork" class="hero-feature">
           <strong>{{ workTitle(currentHeroWork) }}</strong>
-          <span>
-            <el-icon><View /></el-icon>
-            {{ formatNumber(currentHeroWork.view_count) }} 次浏览
-          </span>
-          <button type="button" @click="openWork(currentHeroWork)">
-            查看热门作品 <el-icon><ArrowRight /></el-icon>
+          <div class="hero-meta">
+            <span v-if="heroAuthor(currentHeroWork)">{{ heroAuthor(currentHeroWork) }}</span>
+            <span v-if="primaryTag(currentHeroWork)">#{{ primaryTag(currentHeroWork) }}</span>
+            <span>
+              <el-icon><View /></el-icon>
+              {{ formatNumber(currentHeroWork.view_count) }} 次浏览
+            </span>
+          </div>
+          <button type="button" class="hero-cta" @click="openWork(currentHeroWork)">
+            查看作品 <el-icon><ArrowRight /></el-icon>
           </button>
         </div>
       </div>
@@ -24,15 +28,20 @@
           @click="openWork(currentHeroWork)"
         >
           <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
+          <span v-if="primaryTag(currentHeroWork)" class="hero-preview-tag">#{{ primaryTag(currentHeroWork) }}</span>
+          <span class="hero-preview-title">{{ workTitle(currentHeroWork) }}</span>
         </button>
         <div class="hero-controls" aria-label="热门作品轮播">
-          <button type="button" aria-label="上一张" @click="previousHero">‹</button>
+          <button type="button" aria-label="上一张" @click="previousHero">
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
           <span>{{ activeHeroIndex + 1 }} / {{ featuredWorks.length }}</span>
-          <button type="button" aria-label="下一张" @click="nextHero">›</button>
+          <button type="button" aria-label="下一张" @click="nextHero">
+            <el-icon><ArrowRight /></el-icon>
+          </button>
         </div>
       </div>
     </section>
-
     <div class="home-content">
       <div class="primary-column">
         <main class="feed-column">
@@ -179,6 +188,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
+  ArrowLeft,
   ArrowRight,
   ChatDotRound,
   CollectionTag,
@@ -400,7 +410,30 @@ const communityStatItems = computed(() => {
   ]
 })
 
-const workTitle = (work) => work?.title || work?.original_name || work?.filename || '未命名作品'
+const looksLikeFileName = (value = '') => {
+  const text = String(value).trim()
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(text)
+    || /^[a-f0-9]{16,}(\.[a-z0-9]+)?$/i.test(text)
+    || /^image_\d+_\d+/i.test(text)
+}
+
+const primaryTag = (work) => normalizeTags(work?.tags)[0] || ''
+
+const heroAuthor = (work) => work?.author_name || work?.nickname || ''
+
+const workTitle = (work) => {
+  const title = String(work?.title || '').trim()
+  if (title && !looksLikeFileName(title)) return title
+
+  const description = String(work?.description || '').trim()
+  if (description && !looksLikeFileName(description)) {
+    return description.length > 24 ? `${description.slice(0, 24)}...` : description
+  }
+
+  const tag = primaryTag(work)
+  if (tag) return `${tag}精选作品`
+  return '精选创作'
+}
 
 const stopHeroRotation = () => {
   if (heroTimer) window.clearInterval(heroTimer)
@@ -484,27 +517,26 @@ onBeforeUnmount(stopHeroRotation)
 }
 
 .home-hero {
-  height: 280px;
-  min-height: 280px;
-  max-height: 280px;
+  min-height: 320px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 34vw);
   align-items: stretch;
-  gap: clamp(var(--space-6), 4vw, var(--space-10));
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
   overflow: hidden;
   position: relative;
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(circle at 18% 20%, rgba(22, 199, 132, 0.16), transparent 42%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(91, 141, 239, 0.1)),
+    radial-gradient(circle at 8% 18%, rgba(22, 199, 132, 0.18), transparent 34%),
+    linear-gradient(115deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 249, 247, 0.92) 45%, rgba(91, 141, 239, 0.14) 100%),
     var(--background-card);
   box-shadow: var(--shadow);
-  padding: clamp(var(--space-7), 4vw, var(--space-10));
+  padding: clamp(var(--space-8), 4vw, var(--space-12));
   margin-bottom: var(--space-8);
 }
 
 .hero-copy {
   align-self: center;
+  min-width: 0;
 }
 
 .hero-copy h1 {
@@ -524,58 +556,90 @@ onBeforeUnmount(stopHeroRotation)
 
 .hero-feature {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--space-4);
   margin-top: var(--space-6);
 }
 
 .hero-feature strong {
-  width: 100%;
+  max-width: 620px;
+  overflow-wrap: anywhere;
   color: var(--foreground);
-  font-size: 20px;
+  font-size: 22px;
+  line-height: 1.35;
 }
 
-.hero-feature span,
-.hero-feature button {
+.hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hero-meta span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-}
-
-.hero-feature span {
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.7);
   color: var(--foreground-muted);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.hero-feature button {
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   border-radius: var(--radius-full);
   background: var(--primary);
   color: white;
-  padding: 9px 16px;
+  padding: 10px 18px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--glow-sm);
+  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.hero-cta:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--glow);
 }
 
 .hero-showcase {
   min-width: 0;
   display: grid;
-  grid-template-rows: 190px auto;
+  grid-template-rows: minmax(0, 240px) auto;
   gap: var(--space-3);
 }
 
 .hero-preview {
   width: 100%;
-  height: 190px;
+  height: 240px;
   min-height: 0;
   overflow: hidden;
+  position: relative;
   border: 0;
   border-radius: var(--radius-lg);
-  background: var(--background-muted);
+  background:
+    linear-gradient(135deg, rgba(20, 26, 23, 0.08), rgba(91, 141, 239, 0.14)),
+    var(--background-muted);
   box-shadow: var(--shadow-md);
   padding: 0;
   cursor: pointer;
+}
+
+.hero-preview::after {
+  content: '';
+  position: absolute;
+  inset: 42% 0 0;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.52));
+  pointer-events: none;
 }
 
 .hero-preview img {
@@ -590,6 +654,38 @@ onBeforeUnmount(stopHeroRotation)
   transform: scale(1.025);
 }
 
+.hero-preview-tag,
+.hero-preview-title {
+  position: absolute;
+  z-index: 1;
+  left: var(--space-4);
+}
+
+.hero-preview-tag {
+  top: var(--space-4);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--foreground);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hero-preview-title {
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: -webkit-box;
+  overflow: hidden;
+  color: white;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: left;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.36);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .hero-controls {
   display: flex;
   align-items: center;
@@ -600,16 +696,24 @@ onBeforeUnmount(stopHeroRotation)
 }
 
 .hero-controls button {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.8);
   color: var(--foreground);
-  font-size: 20px;
+  font-size: 15px;
   cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.hero-controls button:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--glow-sm);
 }
 
 .home-content {
@@ -712,6 +816,7 @@ onBeforeUnmount(stopHeroRotation)
   background: var(--background-card);
   box-shadow: var(--shadow-sm);
   padding: var(--space-4);
+  min-width: 0;
 }
 
 .tag-list {
@@ -828,6 +933,13 @@ onBeforeUnmount(stopHeroRotation)
   padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.creator-item button:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .community-stat-list {
@@ -902,7 +1014,11 @@ onBeforeUnmount(stopHeroRotation)
   }
 
   .hero-showcase {
-    display: none;
+    grid-template-rows: 190px auto;
+  }
+
+  .hero-preview {
+    height: 190px;
   }
 
 
@@ -917,5 +1033,21 @@ onBeforeUnmount(stopHeroRotation)
     padding: var(--space-6);
   }
 
+  .hero-copy h1 {
+    font-size: 32px;
+  }
+
+  .hero-copy > p {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .hero-controls {
+    justify-content: space-between;
+  }
+
+  .tag-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

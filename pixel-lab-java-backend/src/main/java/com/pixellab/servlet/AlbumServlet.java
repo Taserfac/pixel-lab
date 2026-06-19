@@ -80,8 +80,7 @@ public class AlbumServlet extends BaseApiServlet {
           return;
         }
         String description = RequestUtil.string(body, "description");
-        Long coverImageId = body.get("coverImageId") == null ? null :
-            Long.parseLong(String.valueOf(body.get("coverImageId")));
+        Long coverImageId = optionalLong(body, "coverImageId", "cover_image_id");
         long albumId = dao.createAlbum(user.getId(), title, description, coverImageId);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", albumId);
@@ -101,14 +100,15 @@ public class AlbumServlet extends BaseApiServlet {
           return;
         }
         Map<String, Object> body = body(request);
-        Object rawImageId = body.get("imageId");
-        if (rawImageId == null) {
+        List<Long> imageIds = imageIds(body);
+        if (imageIds.isEmpty()) {
           Result.badRequest(response, "缺少图片ID");
           return;
         }
-        long imageId = Long.parseLong(String.valueOf(rawImageId));
         String description = RequestUtil.string(body, "description");
-        dao.addImageToAlbum(albumId, imageId, description);
+        for (Long imageId : imageIds) {
+          dao.addImageToAlbum(albumId, imageId, description);
+        }
         ok(response, "添加成功", null);
         return;
       }
@@ -192,8 +192,7 @@ public class AlbumServlet extends BaseApiServlet {
           return;
         }
         String description = RequestUtil.string(body, "description");
-        Long coverImageId = body.get("coverImageId") == null ? null :
-            Long.parseLong(String.valueOf(body.get("coverImageId")));
+        Long coverImageId = optionalLong(body, "coverImageId", "cover_image_id");
         boolean updated = dao.updateAlbum(albumId, user.getId(), title, description, coverImageId);
         if (!updated) {
           Result.notFound(response, "作品集不存在或无权修改");
@@ -284,5 +283,39 @@ public class AlbumServlet extends BaseApiServlet {
     } catch (NumberFormatException ignored) {
       return -1;
     }
+  }
+
+  private Long optionalLong(Map<String, Object> body, String... keys) {
+    for (String key : keys) {
+      Object value = body.get(key);
+      if (value == null || String.valueOf(value).isBlank()) {
+        continue;
+      }
+      return Long.parseLong(String.valueOf(value));
+    }
+    return null;
+  }
+
+  private List<Long> imageIds(Map<String, Object> body) {
+    List<Long> ids = new ArrayList<>();
+    Object rawList = body.get("imageIds");
+    if (rawList == null) {
+      rawList = body.get("image_ids");
+    }
+    if (rawList instanceof List) {
+      for (Object item : (List<?>) rawList) {
+        if (item != null && !String.valueOf(item).isBlank()) {
+          ids.add(Long.parseLong(String.valueOf(item)));
+        }
+      }
+    }
+    Object rawSingle = body.get("imageId");
+    if (rawSingle == null) {
+      rawSingle = body.get("image_id");
+    }
+    if (rawSingle != null && !String.valueOf(rawSingle).isBlank()) {
+      ids.add(Long.parseLong(String.valueOf(rawSingle)));
+    }
+    return ids;
   }
 }

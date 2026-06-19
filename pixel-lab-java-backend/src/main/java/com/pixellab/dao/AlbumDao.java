@@ -76,8 +76,10 @@ public class AlbumDao {
   public Map<String, Object> getAlbum(long albumId) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
       Map<String, Object> album = queryOne(conn,
-          "SELECT a.*, u.nickname AS author_name, u.avatar AS author_avatar "
+          "SELECT a.*, u.nickname AS author_name, u.avatar AS author_avatar, "
+              + "cover.url AS cover_url, cover.thumbnail_url AS cover_thumbnail_url "
               + "FROM albums a LEFT JOIN `user` u ON a.user_id = u.id "
+              + "LEFT JOIN image cover ON a.cover_image_id = cover.id "
               + "WHERE a.id = ? AND a.status = 1",
           List.of(albumId));
       if (album == null) {
@@ -95,8 +97,10 @@ public class AlbumDao {
     try (Connection conn = dataSource.getConnection()) {
       return query(conn,
           "SELECT a.*, "
+              + "cover.url AS cover_url, cover.thumbnail_url AS cover_thumbnail_url, "
               + "(SELECT COUNT(*) FROM album_images WHERE album_id = a.id) AS image_count "
-              + "FROM albums a WHERE a.user_id = ? AND a.status = 1 ORDER BY a.updated_at DESC",
+              + "FROM albums a LEFT JOIN image cover ON a.cover_image_id = cover.id "
+              + "WHERE a.user_id = ? AND a.status = 1 ORDER BY a.updated_at DESC",
           List.of(userId));
     }
   }
@@ -105,8 +109,8 @@ public class AlbumDao {
     try (Connection conn = dataSource.getConnection()) {
       return query(conn,
           "SELECT ai.sort_order, ai.description AS album_description, "
-              + "i.id, i.title, i.original_name, i.url, i.thumbnail_url, "
-              + "i.width, i.height, i.format, i.description "
+          + "i.id, i.title, i.original_name, i.url, i.thumbnail_url, "
+              + "i.width, i.height, i.format, i.description AS image_description "
               + "FROM album_images ai LEFT JOIN image i ON ai.image_id = i.id "
               + "WHERE ai.album_id = ? AND i.status = 1 "
               + "ORDER BY ai.sort_order ASC, ai.created_at ASC",

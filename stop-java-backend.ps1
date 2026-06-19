@@ -7,7 +7,7 @@ $TomcatHome = if ($env:CATALINA_HOME) { $env:CATALINA_HOME } else { Join-Path $T
 $tomcatProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
   Where-Object { $_.CommandLine -and $_.CommandLine.Contains('org.apache.catalina.startup.Bootstrap') -and $_.CommandLine.Contains($TomcatHome) }
 
-$portListeners = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
+$portListeners = Get-NetTCPConnection -LocalPort 8080, 8005 -State Listen -ErrorAction SilentlyContinue
 foreach ($listener in $portListeners) {
   $pidValue = [int]$listener.OwningProcess
   $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction SilentlyContinue

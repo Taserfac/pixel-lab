@@ -50,15 +50,18 @@ function Import-DotEnv {
 function Get-TomcatProcessIds {
   $ids = New-Object System.Collections.Generic.List[int]
 
-  $listeners = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
+  $listeners = Get-NetTCPConnection -LocalPort 8080, 8005 -State Listen -ErrorAction SilentlyContinue
   foreach ($listener in $listeners) {
     $pidValue = [int]$listener.OwningProcess
     $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction SilentlyContinue
     if ($processInfo -and $processInfo.CommandLine -and $processInfo.CommandLine.Contains($TomcatHome)) {
       $ids.Add($pidValue)
     }
+    elseif (!$processInfo -or !$processInfo.CommandLine) {
+      throw "Port $($listener.LocalPort) is already used by PID $pidValue, but the process command line could not be inspected. Stop it first, or change Tomcat's port."
+    }
     elseif ($processInfo) {
-      throw "Port 8080 is already used by PID $pidValue. Stop it first, or change Tomcat's port."
+      throw "Port $($listener.LocalPort) is already used by PID $pidValue. Stop it first, or change Tomcat's port."
     }
   }
 
@@ -77,7 +80,15 @@ function Stop-ExistingTomcat {
     Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
   }
   if ($ids.Count -gt 0) {
-    Start-Sleep -Seconds 2
+    for ($i = 0; $i -lt 15; $i++) {
+      Start-Sleep -Seconds 1
+      $remaining = Get-TomcatProcessIds
+      if (!$remaining -or $remaining.Count -eq 0) {
+        return
+      }
+    }
+
+    throw "Tomcat PID(s) did not stop cleanly: $($ids -join ', ')"
   }
 }
 
