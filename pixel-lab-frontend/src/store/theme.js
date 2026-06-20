@@ -18,6 +18,13 @@ export const useThemeStore = defineStore('theme', () => {
   
   // 是否跟随系统
   const followSystem = ref(storage.getItem('followSystem', false))
+
+  const backgroundStyles = ['pixel-grid', 'aurora', 'star-canvas', 'spectrum']
+  const backgroundMotions = ['on', 'reduced', 'off']
+
+  // 动态背景偏好
+  const backgroundStyle = ref(storage.getItem('backgroundStyle', 'pixel-grid'))
+  const backgroundMotion = ref(storage.getItem('backgroundMotion', 'reduced'))
   
   // ==================== Actions ====================
   
@@ -77,6 +84,18 @@ export const useThemeStore = defineStore('theme', () => {
       setTheme(mediaQuery.matches ? 'dark' : 'light')
     }
   }
+
+  const setBackgroundStyle = (style) => {
+    const normalizedStyle = backgroundStyles.includes(style) ? style : 'pixel-grid'
+    backgroundStyle.value = normalizedStyle
+    storage.setItem('backgroundStyle', normalizedStyle)
+  }
+
+  const setBackgroundMotion = (motion) => {
+    const normalizedMotion = backgroundMotions.includes(motion) ? motion : 'reduced'
+    backgroundMotion.value = normalizedMotion
+    storage.setItem('backgroundMotion', normalizedMotion)
+  }
   
   /**
    * 初始化主题
@@ -84,9 +103,13 @@ export const useThemeStore = defineStore('theme', () => {
   const init = () => {
     const savedTheme = storage.getItem('theme', 'light')
     const savedFollowSystem = storage.getItem('followSystem', false)
+    const savedBackgroundStyle = storage.getItem('backgroundStyle', 'pixel-grid')
+    const savedBackgroundMotion = storage.getItem('backgroundMotion', 'reduced')
     
     theme.value = savedTheme
     followSystem.value = savedFollowSystem
+    backgroundStyle.value = backgroundStyles.includes(savedBackgroundStyle) ? savedBackgroundStyle : 'pixel-grid'
+    backgroundMotion.value = backgroundMotions.includes(savedBackgroundMotion) ? savedBackgroundMotion : 'reduced'
     
     if (savedFollowSystem) {
       setFollowSystem(true)
@@ -104,11 +127,15 @@ export const useThemeStore = defineStore('theme', () => {
     // State
     theme,
     followSystem,
+    backgroundStyle,
+    backgroundMotion,
     
     // Actions
     setTheme,
     toggleTheme,
     setFollowSystem,
+    setBackgroundStyle,
+    setBackgroundMotion,
     init
   }
 })

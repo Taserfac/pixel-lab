@@ -25,6 +25,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -75,7 +76,7 @@ public class AiServlet extends BaseApiServlet {
       mode = "refine";
     }
     if (model == null || model.isBlank()) {
-      model = "deepseek-v4-flash";
+      model = "qwen-vl-plus";
     }
 
     byte[] imageBytes = readAll(currentImage);
@@ -92,20 +93,30 @@ public class AiServlet extends BaseApiServlet {
 
     String notice = "";
     String text;
-    if (config.get("deepseek.api.key", "").isBlank()) {
-      text = fallbackText(mode, prompt);
-      notice = "未配置 DEEPSEEK_API_KEY，当前返回本地模板结果；配置后会调用 DeepSeek。";
-    } else {
-      text = callDeepSeek(config, resolveDeepSeekModel(config, mode, model), aiPrompt);
-    }
-
     String imageUrl = "";
-    if ("draw".equals(mode) && canvasImage != null && wantsPixelArt(prompt)) {
-      imageUrl = createPixelArtImage(request, canvasImage, prompt);
-      if (!notice.isBlank()) {
-        notice += " ";
+    if (config.get("qwen.api.key", "").isBlank()) {
+      text = fallbackText(mode, prompt);
+      notice = "未配置 QWEN_API_KEY，当前返回本地模板结果；配置后会调用 Qwen。";
+      if ("draw".equals(mode) && canvasImage != null && wantsPixelArt(prompt)) {
+        imageUrl = createPixelArtImage(request, canvasImage, prompt);
+        notice += " 已用 Java 本地图像处理生成像素化结果。";
       }
-      notice += "已用 Java 本地图像处理生成像素化结果。";
+    } else if ("draw".equals(mode)) {
+      ImageGenerationResult generated = callQwenImageEdit(
+          request,
+          config,
+          resolveQwenModel(config, mode, model),
+          aiPrompt,
+          imageBytes,
+          currentImage.getContentType(),
+          canvasImage
+      );
+      imageUrl = generated.imageUrl;
+      text = generated.revisedPrompt == null || generated.revisedPrompt.isBlank()
+          ? "AI 已根据当前画布生成二次创作结果图。"
+          : generated.revisedPrompt;
+    } else {
+      text = callQwen(config, resolveQwenModel(config, mode, model), aiPrompt, imageBytes, currentImage.getContentType(), false);
     }
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -114,17 +125,28 @@ public class AiServlet extends BaseApiServlet {
     data.put("text", text);
     data.put("imageUrl", imageUrl);
     data.put("notice", notice);
-    data.put("provider", imageUrl.isBlank() ? "deepseek" : "deepseek+java-image-transform");
+    data.put("provider", imageUrl.isBlank() ? "qwen" : "qwen-image");
     ok(response, "AI 润色完成", data);
   }
 
-  private String callDeepSeek(AppConfig config, String model, String prompt) throws Exception {
-    String baseUrl = config.get("deepseek.base.url", "https://api.deepseek.com").replaceAll("/+$", "");
-    String apiKey = config.get("deepseek.api.key", "");
+  private String callQwen(AppConfig config, String model, String prompt, byte[] imageBytes, String contentType, boolean includeImage) throws Exception {
+    String baseUrl = config.get("qwen.base.url", "https://dashscope.aliyuncs.com/compatible-mode/v1").replaceAll("/+$", "");
+    String apiKey = config.get("qwen.api.key", "");
 
     Map<String, Object> message = new LinkedHashMap<>();
     message.put("role", "user");
-    message.put("content", prompt);
+    if (includeImage && imageBytes != null && imageBytes.length > 0) {
+      String mimeType = contentType == null || contentType.isBlank() ? "image/png" : contentType;
+      List<Map<String, Object>> content = new ArrayList<>();
+      content.add(Map.of("type", "text", "text", prompt));
+      content.add(Map.of(
+          "type", "image_url",
+          "image_url", Map.of("url", "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes))
+      ));
+      message.put("content", content);
+    } else {
+      message.put("content", prompt);
+    }
 
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("model", model);
@@ -141,7 +163,7 @@ public class AiServlet extends BaseApiServlet {
 
     HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
     if (response.statusCode() < 200 || response.statusCode() >= 300) {
-      throw new IllegalStateException("DeepSeek 调用失败: HTTP " + response.statusCode());
+      throw new IllegalStateException("Qwen 调用失败: HTTP " + response.statusCode());
     }
     Map<String, Object> json = JsonUtil.mapper().readValue(response.body(), new TypeReference<Map<String, Object>>() {});
     List<?> choices = (List<?>) json.get("choices");
@@ -154,11 +176,241 @@ public class AiServlet extends BaseApiServlet {
     return content == null ? "" : String.valueOf(content);
   }
 
-  private String resolveDeepSeekModel(AppConfig config, String mode, String selectedModel) {
-    if ("draw".equals(mode)) {
-      return config.get("deepseek.image.model", config.get("deepseek.chat.model", "deepseek-chat"));
+  private ImageGenerationResult callQwenImageEdit(
+      HttpServletRequest servletRequest,
+      AppConfig config,
+      String model,
+      String prompt,
+      byte[] imageBytes,
+      String contentType,
+      BufferedImage canvasImage
+  ) throws Exception {
+    String imageUrl = resolveQwenImageEndpoint(config);
+    String apiKey = config.get("qwen.api.key", "");
+    String mimeType = contentType == null || contentType.isBlank() ? "image/png" : contentType;
+
+    List<Map<String, Object>> content = new ArrayList<>();
+    content.add(Map.of("image", "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes)));
+    content.add(Map.of("text", prompt));
+
+    Map<String, Object> message = new LinkedHashMap<>();
+    message.put("role", "user");
+    message.put("content", content);
+
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("messages", List.of(message));
+
+    Map<String, Object> parameters = new LinkedHashMap<>();
+    parameters.put("n", 1);
+    parameters.put("negative_prompt", "低分辨率，低画质，肢体畸形，手指畸形，画面过饱和，构图混乱，文字模糊，扭曲。");
+    parameters.put("watermark", false);
+    if (!"qwen-image-edit".equals(model)) {
+      parameters.put("prompt_extend", true);
+      parameters.put("size", imageEditSize(canvasImage));
     }
-    return config.get("deepseek.chat.model", "deepseek-chat");
+
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("model", model == null || model.isBlank() ? "qwen-image-edit" : model);
+    payload.put("input", input);
+    payload.put("parameters", parameters);
+
+    HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create(imageUrl))
+        .timeout(Duration.ofSeconds(180))
+        .header("Authorization", "Bearer " + apiKey)
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(JsonUtil.stringify(payload), StandardCharsets.UTF_8))
+        .build();
+
+    HttpResponse<String> response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new IllegalStateException("Qwen 图片生成失败: HTTP " + response.statusCode() + " " + shortBody(response.body()));
+    }
+    return extractGeneratedImage(servletRequest, response.body());
+  }
+
+  private String resolveQwenImageEndpoint(AppConfig config) {
+    String configured = config.get("qwen.image.base.url", "");
+    if (!configured.isBlank()) {
+      return configured.replaceAll("/+$", "");
+    }
+    String baseUrl = config.get("qwen.base.url", "https://dashscope.aliyuncs.com/compatible-mode/v1").replaceAll("/+$", "");
+    if (baseUrl.endsWith("/compatible-mode/v1")) {
+      baseUrl = baseUrl.substring(0, baseUrl.length() - "/compatible-mode/v1".length());
+    }
+    return baseUrl + "/api/v1/services/aigc/multimodal-generation/generation";
+  }
+
+  private byte[] buildImageEditMultipartBody(
+      String boundary,
+      String model,
+      String prompt,
+      byte[] imageBytes,
+      String contentType,
+      BufferedImage canvasImage
+  ) throws IOException {
+    String mimeType = contentType == null || contentType.isBlank() ? "image/png" : contentType;
+    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+      writeFormField(out, boundary, "model", model == null || model.isBlank() ? "qwen-image-edit" : model);
+      writeFormField(out, boundary, "prompt", prompt);
+      writeFormField(out, boundary, "n", "1");
+      writeFormField(out, boundary, "size", imageEditSize(canvasImage));
+      out.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+      out.write("Content-Disposition: form-data; name=\"image\"; filename=\"canvas.png\"\r\n".getBytes(StandardCharsets.UTF_8));
+      out.write(("Content-Type: " + mimeType + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+      out.write(imageBytes);
+      out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+      out.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+      return out.toByteArray();
+    }
+  }
+
+  private void writeFormField(ByteArrayOutputStream out, String boundary, String name, String value) throws IOException {
+    out.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+    out.write(("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+    out.write((value == null ? "" : value).getBytes(StandardCharsets.UTF_8));
+    out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+  }
+
+  private String imageEditSize(BufferedImage canvasImage) {
+    if (canvasImage == null) {
+      return "1024x1024";
+    }
+    double ratio = (double) canvasImage.getWidth() / Math.max(1, canvasImage.getHeight());
+    if (ratio > 1.2) {
+      return "1536x1024";
+    }
+    if (ratio < 0.85) {
+      return "1024x1536";
+    }
+    return "1024x1024";
+  }
+
+  private ImageGenerationResult extractGeneratedImage(HttpServletRequest request, String body) throws Exception {
+    Map<String, Object> json = JsonUtil.mapper().readValue(body, new TypeReference<Map<String, Object>>() {});
+    ImageGenerationResult fromChoices = extractGeneratedImageFromChoices(request, json);
+    if (fromChoices != null) {
+      return fromChoices;
+    }
+
+    ImageGenerationResult fromData = extractGeneratedImageFromList(request, json.get("data"));
+    if (fromData != null) {
+      return fromData;
+    }
+
+    Object output = json.get("output");
+    if (output instanceof Map<?, ?> outputMap) {
+      ImageGenerationResult fromResults = extractGeneratedImageFromList(request, outputMap.get("results"));
+      if (fromResults != null) {
+        return fromResults;
+      }
+    }
+
+    throw new IllegalStateException("Qwen 图片生成响应中没有可用图片");
+  }
+
+  private ImageGenerationResult extractGeneratedImageFromChoices(HttpServletRequest request, Map<String, Object> json) throws Exception {
+    Object output = json.get("output");
+    if (!(output instanceof Map<?, ?> outputMap) || !(outputMap.get("choices") instanceof List<?> choices) || choices.isEmpty()) {
+      return null;
+    }
+    Object first = choices.get(0);
+    if (!(first instanceof Map<?, ?> choice) || !(choice.get("message") instanceof Map<?, ?> message)) {
+      return null;
+    }
+    Object content = message.get("content");
+    if (!(content instanceof List<?> list)) {
+      return null;
+    }
+    for (Object itemValue : list) {
+      if (itemValue instanceof Map<?, ?> item) {
+        String generatedUrl = stringValue(item.get("image"));
+        if (!generatedUrl.isBlank()) {
+          return new ImageGenerationResult(saveRemoteImage(request, generatedUrl), "");
+        }
+      }
+    }
+    return null;
+  }
+
+  private ImageGenerationResult extractGeneratedImageFromList(HttpServletRequest request, Object listLike) throws Exception {
+    if (!(listLike instanceof List<?> list) || list.isEmpty() || !(list.get(0) instanceof Map<?, ?> item)) {
+      return null;
+    }
+    String revisedPrompt = stringValue(item.get("revised_prompt"));
+    String imageUrl = stringValue(item.get("url"));
+    if (!imageUrl.isBlank()) {
+      return new ImageGenerationResult(saveRemoteImage(request, imageUrl), revisedPrompt);
+    }
+    String b64 = stringValue(item.get("b64_json"));
+    if (!b64.isBlank()) {
+      return new ImageGenerationResult(saveImageBytes(request, Base64.getDecoder().decode(b64), "image/png"), revisedPrompt);
+    }
+    return null;
+  }
+
+  private String saveRemoteImage(HttpServletRequest request, String remoteUrl) throws Exception {
+    HttpRequest imageRequest = HttpRequest.newBuilder()
+        .uri(URI.create(remoteUrl))
+        .timeout(Duration.ofSeconds(90))
+        .GET()
+        .build();
+    HttpResponse<byte[]> imageResponse = HttpClient.newHttpClient().send(imageRequest, HttpResponse.BodyHandlers.ofByteArray());
+    if (imageResponse.statusCode() < 200 || imageResponse.statusCode() >= 300) {
+      throw new IllegalStateException("下载 Qwen 结果图失败: HTTP " + imageResponse.statusCode());
+    }
+    String contentType = imageResponse.headers().firstValue("Content-Type").orElse("image/png");
+    return saveImageBytes(request, imageResponse.body(), contentType);
+  }
+
+  private String saveImageBytes(HttpServletRequest request, byte[] bytes, String contentType) throws IOException {
+    File uploadDir = (File) getServletContext().getAttribute(AppContextKeys.UPLOAD_DIR);
+    String extension = imageExtension(contentType);
+    String filename = "ai_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "") + extension;
+    File target = new File(uploadDir, filename);
+    try (ByteArrayInputStream in = new ByteArrayInputStream(bytes)) {
+      BufferedImage image = ImageIO.read(in);
+      if (image != null) {
+        ImageIO.write(image, extension.equals(".jpg") ? "jpg" : "png", target);
+      } else {
+        try (var out = new java.io.FileOutputStream(target)) {
+          out.write(bytes);
+        }
+      }
+    }
+    return publicBaseUrl(request) + "/uploads/" + filename;
+  }
+
+  private String imageExtension(String contentType) {
+    String normalized = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
+    if (normalized.contains("jpeg") || normalized.contains("jpg")) {
+      return ".jpg";
+    }
+    return ".png";
+  }
+
+  private String stringValue(Object value) {
+    return value == null ? "" : String.valueOf(value);
+  }
+
+  private String shortBody(String body) {
+    if (body == null) {
+      return "";
+    }
+    return body.length() <= 500 ? body : body.substring(0, 500);
+  }
+
+  private String resolveQwenModel(AppConfig config, String mode, String selectedModel) {
+    if ("draw".equals(mode)) {
+      if (selectedModel != null && selectedModel.startsWith("qwen-image")) {
+        return selectedModel;
+      }
+      return config.get("qwen.image.model", "qwen-image-edit");
+    }
+    if (selectedModel != null && selectedModel.startsWith("qwen-")) {
+      return selectedModel;
+    }
+    return config.get("qwen.chat.model", "qwen-plus");
   }
 
   private String buildRefinePrompt(String prompt, String canvasNote, List<String> attachmentNotes) {
@@ -349,5 +601,15 @@ public class AiServlet extends BaseApiServlet {
       host = request.getHeader("Host");
     }
     return proto + "://" + host;
+  }
+
+  private static final class ImageGenerationResult {
+    private final String imageUrl;
+    private final String revisedPrompt;
+
+    private ImageGenerationResult(String imageUrl, String revisedPrompt) {
+      this.imageUrl = imageUrl;
+      this.revisedPrompt = revisedPrompt;
+    }
   }
 }

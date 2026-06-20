@@ -22,7 +22,7 @@ The WAR is built as `target/ROOT.war` so Tomcat exposes APIs at `/api/...`.
 ## Local Tomcat Run
 
 1. Initialize MySQL with `src/main/resources/init.sql`.
-2. Copy `.env.example` to `.env.local` in the project root, then configure your local database and DeepSeek values.
+2. Copy `.env.example` to `.env.local` in the project root, then configure your local database and Qwen values.
 3. From the project root, start the backend:
 
 ```powershell
@@ -60,10 +60,10 @@ Every property can be overridden by an environment variable:
 - `DB_PASSWORD`
 - `CORS_ALLOWED_ORIGINS`
 - `UPLOAD_PATH`
-- `DEEPSEEK_API_KEY`
-- `DEEPSEEK_BASE_URL`
-- `DEEPSEEK_CHAT_MODEL`
-- `DEEPSEEK_IMAGE_MODEL`
+- `QWEN_API_KEY`
+- `QWEN_BASE_URL`
+- `QWEN_CHAT_MODEL`
+- `QWEN_IMAGE_MODEL`
 - `COMFYUI_BASE_URL`
 
 Windows examples:
@@ -74,7 +74,7 @@ setx DB_PORT 3306
 setx DB_NAME pixel_lab
 setx DB_USER root
 setx DB_PASSWORD "your_mysql_password"
-setx DEEPSEEK_API_KEY "your_deepseek_key"
+setx QWEN_API_KEY "your_dashscope_key"
 ```
 
 Restart Tomcat after changing environment variables.

@@ -25,6 +25,9 @@
   --primary-hover: #0FAA6E;
   --primary-muted: rgba(22, 199, 132, 0.12);
   --primary-glow: rgba(22, 199, 132, 0.22);
+  --ambient-primary: rgba(22, 199, 132, 0.28);
+  --ambient-accent: rgba(124, 90, 239, 0.22);
+  --ambient-grid: rgba(20, 26, 23, 0.045);
 
   /* 辅助色 */
   --secondary: #5B8DEF;
@@ -111,6 +114,9 @@
   --primary-hover: #0FAA6E;
   --primary-muted: rgba(22, 199, 132, 0.12);
   --primary-glow: rgba(22, 199, 132, 0.22);
+  --ambient-primary: rgba(22, 199, 132, 0.28);
+  --ambient-accent: rgba(124, 90, 239, 0.22);
+  --ambient-grid: rgba(20, 26, 23, 0.045);
 
   --shadow-sm: 0 6px 18px rgba(17, 24, 39, 0.06);
   --shadow: 0 12px 32px rgba(17, 24, 39, 0.08);
@@ -139,6 +145,9 @@
   --primary-hover: #23E09B;
   --primary-muted: rgba(25, 212, 142, 0.14);
   --primary-glow: rgba(25, 212, 142, 0.24);
+  --ambient-primary: rgba(25, 212, 142, 0.22);
+  --ambient-accent: rgba(151, 117, 255, 0.2);
+  --ambient-grid: rgba(255, 255, 255, 0.045);
 
   --shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.18);
   --shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
