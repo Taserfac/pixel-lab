@@ -1,135 +1,69 @@
 <template>
   <div class="draw-page">
-    <aside class="tool-rail">
-      <div class="rail-group primary-tools">
-        <el-tooltip content="画笔 (B)" placement="right">
-          <button
-            class="rail-btn primary-tool"
-            :class="{ active: currentTool === 'brush' }"
-            type="button"
-            @click="selectTool('brush')"
-          >
-            <span class="btn-icon"><el-icon :size="22"><EditPen /></el-icon></span>
-            <span class="btn-key">B</span>
+    <header class="editor-topbar">
+      <div class="document-area">
+        <el-tooltip content="返回首页" placement="bottom">
+          <button class="icon-button back-button" type="button" @click="goBack">
+            <el-icon><ArrowLeft /></el-icon>
           </button>
         </el-tooltip>
-
-        <el-tooltip content="橡皮擦 (E)" placement="right">
-          <button
-            class="rail-btn primary-tool"
-            :class="{ active: currentTool === 'eraser' }"
-            type="button"
-            @click="selectTool('eraser')"
-          >
-            <span class="btn-icon"><el-icon :size="22"><Delete /></el-icon></span>
-            <span class="btn-key">E</span>
-          </button>
-        </el-tooltip>
-
-        <el-tooltip content="移动画布 (H)" placement="right">
-          <button
-            class="rail-btn primary-tool"
-            :class="{ active: currentTool === 'pan' }"
-            type="button"
-            @click="selectTool('pan')"
-          >
-            <span class="btn-icon"><el-icon :size="22"><Rank /></el-icon></span>
-            <span class="btn-key">H</span>
-          </button>
-        </el-tooltip>
+        <el-input v-model="documentName" class="document-name" maxlength="40" aria-label="文件名" />
       </div>
 
-      <div class="rail-group history-tools">
-        <el-tooltip content="上一步 (Ctrl+Z)" placement="right">
-          <button
-            class="rail-btn history-tool"
-            :class="{ disabled: !canUndo }"
-            type="button"
-            @click="undo"
-          >
-            <span class="btn-icon"><el-icon :size="21"><Back /></el-icon></span>
-          </button>
-        </el-tooltip>
-
-        <el-tooltip content="下一步 (Ctrl+Y)" placement="right">
-          <button
-            class="rail-btn history-tool"
-            :class="{ disabled: !canRedo }"
-            type="button"
-            @click="redo"
-          >
-            <span class="btn-icon"><el-icon :size="21"><Right /></el-icon></span>
-          </button>
-        </el-tooltip>
-      </div>
-
-      <div class="rail-group danger-tools">
-        <el-popconfirm
-          title="确定清空当前画布吗？"
-          confirm-button-text="清空"
-          cancel-button-text="取消"
-          @confirm="clearCanvas"
-        >
-          <template #reference>
-            <button class="rail-btn danger-tool" type="button">
-              <span class="btn-icon"><el-icon :size="21"><RefreshRight /></el-icon></span>
-              <span class="btn-key">清</span>
-            </button>
-          </template>
-        </el-popconfirm>
-      </div>
-    </aside>
-
-    <section class="studio">
-      <header class="studio-header">
-        <div class="studio-title">
-          <span class="eyebrow">Pixel Lab</span>
-          <h1>创意画布</h1>
-        </div>
-
-        <div class="header-actions">
-          <div class="zoom-controls" aria-label="画布缩放">
+      <div class="topbar-actions">
+        <section class="action-group view-group" aria-label="视图操作">
+          <span class="group-label">视图</span>
+          <div class="zoom-controls">
             <el-tooltip content="缩小 (Ctrl + -)" placement="bottom">
-              <button
-                class="zoom-btn"
-                type="button"
-                :disabled="zoomLevel <= ZOOM_MIN"
-                @click="zoomOut"
-              >
+              <button class="zoom-btn" type="button" :disabled="zoomLevel <= ZOOM_MIN" @click="zoomOut">
                 <el-icon><ZoomOut /></el-icon>
               </button>
             </el-tooltip>
-            <button class="zoom-value" type="button" @click="resetZoom">
-              {{ zoomLevel }}%
-            </button>
+            <button class="zoom-value" type="button" @click="resetZoom">{{ zoomLevel }}%</button>
             <el-tooltip content="放大 (Ctrl + +)" placement="bottom">
-              <button
-                class="zoom-btn"
-                type="button"
-                :disabled="zoomLevel >= ZOOM_MAX"
-                @click="zoomIn"
-              >
+              <button class="zoom-btn" type="button" :disabled="zoomLevel >= ZOOM_MAX" @click="zoomIn">
                 <el-icon><ZoomIn /></el-icon>
               </button>
             </el-tooltip>
-            <el-tooltip content="适配窗口" placement="bottom">
-              <button class="zoom-btn" type="button" @click="fitCanvasToView">
+            <el-tooltip content="全屏" placement="bottom">
+              <button class="zoom-btn" :class="{ active: isFullscreen }" type="button" @click="toggleFullscreen">
                 <el-icon><FullScreen /></el-icon>
               </button>
             </el-tooltip>
           </div>
+        </section>
 
-          <el-button @click="openAiDialog">
-            <el-icon><MagicStick /></el-icon>
-            AI 创作
-          </el-button>
+        <section class="action-group canvas-actions" aria-label="画布操作">
+          <span class="group-label">画布</span>
+          <el-select v-model="selectedPreset" class="preset-select" size="small" @change="applyPreset">
+            <el-option v-for="preset in canvasPresets" :key="preset.value" :label="preset.label" :value="preset.value" />
+          </el-select>
+          <el-input-number v-model="draftWidth" class="dimension-input" :min="128" :max="2400" :step="64" size="small" controls-position="right" aria-label="画布宽度" />
+          <span class="dimension-separator">×</span>
+          <el-input-number v-model="draftHeight" class="dimension-input" :min="128" :max="2400" :step="64" size="small" controls-position="right" aria-label="画布高度" />
+          <el-button size="small" type="primary" @click="resizeCanvas">应用尺寸</el-button>
+          <el-select v-model="backgroundMode" class="background-select" size="small" @change="applyBackground">
+            <el-option v-for="option in backgroundOptions" :key="option.value" :label="option.label" :value="option.value" />
+          </el-select>
+          <el-color-picker v-if="backgroundMode === 'color'" v-model="backgroundColor" size="small" @change="applyBackground" />
+          <label class="grid-toggle"><span>网格</span><el-switch v-model="showGrid" size="small" /></label>
+        </section>
 
+        <section class="action-group compact-group" aria-label="AI 操作">
+          <span class="group-label">AI</span>
+          <el-button size="small" @click="openAiDialog"><el-icon><MagicStick /></el-icon>AI 创作</el-button>
+        </section>
+
+        <section class="action-group compact-group file-actions" aria-label="文件操作">
+          <span class="group-label">文件</span>
+          <el-popconfirm title="确定清空当前画布吗？" confirm-button-text="清空" cancel-button-text="取消" @confirm="clearCanvas">
+            <template #reference>
+              <el-button size="small"><el-icon><RefreshRight /></el-icon>清空</el-button>
+            </template>
+          </el-popconfirm>
+          <el-button size="small" type="primary" @click="saveToGallery"><el-icon><Upload /></el-icon>保存</el-button>
           <el-dropdown trigger="click" @command="downloadImage">
-            <el-button>
-              <el-icon><Download /></el-icon>
-              导出
-              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-            </el-button>
+            <el-button size="small"><el-icon><Download /></el-icon>导出<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="transparent">PNG 透明背景</el-dropdown-item>
@@ -138,209 +72,133 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+        </section>
+      </div>
+    </header>
 
-          <el-button type="primary" @click="saveToGallery">
-            <el-icon><Upload /></el-icon>
-            保存
-          </el-button>
-        </div>
-      </header>
+    <aside class="tool-rail" aria-label="工具选择">
+      <div class="rail-title">工具选择</div>
+      <div class="rail-group primary-tools">
+        <el-tooltip content="画笔 (B)" placement="right">
+          <button class="rail-btn" :class="{ active: currentTool === 'brush' }" type="button" @click="selectTool('brush')">
+            <el-icon :size="21"><EditPen /></el-icon><span>画笔</span><kbd>B</kbd>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="橡皮 (E)" placement="right">
+          <button class="rail-btn" :class="{ active: currentTool === 'eraser' }" type="button" @click="selectTool('eraser')">
+            <el-icon :size="21"><Delete /></el-icon><span>橡皮</span><kbd>E</kbd>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="移动 (V)" placement="right">
+          <button class="rail-btn" :class="{ active: currentTool === 'pan' }" type="button" @click="selectTool('pan')">
+            <el-icon :size="21"><Rank /></el-icon><span>移动</span><kbd>V</kbd>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="选择工具 (S)" placement="right">
+          <button class="rail-btn" :class="{ active: currentTool === 'select' }" type="button" @click="selectTool('select')">
+            <el-icon :size="21"><Crop /></el-icon><span>选择</span><kbd>S</kbd>
+          </button>
+        </el-tooltip>
+      </div>
 
+      <div class="rail-group history-tools">
+        <el-tooltip content="撤销 (Ctrl+Z)" placement="right">
+          <button class="rail-btn history-tool" :disabled="!canUndo" type="button" @click="undo">
+            <el-icon :size="20"><Back /></el-icon><span>撤销</span>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="重做 (Ctrl+Y)" placement="right">
+          <button class="rail-btn history-tool" :disabled="!canRedo" type="button" @click="redo">
+            <el-icon :size="20"><Right /></el-icon><span>重做</span>
+          </button>
+        </el-tooltip>
+      </div>
+    </aside>
+
+    <section class="studio">
       <div
         ref="canvasWrapperRef"
         class="canvas-stage"
-        :class="{
-          'show-grid': showGrid,
-          'pan-tool': currentTool === 'pan',
-          'space-pan': isSpacePressed,
-          'is-panning': isPanning
-        }"
+        :class="{ 'show-grid': showGrid }"
         @wheel="handleCanvasWheel"
-        @pointerdown.capture="handleCanvasPanStart"
-        @pointermove="handleCanvasPanMove"
-        @pointerup="stopCanvasPanning"
-        @pointerleave="stopCanvasPanning"
       >
-        <div class="canvas-viewport" :style="canvasViewportStyle">
-          <div
-            class="canvas-shell"
-            :class="{ transparent: backgroundMode === 'transparent' }"
-            :style="canvasShellStyle"
-          >
-            <canvas ref="canvasRef" />
-            <div v-show="showGrid" class="canvas-grid-overlay" />
+        <div class="shortcut-strip" aria-label="快捷操作">
+          <span><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销</span>
+          <span><kbd>Ctrl</kbd> + <kbd>S</kbd> 保存</span>
+          <span><kbd>Ctrl</kbd> + 滚轮缩放</span>
+        </div>
+        <div class="canvas-card">
+          <div class="canvas-viewport" :style="canvasViewportStyle">
+            <div class="canvas-shell" :class="{ transparent: backgroundMode === 'transparent' }" :style="canvasShellStyle">
+              <canvas ref="canvasRef" />
+              <div v-show="showGrid" class="canvas-grid-overlay" />
+            </div>
           </div>
         </div>
       </div>
 
       <footer class="status-bar">
-        <span>{{ canvasWidth }} x {{ canvasHeight }}</span>
+        <span>画布 {{ canvasWidth }} × {{ canvasHeight }}px</span>
         <span>缩放 {{ zoomLevel }}%</span>
-        <span>{{ currentToolLabel }}</span>
-        <span>历史 {{ historyIndex + 1 }}/{{ historyCount }}</span>
-        <span v-if="pointerPosition">x {{ pointerPosition.x }}, y {{ pointerPosition.y }}</span>
-        <span class="hint">B 画笔 · E 橡皮 · H 移动 · Ctrl+滚轮 缩放</span>
+        <span>工具 {{ currentToolLabel }}</span>
+        <span v-if="pointerPosition">光标 {{ pointerPosition.x }}, {{ pointerPosition.y }}</span>
+        <span class="status-history">历史 {{ historyIndex + 1 }}/{{ historyCount }}</span>
       </footer>
     </section>
 
     <aside class="inspector">
-      <section class="panel-section">
-        <h2>工具</h2>
-        <el-segmented
-          v-model="currentTool"
-          :options="toolOptions"
-          @change="updateBrush"
-        />
-      </section>
+      <div class="inspector-heading">
+        <div><span>属性面板</span><strong>{{ inspectorTitle }}</strong></div>
+        <span class="tool-shortcut">{{ currentToolShortcut }}</span>
+      </div>
 
-      <section class="panel-section">
-        <div class="section-row">
-          <h2>画笔</h2>
-          <span class="meter">{{ brushSize }}px</span>
-        </div>
-        <div v-show="currentTool === 'pan'" class="tool-note">
-          左键拖动画布视图，不会修改画布内容。
-        </div>
-        <label v-show="currentTool === 'brush'" class="field">
-          <span>类型</span>
-          <el-select
-            v-model="brushType"
-            size="small"
-            @change="updateBrush"
-          >
-            <el-option
-              v-for="brush in brushTypes"
-              :key="brush.value"
-              :label="brush.label"
-              :value="brush.value"
-            />
-          </el-select>
-        </label>
-        <label v-show="currentTool === 'eraser'" class="field">
-          <span>类型</span>
-          <el-select
-            v-model="eraserType"
-            size="small"
-            @change="updateBrush"
-          >
-            <el-option
-              v-for="eraser in eraserTypes"
-              :key="eraser.value"
-              :label="eraser.label"
-              :value="eraser.value"
-            />
-          </el-select>
-        </label>
-        <label class="field">
-          <span>大小</span>
-          <el-slider
-            v-model="brushSize"
-            :min="1"
-            :max="96"
-            :disabled="currentTool === 'pan'"
-            :show-tooltip="false"
-          />
-        </label>
-        <label class="field">
-          <span>透明度</span>
-          <el-slider
-            v-model="brushOpacity"
-            :min="10"
-            :max="100"
-            :step="5"
-            :disabled="currentTool === 'eraser' || currentTool === 'pan'"
-            :show-tooltip="false"
-          />
-        </label>
-        <div v-show="currentTool === 'brush'" class="field">
-          <span>颜色</span>
-          <div class="color-row">
-            <el-color-picker
-              v-model="brushColor"
-              :predefine="presetColors"
-              size="small"
-            />
-            <div class="quick-colors">
-              <button
-                v-for="color in quickColors"
-                :key="color"
-                class="color-dot"
-                :class="{ active: brushColor === color }"
-                :style="{ backgroundColor: color }"
-                type="button"
-                @click="brushColor = color"
-              />
+      <template v-if="currentTool === 'brush'">
+        <el-collapse v-model="inspectorSections">
+          <el-collapse-item title="画笔设置" name="brush">
+            <label class="field"><span>笔刷类型</span><el-select v-model="brushType" size="small" @change="updateBrush"><el-option v-for="brush in brushTypes" :key="brush.value" :label="brush.label" :value="brush.value" /></el-select></label>
+            <label class="field"><span>大小 <em>{{ brushSize }}px</em></span><el-slider v-model="brushSize" :min="1" :max="96" :show-tooltip="false" /></label>
+            <label class="field"><span>压力 <em>{{ brushPressure }}%</em></span><el-slider v-model="brushPressure" :min="0" :max="100" :show-tooltip="false" /></label>
+          </el-collapse-item>
+          <el-collapse-item title="颜色" name="color">
+            <div class="field"><span>当前颜色</span><div class="color-control"><el-color-picker v-model="brushColor" :predefine="presetColors" /><code>{{ brushColor }}</code></div></div>
+            <div class="field"><span>色板</span><div class="quick-colors"><button v-for="color in quickColors" :key="color" class="color-dot" :class="{ active: brushColor === color }" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
+            <div class="field"><span>最近颜色</span><div class="quick-colors recent-colors"><button v-for="color in recentColors" :key="color" class="color-dot" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
+          </el-collapse-item>
+          <el-collapse-item title="高级" name="advanced">
+            <label class="field"><span>透明度 <em>{{ brushOpacity }}%</em></span><el-slider v-model="brushOpacity" :min="10" :max="100" :step="5" :show-tooltip="false" /></label>
+            <label class="field"><span>混合模式</span><el-select v-model="blendMode" size="small"><el-option v-for="mode in blendModes" :key="mode.value" :label="mode.label" :value="mode.value" /></el-select></label>
+          </el-collapse-item>
+        </el-collapse>
+      </template>
+
+      <template v-else-if="currentTool === 'eraser'">
+        <el-collapse v-model="eraserSections">
+          <el-collapse-item title="橡皮设置" name="eraser">
+            <label class="field"><span>橡皮类型</span><el-select v-model="eraserType" size="small" @change="updateBrush"><el-option v-for="eraser in eraserTypes" :key="eraser.value" :label="eraser.label" :value="eraser.value" /></el-select></label>
+            <label class="field"><span>大小 <em>{{ eraserSize }}px</em></span><el-slider v-model="eraserSize" :min="1" :max="96" :show-tooltip="false" /></label>
+            <label class="field"><span>压力 <em>{{ eraserPressure }}%</em></span><el-slider v-model="eraserPressure" :min="0" :max="100" :show-tooltip="false" /></label>
+          </el-collapse-item>
+        </el-collapse>
+      </template>
+
+      <div v-else-if="currentTool === 'pan'" class="tool-help">
+        <el-icon><Rank /></el-icon><strong>移动笔迹</strong><p>直接拖动画布中的笔迹进行移动。画布位置保持固定。</p>
+      </div>
+      <template v-else>
+        <el-collapse v-model="selectionSections">
+          <el-collapse-item title="选择设置" name="selection">
+            <div v-if="selectedObject" class="selection-controls">
+              <div class="field"><span>对象颜色</span><div class="color-control"><el-color-picker v-model="selectionColor" :predefine="presetColors" @change="changeSelectedColor" /><code>{{ selectionColor }}</code></div></div>
+              <el-button class="delete-selection" type="danger" plain @click="deleteSelectedObject"><el-icon><Delete /></el-icon>删除选中对象</el-button>
+              <p class="selection-hint">也可以按 Delete 或 Backspace 删除</p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel-section">
-        <h2>画布</h2>
-        <label class="field">
-          <span>预设</span>
-          <el-select
-            v-model="selectedPreset"
-            size="small"
-            @change="applyPreset"
-          >
-            <el-option
-              v-for="preset in canvasPresets"
-              :key="preset.value"
-              :label="preset.label"
-              :value="preset.value"
-            />
-          </el-select>
-        </label>
-        <div class="size-grid">
-          <label class="field">
-            <span>宽度</span>
-            <el-input-number
-              v-model="draftWidth"
-              :min="128"
-              :max="2400"
-              :step="64"
-              size="small"
-              controls-position="right"
-            />
-          </label>
-          <label class="field">
-            <span>高度</span>
-            <el-input-number
-              v-model="draftHeight"
-              :min="128"
-              :max="2400"
-              :step="64"
-              size="small"
-              controls-position="right"
-            />
-          </label>
-        </div>
-        <el-button class="full-action" @click="resizeCanvas">应用尺寸</el-button>
-      </section>
-
-      <section class="panel-section">
-        <h2>背景</h2>
-        <el-segmented
-          v-model="backgroundMode"
-          :options="backgroundOptions"
-          @change="applyBackground"
-        />
-        <div v-if="backgroundMode === 'color'" class="field inline">
-          <span>颜色</span>
-          <el-color-picker
-            v-model="backgroundColor"
-            size="small"
-            @change="applyBackground"
-          />
-        </div>
-        <div class="field inline">
-          <span>网格</span>
-          <el-switch v-model="showGrid" />
-        </div>
-      </section>
+            <div v-else class="tool-help compact">
+              <el-icon><Crop /></el-icon><strong>选择对象</strong><p>点击画布中的笔画或图像后，可调整颜色、移动、缩放或删除。</p>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </template>
     </aside>
-
     <el-dialog
       v-model="aiDialogVisible"
       title="AI 创作"
@@ -467,12 +325,14 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { EditPen, Delete, Back, Right, Download, Upload, RefreshRight, ArrowDown, MagicStick, UploadFilled, ZoomIn, ZoomOut, FullScreen, Rank } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { ArrowDown, ArrowLeft, Back, Crop, Delete, Download, EditPen, FullScreen, MagicStick, Rank, RefreshRight, Right, Upload, UploadFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { Canvas as FabricCanvas, CircleBrush, FabricImage, PencilBrush, Shadow, SprayBrush } from 'fabric'
 import { uploadImage } from '@/api/image'
 import { refineDrawing } from '@/api/ai'
 
+const router = useRouter()
 const canvasRef = ref(null)
 const canvasWrapperRef = ref(null)
 let fabricCanvas = null
@@ -482,11 +342,16 @@ const ZOOM_MIN = 25
 const ZOOM_MAX = 400
 const ZOOM_STEP = 25
 
+const documentName = ref('未命名作品')
 const currentTool = ref('brush')
 const brushType = ref('hard')
 const eraserType = ref('hard')
 const brushSize = ref(8)
 const brushOpacity = ref(100)
+const brushPressure = ref(50)
+const eraserSize = ref(24)
+const eraserPressure = ref(50)
+const blendMode = ref('source-over')
 const brushColor = ref('#111827')
 const canvasWidth = ref(800)
 const canvasHeight = ref(600)
@@ -498,9 +363,6 @@ const backgroundColor = ref('#ffffff')
 const showGrid = ref(true)
 const pointerPosition = ref(null)
 const zoomLevel = ref(100)
-const panOffset = ref({ x: 0, y: 0 })
-const isSpacePressed = ref(false)
-const isPanning = ref(false)
 const aiDialogVisible = ref(false)
 const aiMode = ref('refine')
 const aiPrompt = ref('')
@@ -511,12 +373,14 @@ const aiResultUrl = ref('')
 const aiResultText = ref('')
 const aiResultNotice = ref('')
 const aiLoading = ref(false)
+const isFullscreen = ref(false)
+const inspectorSections = ref(['brush', 'color', 'advanced'])
+const eraserSections = ref(['eraser'])
+const selectionSections = ref(['selection'])
+const selectedObject = ref(null)
+const selectionColor = ref('#111827')
+const recentColors = ref(['#111827', '#ffffff', '#3b82f6', '#ef4444'])
 
-const toolOptions = [
-  { label: '画笔', value: 'brush' },
-  { label: '橡皮', value: 'eraser' },
-  { label: '移动', value: 'pan' }
-]
 
 const brushTypes = [
   { label: '硬圆笔', value: 'hard' },
@@ -534,6 +398,12 @@ const eraserTypes = [
   { label: '喷点橡皮', value: 'spray' }
 ]
 
+const blendModes = [
+  { label: '正常', value: 'source-over' },
+  { label: '正片叠底', value: 'multiply' },
+  { label: '滤色', value: 'screen' },
+  { label: '叠加', value: 'overlay' }
+]
 const aiModeOptions = [
   { label: '润色建议', value: 'refine' },
   { label: '二次创作', value: 'draw' }
@@ -575,7 +445,6 @@ const quickColors = ['#111827', '#ffffff', '#ef4444', '#f97316', '#facc15', '#22
 const historyList = ref([])
 const historyIndex = ref(-1)
 const maxHistory = 60
-let panStart = null
 
 const canUndo = computed(() => historyIndex.value > 0)
 const canRedo = computed(() => historyIndex.value < historyList.value.length - 1)
@@ -583,11 +452,20 @@ const historyCount = computed(() => historyList.value.length)
 const activeBrushName = computed(() => brushTypes.find((brush) => brush.value === brushType.value)?.label || '硬圆笔')
 const activeEraserName = computed(() => eraserTypes.find((eraser) => eraser.value === eraserType.value)?.label || '硬橡皮')
 const currentToolLabel = computed(() => {
-  if (currentTool.value === 'pan') return '移动画布'
-  return currentTool.value === 'eraser'
-    ? `${activeEraserName.value} ${brushSize.value}px`
-    : `${activeBrushName.value} ${brushSize.value}px / ${brushOpacity.value}%`
+  if (currentTool.value === 'pan') return '移动笔迹'
+  if (currentTool.value === 'select') return '选择对象'
+  if (currentTool.value === 'eraser') return activeEraserName.value + ' ' + eraserSize.value + 'px'
+  return activeBrushName.value + ' ' + brushSize.value + 'px / ' + brushOpacity.value + '%'
 })
+const inspectorTitle = computed(() => ({
+  brush: '画笔',
+  eraser: '橡皮',
+  pan: '移动',
+  select: '选择工具'
+}[currentTool.value] || '工具'))
+const currentToolShortcut = computed(() => ({ brush: 'B', eraser: 'E', pan: 'V', select: 'S' }[currentTool.value] || ''))
+const effectiveBrushWidth = computed(() => Math.max(1, Math.round(brushSize.value * (0.75 + brushPressure.value / 200))))
+const effectiveEraserWidth = computed(() => Math.max(1, Math.round(eraserSize.value * (0.75 + eraserPressure.value / 200))))
 const activeAiModels = computed(() => aiModelGroups[aiMode.value] || aiModelGroups.refine)
 const aiPromptLabel = computed(() => aiMode.value === 'draw' ? '创作要求' : '润色要求')
 const aiPromptPlaceholder = computed(() => (
@@ -605,7 +483,6 @@ const zoomScale = computed(() => zoomLevel.value / 100)
 const canvasViewportStyle = computed(() => ({
   width: `${Math.round(canvasWidth.value * zoomScale.value)}px`,
   height: `${Math.round(canvasHeight.value * zoomScale.value)}px`,
-  transform: `translate(${panOffset.value.x}px, ${panOffset.value.y}px)`
 }))
 
 const canvasShellStyle = computed(() => {
@@ -664,7 +541,9 @@ const initCanvas = async () => {
     height: canvasHeight.value,
     backgroundColor: '',
     isDrawingMode: true,
-    preserveObjectStacking: true
+    preserveObjectStacking: true,
+    perPixelTargetFind: true,
+    targetFindTolerance: 0
   })
 
   fabricCanvas.on('path:created', handlePathCreated)
@@ -673,11 +552,70 @@ const initCanvas = async () => {
     pointerPosition.value = null
   })
 
+  fabricCanvas.on('selection:created', syncSelectedObject)
+  fabricCanvas.on('selection:updated', syncSelectedObject)
+  fabricCanvas.on('selection:cleared', () => {
+    selectedObject.value = null
+  })
+  fabricCanvas.on('object:modified', () => saveHistory('调整对象'))
   syncFabricCanvasLayout()
   updateBrush()
   saveHistory('初始画布')
 }
 
+const goBack = () => {
+  router.push('/dashboard')
+}
+
+const selectBrushColor = (color) => {
+  brushColor.value = color
+}
+
+const toggleFullscreen = async () => {
+  if (!document.fullscreenElement) {
+    await document.documentElement.requestFullscreen?.()
+  } else {
+    await document.exitFullscreen?.()
+  }
+}
+
+const syncFullscreenState = () => {
+  isFullscreen.value = Boolean(document.fullscreenElement)
+}
+const syncSelectedObject = (event) => {
+  const object = event?.selected?.[0] || fabricCanvas?.getActiveObject() || null
+  selectedObject.value = object
+  const objectColor = object?.stroke || object?.fill
+  selectionColor.value = typeof objectColor === 'string' && objectColor.startsWith('#') ? objectColor : '#111827'
+}
+
+const changeSelectedColor = (color) => {
+  if (!fabricCanvas || !color) return
+  const objects = fabricCanvas.getActiveObjects()
+  if (!objects.length) return
+  objects.forEach((object) => {
+    if (object.type === 'path' || object.stroke) {
+      object.set('stroke', color)
+    } else if (object.type !== 'image') {
+      object.set('fill', color)
+    }
+    object.setCoords()
+  })
+  selectionColor.value = color
+  fabricCanvas.requestRenderAll()
+  saveHistory('调整对象颜色')
+}
+
+const deleteSelectedObject = () => {
+  if (!fabricCanvas) return
+  const objects = fabricCanvas.getActiveObjects()
+  if (!objects.length) return
+  fabricCanvas.discardActiveObject()
+  objects.forEach((object) => fabricCanvas.remove(object))
+  selectedObject.value = null
+  fabricCanvas.requestRenderAll()
+  saveHistory('删除对象')
+}
 const selectTool = (tool) => {
   currentTool.value = tool
   updateBrush()
@@ -694,29 +632,39 @@ const getBrushColor = (opacity = brushOpacity.value) => {
   return `rgba(${red}, ${green}, ${blue}, ${opacity / 100})`
 }
 
+const configureEraserBrush = (brush) => {
+  const applyStyles = brush._setBrushStyles?.bind(brush)
+  if (applyStyles) {
+    brush._setBrushStyles = (context) => {
+      applyStyles(context)
+      context.globalCompositeOperation = 'destination-out'
+    }
+  }
+  return brush
+}
 const createBrush = () => {
   if (!fabricCanvas) return
 
   if (currentTool.value === 'eraser') {
     if (eraserType.value === 'spray') {
       const brush = new SprayBrush(fabricCanvas)
-      brush.width = brushSize.value
+      brush.width = effectiveEraserWidth.value
       brush.color = 'rgba(255, 255, 255, 1)'
       brush.density = 36
-      brush.dotWidth = Math.max(2, Math.round(brushSize.value / 6))
-      brush.dotWidthVariance = Math.max(1, Math.round(brushSize.value / 4))
+      brush.dotWidth = Math.max(2, Math.round(eraserSize.value / 6))
+      brush.dotWidthVariance = Math.max(1, Math.round(eraserSize.value / 4))
       brush.randomOpacity = true
-      return brush
+      return configureEraserBrush(brush)
     }
 
     const brush = new PencilBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveEraserWidth.value
     brush.color = 'rgba(255, 255, 255, 1)'
 
     if (eraserType.value === 'soft') {
       brush.shadow = new Shadow({
         color: 'rgba(255, 255, 255, 0.9)',
-        blur: Math.max(6, Math.round(brushSize.value * 0.7)),
+        blur: Math.max(6, Math.round(eraserSize.value * 0.7)),
         offsetX: 0,
         offsetY: 0
       })
@@ -727,14 +675,14 @@ const createBrush = () => {
       brush.strokeLineJoin = 'miter'
     }
 
-    return brush
+    return configureEraserBrush(brush)
   }
 
   const color = getBrushColor()
 
   if (brushType.value === 'spray') {
     const brush = new SprayBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveBrushWidth.value
     brush.color = color
     brush.density = 28
     brush.dotWidth = Math.max(1, Math.round(brushSize.value / 7))
@@ -745,7 +693,7 @@ const createBrush = () => {
 
   if (brushType.value === 'soft') {
     const brush = new PencilBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveBrushWidth.value
     brush.color = color
     brush.shadow = new Shadow({
       color,
@@ -758,7 +706,7 @@ const createBrush = () => {
 
   if (brushType.value === 'marker') {
     const brush = new PencilBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveBrushWidth.value
     brush.color = getBrushColor(Math.min(brushOpacity.value, 58))
     brush.strokeLineCap = 'round'
     brush.strokeLineJoin = 'round'
@@ -767,14 +715,14 @@ const createBrush = () => {
 
   if (brushType.value === 'scatter') {
     const brush = new CircleBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveBrushWidth.value
     brush.color = color
     return brush
   }
 
   if (brushType.value === 'pixel') {
     const brush = new PencilBrush(fabricCanvas)
-    brush.width = brushSize.value
+    brush.width = effectiveBrushWidth.value
     brush.color = color
     brush.strokeLineCap = 'square'
     brush.strokeLineJoin = 'miter'
@@ -782,7 +730,7 @@ const createBrush = () => {
   }
 
   const brush = new PencilBrush(fabricCanvas)
-  brush.width = brushSize.value
+  brush.width = effectiveBrushWidth.value
   brush.color = color
   return brush
 }
@@ -790,10 +738,34 @@ const createBrush = () => {
 const updateBrush = () => {
   if (!fabricCanvas) return
 
-  if (currentTool.value === 'pan') {
+  const isSelectionTool = currentTool.value === 'select'
+  const isMoveTool = currentTool.value === 'pan'
+  const isObjectTool = isSelectionTool || isMoveTool
+
+  fabricCanvas.selection = isSelectionTool
+  fabricCanvas.perPixelTargetFind = true
+  fabricCanvas.targetFindTolerance = 0
+  fabricCanvas.forEachObject((object) => {
+    const canInteract = isObjectTool && !object.isEraserStroke
+    object.set({
+      selectable: canInteract,
+      evented: canInteract,
+      perPixelTargetFind: true,
+      padding: 0,
+      hoverCursor: canInteract ? 'move' : 'default'
+    })
+  })
+
+  if (!isObjectTool) {
+    fabricCanvas.discardActiveObject()
+  }
+
+  if (isObjectTool) {
     fabricCanvas.isDrawingMode = false
-    fabricCanvas.defaultCursor = 'grab'
-    fabricCanvas.hoverCursor = 'grab'
+    fabricCanvas.defaultCursor = 'default'
+    fabricCanvas.hoverCursor = 'move'
+    if (isMoveTool) fabricCanvas.discardActiveObject()
+    fabricCanvas.requestRenderAll()
     return
   }
 
@@ -801,20 +773,27 @@ const updateBrush = () => {
   fabricCanvas.defaultCursor = 'crosshair'
   fabricCanvas.hoverCursor = 'crosshair'
   fabricCanvas.freeDrawingBrush = createBrush()
+  fabricCanvas.requestRenderAll()
 }
-
 const handlePathCreated = (event) => {
   if (!fabricCanvas || isRestoring) return
 
   if (currentTool.value === 'eraser' && event.path) {
-    event.path.globalCompositeOperation = 'destination-out'
-    event.path.stroke = '#ffffff'
-    event.path.opacity = 1
+    event.path.set({
+      globalCompositeOperation: 'destination-out',
+      stroke: '#000000',
+      opacity: 1,
+      selectable: false,
+      evented: false,
+      perPixelTargetFind: false,
+      isEraserStroke: true,
+      excludeFromExport: false
+    })
 
     if (eraserType.value === 'soft') {
       event.path.shadow = new Shadow({
         color: 'rgba(255, 255, 255, 0.9)',
-        blur: Math.max(6, Math.round(brushSize.value * 0.7)),
+        blur: Math.max(6, Math.round(eraserSize.value * 0.7)),
         offsetX: 0,
         offsetY: 0
       })
@@ -826,9 +805,14 @@ const handlePathCreated = (event) => {
     }
 
     fabricCanvas.requestRenderAll()
-  } else if (currentTool.value === 'brush' && brushType.value === 'pixel' && event.path) {
+  } else if (currentTool.value === 'brush' && event.path) {
+    event.path.globalCompositeOperation = blendMode.value
+    event.path.set({ selectable: false, evented: false, perPixelTargetFind: true, padding: 0, isEraserStroke: false })
+
+    if (brushType.value === 'pixel') {
     event.path.strokeLineCap = 'square'
-    event.path.strokeLineJoin = 'miter'
+      event.path.strokeLineJoin = 'miter'
+    }
     fabricCanvas.requestRenderAll()
   }
 
@@ -852,7 +836,7 @@ const saveHistory = (name) => {
   historyList.value = historyList.value.slice(0, historyIndex.value + 1)
   historyList.value.push({
     name,
-    json: fabricCanvas.toJSON(['globalCompositeOperation'])
+    json: fabricCanvas.toJSON(['globalCompositeOperation', 'isEraserStroke'])
   })
 
   if (historyList.value.length > maxHistory) {
@@ -897,7 +881,6 @@ const applyPreset = (value) => {
 
   draftWidth.value = preset.width
   draftHeight.value = preset.height
-  resizeCanvas()
 }
 
 const resizeCanvas = () => {
@@ -909,12 +892,12 @@ const resizeCanvas = () => {
     width: canvasWidth.value,
     height: canvasHeight.value
   })
+
   syncFabricCanvasLayout()
   fabricCanvas.requestRenderAll()
   selectedPreset.value = canvasPresets.some((item) => item.width === canvasWidth.value && item.height === canvasHeight.value)
     ? `${canvasWidth.value}x${canvasHeight.value}`
     : 'custom'
-  panOffset.value = { x: 0, y: 0 }
   saveHistory('调整画布尺寸')
 }
 
@@ -939,7 +922,6 @@ const zoomOut = () => {
 
 const resetZoom = () => {
   setZoomLevel(100)
-  panOffset.value = { x: 0, y: 0 }
 }
 
 const fitCanvasToView = () => {
@@ -957,7 +939,6 @@ const fitCanvasToView = () => {
   )
 
   setZoomLevel(fitScale * 100)
-  panOffset.value = { x: 0, y: 0 }
 }
 
 const handleCanvasWheel = (event) => {
@@ -969,75 +950,6 @@ const handleCanvasWheel = (event) => {
   } else {
     zoomOut()
   }
-}
-
-const shouldStartCanvasPan = (event) => {
-  return event.button === 1 ||
-    (event.button === 0 && (isSpacePressed.value || currentTool.value === 'pan'))
-}
-
-const handleCanvasPanStart = (event) => {
-  const stage = canvasWrapperRef.value
-  if (!stage || !shouldStartCanvasPan(event)) return
-
-  event.preventDefault()
-  event.stopPropagation()
-
-  isPanning.value = true
-  panStart = {
-    x: event.clientX,
-    y: event.clientY,
-    offsetX: panOffset.value.x,
-    offsetY: panOffset.value.y
-  }
-  stage.setPointerCapture?.(event.pointerId)
-
-  if (fabricCanvas) {
-    fabricCanvas.isDrawingMode = false
-    fabricCanvas.defaultCursor = 'grabbing'
-    fabricCanvas.hoverCursor = 'grabbing'
-  }
-}
-
-const moveCanvasPan = (event) => {
-  const stage = canvasWrapperRef.value
-  if (!stage || !isPanning.value || !panStart) return
-
-  event.preventDefault()
-  event.stopPropagation()
-
-  panOffset.value = {
-    x: panStart.offsetX + event.clientX - panStart.x,
-    y: panStart.offsetY + event.clientY - panStart.y
-  }
-}
-
-const handleCanvasPanMove = (event) => {
-  moveCanvasPan(event)
-}
-
-const stopCanvasPanning = (event) => {
-  const stage = canvasWrapperRef.value
-  if (!isPanning.value) return
-
-  event?.preventDefault?.()
-  event?.stopPropagation?.()
-  if (event?.pointerId !== undefined) {
-    stage?.releasePointerCapture?.(event.pointerId)
-  }
-
-  isPanning.value = false
-  panStart = null
-  updateBrush()
-  refreshCanvasOffset()
-}
-
-const handleGlobalPointerMove = (event) => {
-  moveCanvasPan(event)
-}
-
-const handleGlobalPointerUp = (event) => {
-  stopCanvasPanning(event)
 }
 
 const drawToCanvas = async (format = 'png', includeBackground = false, multiplier = 2) => {
@@ -1080,6 +992,7 @@ const dataUrlToFile = async (dataUrl, filename) => {
   return new File([blob], filename, { type: blob.type || 'image/png' })
 }
 
+const safeDocumentName = () => documentName.value.trim().replace(/[\\/:*?"<>|]/g, '-') || '未命名作品'
 const downloadImage = async (mode) => {
   if (!fabricCanvas) return
 
@@ -1087,7 +1000,7 @@ const downloadImage = async (mode) => {
   const includeBackground = mode !== 'transparent'
   const dataURL = await drawToCanvas(format, includeBackground)
   const link = document.createElement('a')
-  link.download = `drawing_${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`
+  link.download = `${safeDocumentName()}_${Date.now()}.${format === 'jpeg' ? 'jpg' : 'png'}`
   link.href = dataURL
   link.click()
   ElMessage.success('导出成功')
@@ -1395,7 +1308,7 @@ const saveToGallery = async () => {
     const dataURL = await drawToCanvas('png', backgroundMode.value !== 'transparent')
     const res = await fetch(dataURL)
     const blob = await res.blob()
-    const file = new File([blob], `drawing_${Date.now()}.png`, { type: 'image/png' })
+    const file = new File([blob], `${safeDocumentName()}_${Date.now()}.png`, { type: 'image/png' })
     await uploadImage(file)
     ElMessage.success('已保存到个人中心')
   } catch (error) {
@@ -1409,13 +1322,12 @@ const handleKeydown = (event) => {
   const isTyping = ['INPUT', 'TEXTAREA'].includes(target?.tagName) || target?.isContentEditable
   if (isTyping) return
 
-  if (event.code === 'Space') {
-    event.preventDefault()
-    isSpacePressed.value = true
-    return
-  }
 
   if (event.ctrlKey || event.metaKey) {
+    if (event.key.toLowerCase() === 's') {
+      event.preventDefault()
+      saveToGallery()
+    }
     if (event.key.toLowerCase() === 'z') {
       event.preventDefault()
       undo()
@@ -1439,41 +1351,37 @@ const handleKeydown = (event) => {
     return
   }
 
+  if ((event.key === 'Delete' || event.key === 'Backspace') && currentTool.value === 'select') {
+    event.preventDefault()
+    deleteSelectedObject()
+    return
+  }
   if (event.key.toLowerCase() === 'b') selectTool('brush')
   if (event.key.toLowerCase() === 'e') selectTool('eraser')
-  if (event.key.toLowerCase() === 'h') selectTool('pan')
-}
-
-const handleKeyup = (event) => {
-  if (event.code === 'Space') {
-    isSpacePressed.value = false
-  }
+  if (event.key.toLowerCase() === 'v') selectTool('pan')
+  if (event.key.toLowerCase() === 's') selectTool('select')
 }
 
 const handleWindowBlur = () => {
-  isSpacePressed.value = false
-  isPanning.value = false
-  panStart = null
   updateBrush()
 }
 
-watch([brushSize, brushColor, brushOpacity, currentTool, brushType, eraserType], updateBrush)
+watch([brushSize, brushColor, brushOpacity, brushPressure, eraserSize, eraserPressure, currentTool, brushType, eraserType], updateBrush)
+watch(brushColor, (color) => {
+  recentColors.value = [color, ...recentColors.value.filter(item => item !== color)].slice(0, 8)
+})
 
 onMounted(() => {
   initCanvas()
   window.addEventListener('keydown', handleKeydown)
-  window.addEventListener('keyup', handleKeyup)
   window.addEventListener('blur', handleWindowBlur)
-  window.addEventListener('pointermove', handleGlobalPointerMove)
-  window.addEventListener('pointerup', handleGlobalPointerUp)
+  document.addEventListener('fullscreenchange', syncFullscreenState)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
-  window.removeEventListener('keyup', handleKeyup)
   window.removeEventListener('blur', handleWindowBlur)
-  window.removeEventListener('pointermove', handleGlobalPointerMove)
-  window.removeEventListener('pointerup', handleGlobalPointerUp)
+  document.removeEventListener('fullscreenchange', syncFullscreenState)
   if (fabricCanvas) {
     fabricCanvas.dispose()
     fabricCanvas = null
@@ -1483,310 +1391,326 @@ onUnmounted(() => {
 
 <style scoped>
 .draw-page {
-  height: calc(100vh - 64px - 124px);
-  min-height: 0;
+  --editor-accent: #16a36a;
+  --editor-accent-soft: #e7f7ef;
+  --editor-ink: #17211d;
+  --editor-muted: #6d7973;
+  width: 100%;
+  height: 100vh;
+  min-width: 980px;
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 304px;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  grid-template-columns: 88px minmax(0, 1fr) 300px;
+  grid-template-rows: 80px minmax(0, 1fr);
+  color: var(--editor-ink);
+  background: #d9dddc;
   overflow: hidden;
 }
 
-.tool-rail {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-2);
-  background: var(--background-soft);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-hover) transparent;
-}
-
-.rail-group {
-  flex: 0 0 auto;
-  display: grid;
-  gap: var(--space-2);
-  padding: 6px;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.tool-rail::-webkit-scrollbar,
-.inspector::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tool-rail::-webkit-scrollbar-track,
-.inspector::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.tool-rail::-webkit-scrollbar-thumb,
-.inspector::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: var(--border-hover);
-  background-clip: padding-box;
-}
-
-.rail-btn {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--background-card);
-  color: var(--foreground-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.btn-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-key {
-  position: absolute;
-  right: 5px;
-  bottom: 4px;
-  min-width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--foreground-subtle);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  line-height: 14px;
-  text-align: center;
-}
-
-.rail-btn:hover {
-  color: var(--primary);
-  border-color: var(--primary);
-  background: var(--primary-muted);
-  transform: translateY(-1px);
-}
-
-.rail-btn.active {
-  color: var(--background);
-  background: var(--primary);
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-muted), 0 0 18px var(--primary-glow);
-}
-
-.rail-btn.active .btn-key {
-  background: rgba(10, 10, 10, 0.2);
-  color: var(--background);
-}
-
-.primary-tool {
-  height: 52px;
-}
-
-.history-tool {
-  height: 42px;
-  background: transparent;
-}
-
-.danger-tool {
-  width: 48px;
-  height: 44px;
-  color: var(--foreground-muted);
-  background: rgba(255, 71, 87, 0.08);
-  border-color: rgba(255, 71, 87, 0.22);
-}
-
-.danger-tool:hover {
-  color: var(--error);
-  background: rgba(255, 71, 87, 0.14);
-  border-color: var(--error);
-  box-shadow: 0 0 18px rgba(255, 71, 87, 0.16);
-}
-
-.rail-btn.disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-}
-
-.rail-btn.disabled:hover {
-  color: var(--foreground-muted);
-  border-color: var(--border);
-  background: transparent;
-  transform: none;
-  box-shadow: none;
-}
-
-.studio {
+.editor-topbar {
+  grid-column: 1 / -1;
+  z-index: 20;
   min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: 64px minmax(0, 1fr) 32px;
-  background: var(--background);
-}
-
-.studio-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: 0 var(--space-5);
-  background: var(--background-soft);
-  border-bottom: 1px solid var(--border);
+  gap: 20px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid #dce2df;
+  box-shadow: 0 2px 14px rgba(24, 34, 30, 0.06);
 }
 
-.studio-title {
-  min-width: 0;
-}
-
-.eyebrow {
-  display: block;
-  color: var(--foreground-subtle);
-  font-size: 11px;
-  line-height: 1;
-}
-
-.studio-title h1 {
-  margin: 4px 0 0;
-  color: var(--foreground);
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.header-actions {
+.document-area,
+.topbar-actions,
+.action-group,
+.zoom-controls,
+.grid-toggle {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
-.zoom-controls {
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--background);
+.document-area {
+  flex: 0 0 248px;
+  gap: 8px;
 }
+
+.document-name {
+  width: 196px;
+}
+
+.document-name :deep(.el-input__wrapper) {
+  box-shadow: none;
+  background: #f4f6f5;
+}
+
+.icon-button,
+.zoom-btn,
+.zoom-value {
+  border: 0;
+  background: transparent;
+  color: #53605a;
+  cursor: pointer;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+}
+
+.icon-button:hover,
+.zoom-btn:hover,
+.zoom-btn.active,
+.zoom-value:hover {
+  color: var(--editor-accent);
+  background: var(--editor-accent-soft);
+}
+
+.topbar-actions {
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topbar-actions::-webkit-scrollbar { display: none; }
+
+.action-group {
+  flex: 0 0 auto;
+  min-height: 54px;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid #e1e6e3;
+  border-radius: 10px;
+  background: #fafbfa;
+}
+
+.group-label {
+  align-self: flex-start;
+  margin: 1px 3px 0 0;
+  color: #8a948f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.zoom-controls { gap: 2px; }
 
 .zoom-btn,
 .zoom-value {
   height: 28px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--foreground-muted);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast),
-    box-shadow var(--transition-fast);
+  border-radius: 7px;
 }
 
 .zoom-btn {
-  width: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 28px;
+  display: inline-grid;
+  place-items: center;
 }
 
 .zoom-value {
-  min-width: 58px;
-  padding: 0 8px;
-  color: var(--foreground);
-  font-family: var(--font-mono);
+  min-width: 48px;
+  padding: 0 5px;
+  color: #26322c;
   font-size: 12px;
-  font-weight: 800;
-}
-
-.zoom-btn:hover,
-.zoom-value:hover {
-  color: var(--primary);
-  background: var(--primary-muted);
+  font-weight: 700;
 }
 
 .zoom-btn:disabled {
-  opacity: 0.38;
+  opacity: .35;
   cursor: not-allowed;
 }
 
-.zoom-btn:disabled:hover {
-  color: var(--foreground-muted);
+.preset-select { width: 100px; }
+.dimension-input { width: 82px; }
+.background-select { width: 88px; }
+
+.dimension-separator {
+  color: #9aa39f;
+  font-size: 12px;
+}
+
+.grid-toggle {
+  gap: 5px;
+  margin-left: 3px;
+  color: #626e68;
+  font-size: 12px;
+}
+
+.tool-rail {
+  grid-column: 1;
+  grid-row: 2;
+  z-index: 10;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 9px 12px;
+  background: #202925;
+  border-right: 1px solid #38413d;
+  box-shadow: 5px 0 18px rgba(22, 30, 27, .12);
+}
+
+.rail-title {
+  margin: 0 0 11px;
+  color: #88938e;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .08em;
+}
+
+.rail-group {
+  display: grid;
+  gap: 8px;
+}
+
+.history-tools {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #3b4540;
+}
+
+.rail-btn {
+  position: relative;
+  min-height: 60px;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  padding: 7px 4px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   background: transparent;
+  color: #aab3af;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: .16s ease;
+}
+
+.rail-btn:hover {
+  color: #fff;
+  background: #303a35;
+}
+
+.rail-btn.active {
+  color: #fff;
+  border-color: rgba(59, 210, 142, .34);
+  background: #147d54;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, .22);
+}
+
+.rail-btn kbd {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  color: #75807b;
+  font: 9px/1 ui-monospace, monospace;
+}
+
+.rail-btn.active kbd { color: #bcebd4; }
+
+.rail-btn:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+.history-tool { min-height: 48px; }
+
+.studio {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 34px;
+  background: #c9cecc;
 }
 
 .canvas-stage {
+  position: relative;
+  min-width: 0;
   min-height: 0;
-  display: block;
-  padding: var(--space-6);
+  display: grid;
+  place-items: center;
+  padding: 76px 42px 44px;
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
-  background: radial-gradient(circle at 50% 28%, rgba(0, 255, 136, 0.06), transparent 30%), var(--background-muted);
+  background:
+    radial-gradient(ellipse at center, rgba(255,255,255,.18) 0%, rgba(255,255,255,.04) 45%, rgba(23,31,28,.18) 100%),
+    #c9cecc;
+  box-shadow: inset 0 0 85px rgba(20, 28, 25, .16);
 }
 
-.canvas-stage.pan-tool,
-.canvas-stage.pan-tool .canvas-shell canvas,
-.canvas-stage.pan-tool .canvas-shell :deep(canvas),
-.canvas-stage.space-pan,
-.canvas-stage.space-pan .canvas-shell canvas,
-.canvas-stage.space-pan .canvas-shell :deep(canvas) {
-  cursor: grab;
+.shortcut-strip {
+  position: absolute;
+  z-index: 8;
+  top: 18px;
+  left: 50%;
+  display: flex;
+  gap: 20px;
+  padding: 8px 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 9px;
+  background: rgba(246,248,247,.88);
+  color: #68736e;
+  box-shadow: 0 5px 18px rgba(26, 34, 31, .09);
+  font-size: 11px;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
 }
 
-.canvas-stage.is-panning,
-.canvas-stage.is-panning .canvas-shell canvas,
-.canvas-stage.is-panning .canvas-shell :deep(canvas) {
-  cursor: grabbing;
-  user-select: none;
+.shortcut-strip kbd {
+  color: #2c3933;
+  font: 600 10px/1 ui-monospace, monospace;
+}
+
+.canvas-card {
+  min-width: 220px;
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.48);
+  border-radius: 8px;
+  background: rgba(236,239,238,.42);
+  box-shadow: 0 20px 45px rgba(31, 41, 37, .18), inset 0 1px rgba(255,255,255,.55);
 }
 
 .canvas-viewport {
   position: relative;
   flex: 0 0 auto;
-  margin: auto;
-  transition: transform 0.08s linear;
+  transition: transform .08s linear;
   will-change: transform;
 }
 
-.canvas-stage.is-panning .canvas-viewport {
-  transition: none;
-}
+.canvas-stage.is-panning .canvas-viewport { transition: none; }
 
 .canvas-shell {
   position: absolute;
   left: 0;
   top: 0;
   isolation: isolate;
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
   overflow: hidden;
   transform-origin: left top;
+  border: 1px solid rgba(42, 53, 48, .24);
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(20, 28, 25, .30), 0 2px 7px rgba(20, 28, 25, .18);
 }
 
 .canvas-shell.transparent {
-  background-image: repeating-conic-gradient(#d7d7d7 0% 25%, #f1f1f1 0% 50%);
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d9dddb 25%, transparent 25%),
+    linear-gradient(-45deg, #d9dddb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9dddb 75%),
+    linear-gradient(-45deg, transparent 75%, #d9dddb 75%);
   background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
 }
 
 .canvas-shell canvas {
@@ -1811,10 +1735,6 @@ onUnmounted(() => {
   height: 100% !important;
 }
 
-.canvas-shell :deep(.lower-canvas) {
-  z-index: 2;
-}
-
 .canvas-shell :deep(.upper-canvas) {
   z-index: 3;
   cursor: crosshair;
@@ -1824,160 +1744,239 @@ onUnmounted(() => {
 .canvas-grid-overlay {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 4;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.11) 1px, transparent 1px),
-    linear-gradient(rgba(0, 255, 136, 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 136, 0.2) 1px, transparent 1px);
+    linear-gradient(rgba(22, 89, 62, .10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 89, 62, .10) 1px, transparent 1px),
+    linear-gradient(rgba(22, 89, 62, .22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 89, 62, .22) 1px, transparent 1px);
   background-size: 16px 16px, 16px 16px, 64px 64px, 64px 64px;
+}
+
+.canvas-stage.pan-tool,
+.canvas-stage.pan-tool :deep(canvas),
+.canvas-stage.space-pan,
+.canvas-stage.space-pan :deep(canvas) { cursor: grab; }
+
+.canvas-stage.is-panning,
+.canvas-stage.is-panning :deep(canvas) {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .status-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  padding: 0 var(--space-5);
-  background: var(--background-soft);
-  border-top: 1px solid var(--border);
-  color: var(--foreground-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  gap: 22px;
+  padding: 0 16px;
   overflow: hidden;
+  border-top: 1px solid #bac1be;
+  background: #e9eceb;
+  color: #5e6a64;
+  font: 11px/1 ui-monospace, monospace;
+  white-space: nowrap;
 }
 
-.status-bar .hint {
-  margin-left: auto;
-  white-space: nowrap;
-  opacity: 0.75;
-}
+.status-history { margin-left: auto; }
 
 .inspector {
+  grid-column: 3;
+  grid-row: 2;
+  z-index: 10;
   min-width: 0;
   min-height: 0;
-  padding: var(--space-4);
-  background: var(--background-soft);
-  border-left: 1px solid var(--border);
+  padding: 0 18px 20px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  border-left: 1px solid #d9dfdc;
+  background: #f8faf9;
+  box-shadow: -5px 0 18px rgba(22, 30, 27, .08);
   scrollbar-width: thin;
-  scrollbar-color: var(--border-hover) transparent;
+  scrollbar-color: #bec7c2 transparent;
 }
 
-.panel-section {
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--border);
+.inspector-heading {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -18px 5px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #e1e6e3;
+  background: rgba(248,250,249,.96);
+  backdrop-filter: blur(8px);
 }
 
-.panel-section:first-child {
-  padding-top: 0;
+.inspector-heading div { display: grid; gap: 2px; }
+
+.inspector-heading span {
+  color: #929b97;
+  font-size: 10px;
+  letter-spacing: .08em;
 }
 
-.panel-section:last-child {
-  border-bottom: 0;
+.inspector-heading strong {
+  font-size: 16px;
+  font-weight: 700;
 }
 
-.panel-section h2,
-.section-row h2 {
-  margin: 0 0 var(--space-3);
-  color: var(--foreground);
+.tool-shortcut {
+  min-width: 28px;
+  padding: 6px;
+  border: 1px solid #d9dfdc;
+  border-radius: 6px;
+  background: #fff;
+  color: #4f5c56 !important;
+  text-align: center;
+  font: 700 11px/1 ui-monospace, monospace !important;
+}
+
+.inspector :deep(.el-collapse) {
+  border: 0;
+}
+
+.inspector :deep(.el-collapse-item__header) {
+  height: 49px;
+  border-bottom-color: #e5e9e7;
+  background: transparent;
+  color: #34413b;
   font-size: 13px;
   font-weight: 700;
 }
 
-.section-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+.inspector :deep(.el-collapse-item__wrap) {
+  border-bottom-color: #e5e9e7;
+  background: transparent;
 }
 
-.meter {
-  color: var(--foreground-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
+.inspector :deep(.el-collapse-item__content) {
+  padding: 2px 2px 18px;
 }
 
 .field {
   display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-  color: var(--foreground-muted);
+  gap: 8px;
+  margin-top: 13px;
+  color: #626f69;
   font-size: 12px;
   font-weight: 600;
 }
 
-.field.inline {
-  grid-template-columns: 1fr auto;
-  align-items: center;
+.field > span {
+  display: flex;
+  justify-content: space-between;
 }
 
-.tool-note {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--foreground-muted);
-  background: var(--background);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.6;
+.field em {
+  color: var(--editor-accent);
+  font-style: normal;
+  font-family: ui-monospace, monospace;
 }
 
-.size-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
+.inspector :deep(.el-select) { width: 100%; }
 
-.color-row,
-.quick-colors {
+.color-control {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
-.color-row {
-  gap: var(--space-2);
+.color-control code {
+  color: #65716b;
+  font-size: 11px;
 }
 
 .quick-colors {
+  display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 7px;
 }
 
 .color-dot {
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border-hover);
-  border-radius: var(--radius-sm);
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 7px;
+  outline: 1px solid #d6dcd9;
   cursor: pointer;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: transform .15s ease, outline-color .15s ease;
 }
 
-.color-dot:hover {
-  transform: translateY(-1px);
-}
+.color-dot:hover { transform: translateY(-2px); }
 
 .color-dot.active {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-muted);
+  outline: 2px solid var(--editor-accent);
 }
 
-.full-action {
+.recent-colors .color-dot {
+  width: 22px;
+  height: 22px;
+}
+
+.tool-help {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 28px;
+  padding: 28px 18px;
+  border: 1px solid #e1e6e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #65716b;
+  text-align: center;
+}
+
+.tool-help .el-icon {
+  color: var(--editor-accent);
+  font-size: 28px;
+}
+
+.tool-help strong { color: #29352f; }
+
+.tool-help p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.selection-controls {
+  display: grid;
+  gap: 18px;
+  padding: 4px 2px 12px;
+}
+
+.delete-selection {
   width: 100%;
-  margin-top: var(--space-3);
+  margin-top: 4px;
 }
 
-.inspector :deep(.el-segmented) {
-  width: 100%;
+.selection-hint {
+  margin: -8px 0 0;
+  color: #8a948f;
+  font-size: 11px;
+  text-align: center;
 }
 
-.inspector :deep(.el-select),
-.inspector :deep(.el-input-number) {
-  width: 100%;
+.tool-help.compact {
+  margin-top: 8px;
+  padding: 22px 14px;
 }
+@media (max-width: 1280px) {
+  .draw-page {
+    min-width: 920px;
+    grid-template-columns: 78px minmax(0, 1fr) 270px;
+  }
 
+  .document-area { flex-basis: 210px; }
+  .document-name { width: 160px; }
+  .action-group { padding-inline: 6px; }
+  .group-label { display: none; }
+  .canvas-stage { padding-inline: 28px; }
+}
 :deep(.ai-dialog) {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2262,31 +2261,7 @@ onUnmounted(() => {
   box-shadow: 0 0 18px var(--primary-glow);
 }
 
-@media (max-width: 1180px) {
-  .draw-page {
-    grid-template-columns: 72px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
 
-  .tool-rail {
-    grid-row: 1 / 3;
-  }
-
-  .inspector {
-    grid-column: 2;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(160px, 1fr));
-    gap: var(--space-4);
-    padding: var(--space-3);
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .panel-section {
-    padding: 0;
-    border-bottom: 0;
-  }
-}
 
 @media (max-width: 1080px) {
   :deep(.ai-dialog .el-dialog__body) {
@@ -2327,67 +2302,5 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 760px) {
-  .draw-page {
-    height: calc(100vh - 64px - 96px);
-    min-height: 0;
-    grid-template-columns: 56px minmax(0, 1fr);
-  }
 
-  .tool-rail {
-    padding: var(--space-2) 4px;
-  }
-
-  .rail-group {
-    padding: 4px;
-  }
-
-  .rail-btn {
-    width: 40px;
-    height: 40px;
-  }
-
-  .danger-tool {
-    width: 40px;
-  }
-
-  .btn-key {
-    display: none;
-  }
-
-  .studio {
-    grid-template-rows: auto minmax(0, 1fr) 32px;
-  }
-
-  .studio-header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: var(--space-3);
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-
-  .canvas-stage {
-    align-items: flex-start;
-    justify-content: flex-start;
-    padding: var(--space-3);
-  }
-
-  .inspector {
-    grid-template-columns: 1fr;
-    max-height: 260px;
-  }
-
-  .status-bar {
-    gap: var(--space-2);
-    overflow-x: auto;
-  }
-
-  .status-bar .hint {
-    margin-left: 0;
-  }
-}
 </style>

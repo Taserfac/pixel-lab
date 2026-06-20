@@ -1,6 +1,6 @@
 <template>
   <div class="community-layout">
-    <header class="top-bar">
+    <header v-if="!isFullscreenEditor" class="top-bar">
       <router-link
         to="/dashboard"
         class="brand"
@@ -258,7 +258,7 @@
       </template>
     </el-dialog>
 
-    <main class="main-area">
+    <main class="main-area" :class="{ 'editor-mode': isFullscreenEditor }">
       <router-view v-slot="{ Component }">
         <transition
           name="fade"
@@ -269,7 +269,7 @@
       </router-view>
     </main>
 
-    <nav class="dock-nav" aria-label="底部导航">
+    <nav v-if="!isFullscreenEditor" class="dock-nav" aria-label="底部导航">
       <router-link
         v-for="item in primaryNavItems"
         :key="item.path"
@@ -423,6 +423,7 @@ const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模�
 
 const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 const isCreateRoute = computed(() => ['/draw', '/workbench'].some(isMenuActive))
+const isFullscreenEditor = computed(() => route.path === '/draw')
 
 const openSearchSuggestions = () => {
   if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
@@ -995,6 +996,12 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: clamp(var(--space-5), 4vw, var(--space-10));
   padding-bottom: 112px;
+}
+.main-area.editor-mode {
+  height: 100vh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .dock-nav {
