@@ -322,8 +322,25 @@ button:disabled,
   background-color: var(--border) !important;
 }
 
-/* 对话框 */
+/* 对话框：外框始终完整显示，内容过多时只滚动内容区 */
+.el-overlay-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.el-overlay-dialog > .el-dialog {
+  width: min(var(--el-dialog-width, 50%), calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  margin: 0 !important;
+}
+
 .el-dialog {
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius-xl) !important;
   border: 0 !important;
   background: var(--background-card) !important;
@@ -332,6 +349,7 @@ button:disabled,
 }
 
 .el-dialog__header {
+  flex: 0 0 auto;
   padding: var(--space-5) var(--space-6) !important;
   border-bottom: 1px solid var(--border);
 }
@@ -343,12 +361,28 @@ button:disabled,
 }
 
 .el-dialog__body {
+  min-height: 0;
   padding: var(--space-6) !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .el-dialog__footer {
+  flex: 0 0 auto;
   border-top: 1px solid var(--border);
   padding: var(--space-4) var(--space-6) !important;
+}
+
+@media (max-width: 640px), (max-height: 560px) {
+  .el-overlay-dialog {
+    padding: 8px;
+  }
+
+  .el-overlay-dialog > .el-dialog {
+    width: min(var(--el-dialog-width, 50%), calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+  }
 }
 
 /* 消息提示 */

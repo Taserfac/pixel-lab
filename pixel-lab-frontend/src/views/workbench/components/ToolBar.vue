@@ -3,16 +3,7 @@
     <div class="toolbar-heading">
       <div>
         <h2>编辑面板</h2>
-        <span>Studio Controls</span>
       </div>
-      <button
-        class="icon-button"
-        type="button"
-        title="重置全部调整"
-        @click="$emit('reset-adjustments')"
-      >
-        <el-icon><Refresh /></el-icon>
-      </button>
     </div>
 
     <section class="tool-section">
@@ -76,16 +67,10 @@
         <el-icon><Crop /></el-icon>
         <h3>裁剪变换</h3>
       </div>
-      <div class="ratio-grid">
-        <button
-          v-for="ratio in cropRatios"
-          :key="ratio"
-          type="button"
-          @click="$emit('crop')"
-        >
-          {{ ratio }}
-        </button>
-      </div>
+      <button class="crop-action" type="button" @click="$emit('crop')">
+        <el-icon><Crop /></el-icon>
+        裁剪
+      </button>
       <div class="transform-grid">
         <button type="button" @click="$emit('rotate', -90)">
           <el-icon><RefreshLeft /></el-icon>
@@ -153,8 +138,8 @@
         <h3>文字 / 水印</h3>
       </div>
       <div class="split-actions">
-        <button type="button" @click="showComingSoon('添加文字')">添加文字</button>
-        <button type="button" @click="showComingSoon('添加水印')">添加水印</button>
+        <button type="button" @click="requestText('text')">添加文字</button>
+        <button type="button" @click="requestText('watermark')">添加水印</button>
       </div>
       <div class="adjust-row compact">
         <div class="adjust-label">
@@ -184,14 +169,13 @@
 
 <script setup>
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import {
   Crop,
   EditPen,
   Grid,
   MagicStick,
   Operation,
-  Refresh,
   RefreshLeft,
   RefreshRight,
   Sort
@@ -212,9 +196,10 @@ const emit = defineEmits([
   'rotate',
   'flip',
   'crop',
-  'reset-adjustments',
   'apply-pixel',
   'reset-pixel',
+  'add-text',
+  'add-watermark',
   'update:pixel-size',
   'update:color-count'
 ])
@@ -225,7 +210,6 @@ const adjustmentItems = [
   { key: 'saturate', label: '饱和度', min: -100, max: 100, step: 1 },
   { key: 'sharpen', label: '锐化', min: 0, max: 100, step: 1 }
 ]
-const cropRatios = ['自由裁剪', '1:1', '4:3', '16:9']
 const positions = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br']
 const watermarkOpacity = ref(60)
 const watermarkPosition = ref('mc')
@@ -236,8 +220,34 @@ const updateAdjustment = (key, value) => {
 
 const formatValue = (value = 0) => value > 0 ? `+${Math.round(value)}` : Math.round(value)
 
-const showComingSoon = (name) => {
-  ElMessage.info(`${name}功能已放入面板，后续可继续接入实际渲染`)
+const requestText = async (type) => {
+  const isWatermark = type === 'watermark'
+  try {
+    const { value } = await ElMessageBox.prompt(
+      isWatermark ? '请输入水印内容' : '请输入要添加的文字',
+      isWatermark ? '添加水印' : '添加文字',
+      {
+        confirmButtonText: '添加',
+        cancelButtonText: '取消',
+        inputPlaceholder: isWatermark ? '例如：Pixel Lab' : '输入文字内容',
+        inputValidator: value => value?.trim() ? true : '内容不能为空',
+        inputErrorMessage: '内容不能为空'
+      }
+    )
+
+    const text = value.trim()
+    if (isWatermark) {
+      emit('add-watermark', {
+        text,
+        opacity: watermarkOpacity.value,
+        position: watermarkPosition.value
+      })
+    } else {
+      emit('add-text', { text })
+    }
+  } catch {
+    // 用户取消输入
+  }
 }
 
 const getPreviewStyle = (filterValue) => {
@@ -325,7 +335,7 @@ const getPreviewStyle = (filterValue) => {
 
 .icon-button,
 .filter-item,
-.ratio-grid button,
+.crop-action,
 .transform-grid button,
 .split-actions button,
 .position-grid button {
@@ -350,7 +360,7 @@ const getPreviewStyle = (filterValue) => {
 }
 
 .icon-button:hover,
-.ratio-grid button:hover,
+.crop-action:hover,
 .transform-grid button:hover,
 .split-actions button:hover {
   border-color: #13bd79;
@@ -496,7 +506,6 @@ const getPreviewStyle = (filterValue) => {
   color: #09a768;
 }
 
-.ratio-grid,
 .transform-grid,
 .split-actions {
   display: grid;
@@ -504,12 +513,13 @@ const getPreviewStyle = (filterValue) => {
   gap: 8px;
 }
 
-.ratio-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.crop-action {
+  width: 100%;
+  min-height: 38px;
   margin-bottom: 8px;
 }
 
-.ratio-grid button,
+.crop-action,
 .transform-grid button,
 .split-actions button {
   min-height: 34px;
@@ -566,9 +576,6 @@ const getPreviewStyle = (filterValue) => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .ratio-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 1024px) {
@@ -585,7 +592,6 @@ const getPreviewStyle = (filterValue) => {
 
 @media (max-width: 640px) {
   .filter-grid,
-  .ratio-grid,
   .transform-grid,
   .split-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));

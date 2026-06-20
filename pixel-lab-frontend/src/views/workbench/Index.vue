@@ -23,9 +23,10 @@
             @rotate="rotateImage"
             @flip="flipImage"
             @crop="openCropDialog"
-            @reset-adjustments="resetAdjustments"
             @apply-pixel="applyPixelate"
             @reset-pixel="resetPixelate"
+            @add-text="addTextToCanvas"
+            @add-watermark="addWatermarkToCanvas"
             @update:pixel-size="pixelSize = $event"
             @update:color-count="colorCount = $event"
           />
@@ -38,7 +39,7 @@
             v-model:preview-mode="previewMode"
             :image-name="currentImage?.name || ''"
             :canvas-size="currentCanvasSize"
-            @resize="initCanvas"
+            @resize="fitCanvasToView"
             @zoom-in="zoomIn"
             @zoom-out="zoomOut"
             @fit="fitCanvasToView"
@@ -48,13 +49,14 @@
         <!-- 底部操作栏 -->
         <ActionBar
           :can-undo="canUndo"
+          @back="goBack"
           :can-redo="canRedo"
           @undo="undo"
           @redo="redo"
           @reset="resetImage"
           @fit="fitCanvasToView"
-          @templates="templatePanelVisible = true"
           @change-image="showImageSelector"
+          @draft="handleSaveDraft"
           @save="saveToGallery"
           @publish="openPublishDialog"
           @download="downloadImage"
@@ -75,12 +77,6 @@
       v-model="cropDialogVisible"
       :image-src="originalImage?.src || ''"
       @confirm="handleCropConfirm"
-    />
-
-    <!-- 模板选择对话框 -->
-    <TemplatePanel
-      v-model="templatePanelVisible"
-      @select="applyTemplate"
     />
 
     <!-- 导出格式对话框 -->
@@ -186,37 +182,38 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import ImportArea from './components/ImportArea.vue'
 import ToolBar from './components/ToolBar.vue'
 import CanvasArea from './components/CanvasArea.vue'
 import ActionBar from './components/ActionBar.vue'
 import ImageSelector from './components/ImageSelector.vue'
 import CropDialog from './components/CropDialog.vue'
-import TemplatePanel from './components/TemplatePanel.vue'
 import { getUserImages, uploadImage, updateImageVisibility, updateImageMetadata } from '@/api/image'
 import { useHistory } from './composables/useHistory'
 
-// ========== 自动加载图片 ==========
-onMounted(() => {
-  const pendingImage = localStorage.getItem('pixel_lab_workbench_image')
-  if (pendingImage) {
-    localStorage.removeItem('pixel_lab_workbench_image')
-    loadImage(pendingImage, 'uploaded_image.png')
-  }
-})
+const emit = defineEmits(['workbench-editing-change'])
+const router = useRouter()
+const DRAFT_STORAGE_KEY = 'pixel-lab:image-workbench-draft:v1'
+const hasUnsavedChanges = ref(false)
+
+const goBack = () => {
+  if (router.options.history.state.back) router.back()
+  else router.push('/dashboard')
+}
 
 // ========== 组件 refs ==========
 const canvasAreaRef = ref(null)
 
 // ========== 状态定义 ==========
 const currentImage = ref(null)
+watch(currentImage, image => emit('workbench-editing-change', Boolean(image)), { immediate: true })
 const originalImage = ref(null)
 const thumbnailUrl = ref('')
 const viewZoom = ref(1)
 const currentCanvasSize = reactive({ width: 0, height: 0 })
-const templateSourceDataUrl = ref('')
 const baseImageDataUrl = ref('')
 const previewMode = ref('compare')
 
@@ -227,9 +224,6 @@ const myImages = ref([])
 
 // 裁剪对话框
 const cropDialogVisible = ref(false)
-
-// 模板面板
-const templatePanelVisible = ref(false)
 
 // 导出格式
 const exportDialogVisible = ref(false)
@@ -341,7 +335,6 @@ const loadImage = async (url, name) => {
       originalImage.value = img
       currentImage.value = { url, name }
       thumbnailUrl.value = url
-      templateSourceDataUrl.value = ''
       baseImageDataUrl.value = url
 
       nextTick(() => {
@@ -372,6 +365,7 @@ const openCropDialog = () => {
 const handleCropConfirm = async ({ url, blob }) => {
   // 用裁剪后的图片替换当前图片
   await loadImage(url, `cropped_${currentImage.value?.name || 'image.png'}`)
+  hasUnsavedChanges.value = true
   ElMessage.success('裁剪成功')
 }
 
@@ -434,10 +428,14 @@ const fitCanvasToView = () => {
   const wrapper = canvasAreaRef.value?.wrapper
   if (!canvas || !wrapper || !canvas.width || !canvas.height) return
 
-  const maxWidth = Math.max(wrapper.clientWidth - 64, 120)
-  const maxHeight = Math.max(wrapper.clientHeight - 64, 120)
-  const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1)
-  viewZoom.value = clamp(Number(ratio.toFixed(2)), 0.08, 2)
+  const wrapperStyle = window.getComputedStyle(wrapper)
+  const horizontalPadding = parseFloat(wrapperStyle.paddingLeft) + parseFloat(wrapperStyle.paddingRight)
+  const verticalPadding = parseFloat(wrapperStyle.paddingTop) + parseFloat(wrapperStyle.paddingBottom)
+  const maxWidth = Math.max(wrapper.clientWidth - horizontalPadding - 2, 80)
+  const maxHeight = Math.max(wrapper.clientHeight - verticalPadding - 2, 80)
+  const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height)
+  const fittedRatio = Math.floor(ratio * 100) / 100
+  viewZoom.value = clamp(fittedRatio, 0.01, 2)
 }
 
 const zoomIn = () => {
@@ -464,33 +462,6 @@ const buildRenderedCanvas = () => {
   return rendered
 }
 
-const createCanvasFromUrl = (url) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = img.width
-      canvas.height = img.height
-      canvas.getContext('2d').drawImage(img, 0, 0)
-      resolve(canvas)
-    }
-    img.onerror = reject
-    img.src = url
-  })
-}
-
-const getTemplateSourceCanvas = async () => {
-  if (templateSourceDataUrl.value) {
-    return createCanvasFromUrl(templateSourceDataUrl.value)
-  }
-
-  const canvas = buildRenderedCanvas()
-  if (canvas) {
-    templateSourceDataUrl.value = canvas.toDataURL('image/png')
-  }
-  return canvas
-}
-
 // ========== 滤镜与调整 ==========
 const applyFilter = (filter) => {
   currentFilter.value = filter
@@ -501,6 +472,7 @@ const applyFilter = (filter) => {
 const updateAdjustment = ({ key, value }) => {
   adjustments[key] = value
   drawImage()
+  hasUnsavedChanges.value = true
 }
 
 const resetAdjustments = () => {
@@ -519,6 +491,7 @@ const saveToHistory = () => {
     filter: currentFilter.value,
     adjustments: { ...adjustments }
   })
+  hasUnsavedChanges.value = true
 }
 
 // ========== 几何变换 ==========
@@ -551,7 +524,6 @@ const rotateImage = (degree) => {
   ctx.restore()
 
   updateOriginalFromCanvas()
-  templateSourceDataUrl.value = ''
   updateCanvasSize()
   nextTick(fitCanvasToView)
   saveToHistory()
@@ -584,7 +556,6 @@ const flipImage = (direction) => {
   ctx.restore()
 
   updateOriginalFromCanvas()
-  templateSourceDataUrl.value = ''
   updateCanvasSize()
   saveToHistory()
 }
@@ -600,6 +571,51 @@ const updateOriginalFromCanvas = () => {
 }
 
 // ========== 像素画功能 ==========
+const drawCanvasText = ({ text, opacity = 100, position = 'mc', watermark = false }) => {
+  const canvas = canvasAreaRef.value?.canvas
+  if (!canvas || !text) return
+
+  const ctx = canvas.getContext('2d')
+  const minEdge = Math.min(canvas.width, canvas.height)
+  const margin = Math.max(12, Math.round(minEdge * 0.04))
+  let fontSize = Math.max(watermark ? 14 : 24, Math.round(minEdge * (watermark ? 0.05 : 0.1)))
+  const maxWidth = canvas.width - margin * 2
+
+  ctx.save()
+  ctx.font = `700 ${fontSize}px system-ui, sans-serif`
+  const measuredWidth = ctx.measureText(text).width
+  if (measuredWidth > maxWidth) {
+    fontSize = Math.max(12, Math.floor(fontSize * maxWidth / measuredWidth))
+    ctx.font = `700 ${fontSize}px system-ui, sans-serif`
+  }
+
+  const horizontal = position[1]
+  const vertical = position[0]
+  const x = horizontal === 'l' ? margin : horizontal === 'r' ? canvas.width - margin : canvas.width / 2
+  const y = vertical === 't' ? margin : vertical === 'b' ? canvas.height - margin : canvas.height / 2
+  ctx.textAlign = horizontal === 'l' ? 'left' : horizontal === 'r' ? 'right' : 'center'
+  ctx.textBaseline = vertical === 't' ? 'top' : vertical === 'b' ? 'bottom' : 'middle'
+  ctx.globalAlpha = Math.max(0.1, Math.min(opacity / 100, 1))
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = Math.max(2, fontSize * 0.09)
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeText(text, x, y)
+  ctx.fillText(text, x, y)
+  ctx.restore()
+
+  updateOriginalFromCanvas()
+  saveToHistory()
+  ElMessage.success(watermark ? '水印已添加' : '文字已添加')
+}
+
+const addTextToCanvas = ({ text }) => {
+  drawCanvasText({ text, position: 'mc' })
+}
+
+const addWatermarkToCanvas = ({ text, opacity, position }) => {
+  drawCanvasText({ text, opacity, position, watermark: true })
+}
 const applyPixelate = () => {
   const canvas = canvasAreaRef.value?.canvas
   const renderedCanvas = buildRenderedCanvas()
@@ -627,7 +643,6 @@ const applyPixelate = () => {
 
   resetAdjustments()
   updateOriginalFromCanvas()
-  templateSourceDataUrl.value = ''
   saveToHistory()
   ElMessage.success('已应用像素画效果')
 }
@@ -764,7 +779,6 @@ const redo = () => {
 const restoreHistory = (state) => {
   currentFilter.value = state.filter
   Object.assign(adjustments, state.adjustments)
-  templateSourceDataUrl.value = ''
 
   const canvas = canvasAreaRef.value?.canvas
   if (!canvas) return
@@ -779,13 +793,13 @@ const restoreHistory = (state) => {
     originalImage.value = img
     updateCanvasSize()
     nextTick(fitCanvasToView)
+    hasUnsavedChanges.value = true
   }
   img.src = state.imageData
 }
 
 const resetImage = () => {
   resetAdjustments()
-  templateSourceDataUrl.value = ''
   const state = {
     imageData: baseImageDataUrl.value || currentImage.value?.url,
     filter: 'none',
@@ -796,9 +810,146 @@ const resetImage = () => {
 
   restoreHistory(state)
   saveHistory(state)
+  hasUnsavedChanges.value = true
   ElMessage.success('已重置')
 }
 
+// ========== 草稿 ==========
+const createDraftPayload = () => {
+  const canvas = canvasAreaRef.value?.canvas
+  if (!canvas || !currentImage.value) return null
+
+  return {
+    version: 1,
+    savedAt: Date.now(),
+    imageName: currentImage.value.name,
+    imageData: canvas.toDataURL('image/png'),
+    filter: currentFilter.value,
+    adjustments: { ...adjustments },
+    pixelSize: pixelSize.value,
+    colorCount: colorCount.value
+  }
+}
+
+const clearStoredDraft = () => {
+  localStorage.removeItem(DRAFT_STORAGE_KEY)
+}
+
+const saveDraftLocally = (markSaved = true) => {
+  const draft = createDraftPayload()
+  if (!draft) return false
+
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+    if (markSaved) hasUnsavedChanges.value = false
+    return true
+  } catch (error) {
+    console.error('保存图片草稿失败:', error)
+    return false
+  }
+}
+
+const handleSaveDraft = () => {
+  if (saveDraftLocally()) ElMessage.success('草稿已保存')
+  else ElMessage.error('草稿保存失败，请检查浏览器存储空间')
+}
+
+const readStoredDraft = () => {
+  try {
+    const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!rawDraft) return null
+    const draft = JSON.parse(rawDraft)
+    if (draft?.version !== 1 || !draft.imageData) throw new Error('Invalid draft data')
+    return draft
+  } catch (error) {
+    console.error('读取图片草稿失败:', error)
+    clearStoredDraft()
+    return null
+  }
+}
+
+const restoreStoredDraft = async (draft) => {
+  await loadImage(draft.imageData, draft.imageName || '图片草稿.png')
+  await nextTick()
+  currentFilter.value = draft.filter || 'none'
+  Object.assign(adjustments, {
+    brightness: 0,
+    contrast: 0,
+    saturate: 0,
+    sharpen: 0,
+    ...draft.adjustments
+  })
+  pixelSize.value = Number(draft.pixelSize) || 8
+  colorCount.value = Number(draft.colorCount) || 32
+  hasUnsavedChanges.value = false
+}
+
+const offerDraftRestore = async () => {
+  const draft = readStoredDraft()
+  if (!draft) return
+
+  try {
+    await ElMessageBox.confirm(
+      `发现 ${new Date(draft.savedAt).toLocaleString()} 保存的图片草稿，是否恢复？`,
+      '恢复草稿',
+      {
+        confirmButtonText: '恢复草稿',
+        cancelButtonText: '放弃草稿',
+        type: 'info',
+        closeOnClickModal: false
+      }
+    )
+    await restoreStoredDraft(draft)
+    ElMessage.success('草稿已恢复')
+  } catch {
+    clearStoredDraft()
+  }
+}
+
+const handleBeforeUnload = (event) => {
+  if (!hasUnsavedChanges.value) return
+  saveDraftLocally(false)
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+onBeforeRouteLeave(async () => {
+  if (!hasUnsavedChanges.value) return true
+
+  try {
+    await ElMessageBox.confirm('当前图片尚未保存，是否保存为草稿后退出？', '保存草稿', {
+      confirmButtonText: '保存草稿并退出',
+      cancelButtonText: '不保存',
+      distinguishCancelAndClose: true,
+      closeOnClickModal: false,
+      type: 'warning'
+    })
+    if (!saveDraftLocally()) {
+      ElMessage.error('草稿保存失败，请检查浏览器存储空间')
+      return false
+    }
+    return true
+  } catch (action) {
+    if (action === 'cancel') return true
+    return false
+  }
+})
+
+onMounted(async () => {
+  const pendingImage = localStorage.getItem('pixel_lab_workbench_image')
+  if (pendingImage) {
+    localStorage.removeItem('pixel_lab_workbench_image')
+    await loadImage(pendingImage, 'uploaded_image.png')
+  } else {
+    await offerDraftRestore()
+  }
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
+onUnmounted(() => {
+  emit('workbench-editing-change', false)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+})
 // ========== 导出保存 ==========
 const createEditedImageFile = async () => {
   const canvas = buildRenderedCanvas()
@@ -822,6 +973,8 @@ const saveToGallery = async () => {
     if (!file) return false
 
     await uploadImage(file)
+    hasUnsavedChanges.value = false
+    clearStoredDraft()
     ElMessage.success('已保存到个人中心')
     return true
   } catch (error) {
@@ -849,37 +1002,6 @@ const confirmExport = () => {
   link.click()
   exportDialogVisible.value = false
   ElMessage.success('下载成功')
-}
-
-const applyTemplate = async (template) => {
-  const canvas = canvasAreaRef.value?.canvas
-  if (!canvas || !originalImage.value) return
-
-  const sourceCanvas = await getTemplateSourceCanvas()
-  if (!sourceCanvas) return
-
-  const targetWidth = Math.min(Math.max(Math.round(template.width), 1), 4096)
-  const targetHeight = Math.min(Math.max(Math.round(template.height), 1), 4096)
-  const ratio = Math.min(targetWidth / sourceCanvas.width, targetHeight / sourceCanvas.height)
-  const drawWidth = Math.round(sourceCanvas.width * ratio)
-  const drawHeight = Math.round(sourceCanvas.height * ratio)
-  const offsetX = Math.round((targetWidth - drawWidth) / 2)
-  const offsetY = Math.round((targetHeight - drawHeight) / 2)
-
-  canvas.width = targetWidth
-  canvas.height = targetHeight
-
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, targetWidth, targetHeight)
-  ctx.drawImage(sourceCanvas, offsetX, offsetY, drawWidth, drawHeight)
-
-  resetAdjustments()
-  updateOriginalFromCanvas()
-  updateCanvasSize()
-  nextTick(fitCanvasToView)
-  saveToHistory()
-  ElMessage.success(`已应用模板: ${template.name} (${targetWidth}×${targetHeight})`)
 }
 
 const openPublishDialog = () => {
@@ -914,6 +1036,8 @@ const publishToCommunity = async () => {
       description: publishForm.description.trim()
     })
     await updateImageVisibility(imageId, true)
+    hasUnsavedChanges.value = false
+    clearStoredDraft()
     publishDialogVisible.value = false
     ElMessage.success('已发布到社区')
   } catch (error) {
@@ -927,12 +1051,12 @@ const publishToCommunity = async () => {
 
 <style scoped>
 .workbench-page {
-  height: calc(100vh - 184px);
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: clamp(var(--space-3), 1.5vw, var(--space-5));
   overflow: hidden;
-  min-height: 640px;
+  min-height: 0;
   border-radius: 24px;
   background:
     radial-gradient(circle at 8% 8%, rgba(22, 199, 132, 0.08), transparent 28%),
@@ -970,16 +1094,6 @@ const publishToCommunity = async () => {
 }
 
 @media (max-width: 1024px) {
-  .workbench-page {
-    height: auto;
-    min-height: calc(100vh - 184px);
-    overflow: visible;
-  }
-
-  .editor-container,
-  .main-content {
-    overflow: visible;
-  }
 
   .main-content {
     flex-direction: column;

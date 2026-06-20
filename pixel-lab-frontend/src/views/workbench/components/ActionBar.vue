@@ -1,6 +1,10 @@
 <template>
   <div class="action-bar">
     <div class="tool-actions" aria-label="编辑工具栏">
+      <button type="button" @click="$emit('back')">
+        <el-icon><ArrowLeft /></el-icon>
+        <span>返回</span>
+      </button>
       <button
         type="button"
         :disabled="!canUndo"
@@ -25,13 +29,13 @@
         <el-icon><FullScreen /></el-icon>
         <span>适应窗口</span>
       </button>
-      <button type="button" @click="$emit('templates')">
-        <el-icon><Grid /></el-icon>
-        <span>模板</span>
-      </button>
       <button type="button" @click="$emit('change-image')">
         <el-icon><FolderOpened /></el-icon>
         <span>换一张</span>
+      </button>
+      <button type="button" @click="$emit('draft')">
+        <el-icon><Document /></el-icon>
+        <span>保存草稿</span>
       </button>
       <button type="button" @click="$emit('save')">
         <el-icon><Upload /></el-icon>
@@ -54,11 +58,12 @@
 
 <script setup>
 import {
+  ArrowLeft,
   Back,
+  Document,
   Download,
   FolderOpened,
   FullScreen,
-  Grid,
   Promotion,
   Refresh,
   Right,
@@ -70,7 +75,7 @@ defineProps({
   canRedo: { type: Boolean, default: false }
 })
 
-defineEmits(['undo', 'redo', 'reset', 'fit', 'templates', 'change-image', 'save', 'publish', 'download'])
+defineEmits(['back', 'undo', 'redo', 'reset', 'fit', 'change-image', 'draft', 'save', 'publish', 'download'])
 </script>
 
 <style scoped>

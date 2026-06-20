@@ -44,17 +44,15 @@
         <span>{{ stats.works || 0 }} 件作品</span>
       </div>
 
-      <div v-if="works.length" class="masonry-grid">
-        <PostCard
-          v-for="(work, index) in works"
-          :key="work.id"
-          :work="work"
-          :style="{ '--post-ratio': cardRatios[index % cardRatios.length] }"
-          @select="openPost"
-          @tag-click="searchTag"
-          @author-select="() => {}"
-        />
-      </div>
+      <StableMasonry
+        v-if="works.length"
+        :works="works"
+        :max-columns="4"
+        :loading="loading"
+        @select="openPost"
+        @tag-click="searchTag"
+        @author-select="() => {}"
+      />
       <EmptyState
         v-else-if="!loading"
         title="还没有公开作品"
@@ -79,7 +77,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import EmptyState from '@/components/common/EmptyState.vue'
-import PostCard from '@/components/community/PostCard.vue'
+import StableMasonry from '@/components/community/StableMasonry.vue'
 import { getUserProfile } from '@/api/community'
 import { followUser, unfollowUser } from '@/api/social'
 import { useUserStore } from '@/store/user'
@@ -94,7 +92,6 @@ const profile = ref(null)
 const stats = ref({})
 const works = ref([])
 const isFollowing = ref(false)
-const cardRatios = ['4 / 5', '1 / 1', '5 / 4', '3 / 4', '4 / 3']
 
 const displayName = computed(() => profile.value?.nickname || profile.value?.username || '创作者')
 const isSelf = computed(() => Number(profile.value?.id) === Number(userStore.userInfo?.id))
@@ -203,11 +200,8 @@ watch(() => route.params.id, loadProfile, { immediate: true })
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: var(--space-5); }
 .section-heading h2 { margin: 5px 0 0; color: var(--foreground); font-size: 26px; }
 .section-heading > span { color: var(--foreground-muted); font-size: 13px; }
-.masonry-grid { column-count: 4; column-gap: var(--space-5); }
-
 @media (max-width: 980px) {
   .stats-grid { grid-template-columns: repeat(3, 1fr); }
-  .masonry-grid { column-count: 3; }
 }
 
 @media (max-width: 700px) {
@@ -216,10 +210,5 @@ watch(() => route.params.id, loadProfile, { immediate: true })
   .profile-actions { width: 100%; }
   .profile-actions .el-button { width: 100%; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .masonry-grid { column-count: 2; column-gap: var(--space-3); }
-}
-
-@media (max-width: 480px) {
-  .masonry-grid { column-count: 1; }
 }
 </style>

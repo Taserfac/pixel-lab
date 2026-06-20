@@ -1,5 +1,5 @@
 <template>
-  <div class="community-layout">
+  <div class="community-layout" :class="{ 'fixed-editor-layout': isFixedEditor }">
     <header v-if="!isFullscreenEditor" class="top-bar">
       <router-link
         to="/dashboard"
@@ -258,18 +258,21 @@
       </template>
     </el-dialog>
 
-    <main class="main-area" :class="{ 'editor-mode': isFullscreenEditor }">
+    <main class="main-area" :class="{ 'editor-mode': isFullscreenEditor, 'workbench-mode': isWorkbench, 'workbench-editing': isWorkbenchEditing }">
       <router-view v-slot="{ Component }">
         <transition
           name="fade"
           mode="out-in"
         >
-          <component :is="Component" />
+          <component
+            :is="Component"
+            @workbench-editing-change="setWorkbenchEditing"
+          />
         </transition>
       </router-view>
     </main>
 
-    <nav v-if="!isFullscreenEditor" class="dock-nav" aria-label="底部导航">
+    <nav v-if="!isDockHidden" class="dock-nav" aria-label="底部导航">
       <router-link
         v-for="item in primaryNavItems"
         :key="item.path"
@@ -427,6 +430,13 @@ const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模�
 const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 const isCreateRoute = computed(() => ['/draw', '/workbench'].some(isMenuActive))
 const isFullscreenEditor = computed(() => route.path === '/draw')
+const isWorkbench = computed(() => route.path === '/workbench')
+const isWorkbenchEditing = ref(false)
+const setWorkbenchEditing = value => {
+  isWorkbenchEditing.value = Boolean(value)
+}
+const isFixedEditor = computed(() => isFullscreenEditor.value || isWorkbench.value)
+const isDockHidden = computed(() => isFullscreenEditor.value || (isWorkbench.value && isWorkbenchEditing.value))
 
 const openSearchSuggestions = () => {
   if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
@@ -699,6 +709,12 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: var(--background);
   color: var(--foreground);
+}
+
+.community-layout.fixed-editor-layout {
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .top-bar {
@@ -1013,6 +1029,18 @@ onBeforeUnmount(() => {
   padding: clamp(var(--space-5), 4vw, var(--space-10));
   padding-bottom: 112px;
 }
+.main-area.workbench-mode {
+  flex: 0 0 auto;
+  height: calc(100vh - 72px);
+  min-height: 0;
+  padding: 12px clamp(12px, 3vw, 36px);
+  overflow: hidden;
+}
+
+.main-area.workbench-mode:not(.workbench-editing) {
+  padding-bottom: 104px;
+}
+
 .main-area.editor-mode {
   height: 100vh;
   min-height: 0;

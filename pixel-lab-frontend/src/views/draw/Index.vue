@@ -80,7 +80,7 @@
       <div class="rail-title">工具选择</div>
       <div class="rail-group primary-tools">
         <el-tooltip content="画笔 (B)" placement="right">
-          <button class="rail-btn" :class="{ active: currentTool === 'brush' }" type="button" @click="selectTool('brush')">
+          <button class="rail-btn" :class="{ active: currentTool === 'brush' && !isShapeToolActive }" type="button" @click="selectTool('brush')">
             <el-icon :size="21"><EditPen /></el-icon><span>画笔</span><kbd>B</kbd>
           </button>
         </el-tooltip>
@@ -89,14 +89,55 @@
             <el-icon :size="21"><Delete /></el-icon><span>橡皮</span><kbd>E</kbd>
           </button>
         </el-tooltip>
-        <el-tooltip content="移动 (V)" placement="right">
+        <el-tooltip content="移动画布 (V)" placement="right">
           <button class="rail-btn" :class="{ active: currentTool === 'pan' }" type="button" @click="selectTool('pan')">
             <el-icon :size="21"><Rank /></el-icon><span>移动</span><kbd>V</kbd>
           </button>
         </el-tooltip>
-        <el-tooltip content="选择工具 (S)" placement="right">
-          <button class="rail-btn" :class="{ active: currentTool === 'select' }" type="button" @click="selectTool('select')">
-            <el-icon :size="21"><Crop /></el-icon><span>选择</span><kbd>S</kbd>
+      </div>
+
+      <div class="rail-group shape-tools">
+        <el-popover
+          v-model:visible="shapeMenuVisible"
+          placement="right-start"
+          trigger="click"
+          :width="160"
+          popper-class="shape-menu-popper"
+        >
+          <template #reference>
+            <button
+              class="rail-btn shape-tool"
+              :class="{ active: currentTool === 'brush' && shapeMenuBrushTypes.has(brushType) }"
+              type="button"
+            >
+              <span class="tool-glyph">◇</span>
+              <span>形状</span>
+            </button>
+          </template>
+          <div class="shape-menu-options">
+            <button
+              v-for="shape in shapeMenuTools"
+              :key="shape.value"
+              class="shape-menu-option"
+              :class="{ active: brushType === shape.value }"
+              type="button"
+              @click="selectDrawingTool(shape.value)"
+            >
+              <span class="tool-glyph">{{ shape.glyph }}</span>
+              <span>{{ shape.label }}</span>
+            </button>
+          </div>
+        </el-popover>
+
+        <el-tooltip v-for="tool in directDrawingTools" :key="tool.value" :content="tool.label" placement="right">
+          <button
+            class="rail-btn shape-tool"
+            :class="{ active: currentTool === 'brush' && brushType === tool.value }"
+            type="button"
+            @click="selectDrawingTool(tool.value)"
+          >
+            <span class="tool-glyph">{{ tool.glyph }}</span>
+            <span>{{ tool.shortLabel }}</span>
           </button>
         </el-tooltip>
       </div>
@@ -119,15 +160,19 @@
       <div
         ref="canvasWrapperRef"
         class="canvas-stage"
-        :class="{ 'show-grid': showGrid }"
+        :class="{ 'show-grid': showGrid, 'pan-tool': currentTool === 'pan', 'is-panning': isCanvasPanning }"
         @wheel="handleCanvasWheel"
+        @pointerdown.capture="startCanvasPan"
+        @pointermove="moveCanvasPan"
+        @pointerup="endCanvasPan"
+        @pointercancel="endCanvasPan"
       >
         <div class="shortcut-strip" aria-label="快捷操作">
           <span><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销</span>
           <span><kbd>Ctrl</kbd> + <kbd>S</kbd> 保存</span>
-          <span><kbd>Ctrl</kbd> + 滚轮缩放</span>
+          <span>滚轮缩放 · 中键拖动画布</span>
         </div>
-        <div class="canvas-card">
+        <div class="canvas-card" :style="canvasCardStyle">
           <div class="canvas-viewport" :style="canvasViewportStyle">
             <div class="canvas-shell" :class="{ transparent: backgroundMode === 'transparent' }" :style="canvasShellStyle">
               <canvas ref="canvasRef" />
@@ -149,55 +194,69 @@
     <aside class="inspector">
       <div class="inspector-heading">
         <div><span>属性面板</span><strong>{{ inspectorTitle }}</strong></div>
-        <span class="tool-shortcut">{{ currentToolShortcut }}</span>
+        <span v-if="currentToolShortcut" class="tool-shortcut">{{ currentToolShortcut }}</span>
       </div>
 
       <template v-if="currentTool === 'brush'">
-        <el-collapse v-model="inspectorSections">
-          <el-collapse-item title="画笔设置" name="brush">
-            <label class="field"><span>笔刷类型</span><el-select v-model="brushType" size="small" @change="updateBrush"><el-option v-for="brush in brushTypes" :key="brush.value" :label="brush.label" :value="brush.value" /></el-select></label>
-            <label class="field"><span>大小 <em>{{ brushSize }}px</em></span><el-slider v-model="brushSize" :min="1" :max="96" :show-tooltip="false" /></label>
-            <label class="field"><span>压力 <em>{{ brushPressure }}%</em></span><el-slider v-model="brushPressure" :min="0" :max="100" :show-tooltip="false" /></label>
-          </el-collapse-item>
-          <el-collapse-item title="颜色" name="color">
-            <div class="field"><span>当前颜色</span><div class="color-control"><el-color-picker v-model="brushColor" :predefine="presetColors" /><code>{{ brushColor }}</code></div></div>
-            <div class="field"><span>色板</span><div class="quick-colors"><button v-for="color in quickColors" :key="color" class="color-dot" :class="{ active: brushColor === color }" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
-            <div class="field"><span>最近颜色</span><div class="quick-colors recent-colors"><button v-for="color in recentColors" :key="color" class="color-dot" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
-          </el-collapse-item>
-          <el-collapse-item title="高级" name="advanced">
-            <label class="field"><span>透明度 <em>{{ brushOpacity }}%</em></span><el-slider v-model="brushOpacity" :min="10" :max="100" :step="5" :show-tooltip="false" /></label>
-            <label class="field"><span>混合模式</span><el-select v-model="blendMode" size="small"><el-option v-for="mode in blendModes" :key="mode.value" :label="mode.label" :value="mode.value" /></el-select></label>
-          </el-collapse-item>
-        </el-collapse>
+        <section v-if="!isShapeToolActive" class="inspector-section">
+          <div class="section-title">笔刷类型</div>
+          <div class="type-button-grid">
+            <button
+              v-for="brush in brushTypes"
+              :key="brush.value"
+              class="type-choice"
+              :class="{ active: brushType === brush.value }"
+              type="button"
+              @click="selectBrushType(brush.value)"
+            >
+              {{ brush.label }}
+            </button>
+          </div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-title">{{ isShapeToolActive ? '线条设置' : '画笔设置' }}</div>
+          <label class="field"><span>大小 <em>{{ brushSize }}px</em></span><el-slider v-model="brushSize" :min="1" :max="96" :show-tooltip="false" /></label>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-title">颜色</div>
+          <div class="field"><span>当前颜色</span><div class="color-control"><el-color-picker v-model="brushColor" :predefine="presetColors" /><code>{{ brushColor }}</code></div></div>
+          <div class="field"><span>色板</span><div class="quick-colors"><button v-for="color in quickColors" :key="color" class="color-dot" :class="{ active: brushColor === color }" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
+          <div class="field"><span>最近颜色</span><div class="quick-colors recent-colors"><button v-for="color in recentColors" :key="color" class="color-dot" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
+        </section>
+
+        <section class="inspector-section">
+          <div class="section-title">透明度</div>
+          <label class="field"><span>透明度 <em>{{ brushOpacity }}%</em></span><el-slider v-model="brushOpacity" :min="10" :max="100" :step="5" :show-tooltip="false" /></label>
+        </section>
       </template>
 
       <template v-else-if="currentTool === 'eraser'">
-        <el-collapse v-model="eraserSections">
-          <el-collapse-item title="橡皮设置" name="eraser">
-            <label class="field"><span>橡皮类型</span><el-select v-model="eraserType" size="small" @change="updateBrush"><el-option v-for="eraser in eraserTypes" :key="eraser.value" :label="eraser.label" :value="eraser.value" /></el-select></label>
-            <label class="field"><span>大小 <em>{{ eraserSize }}px</em></span><el-slider v-model="eraserSize" :min="1" :max="96" :show-tooltip="false" /></label>
-            <label class="field"><span>压力 <em>{{ eraserPressure }}%</em></span><el-slider v-model="eraserPressure" :min="0" :max="100" :show-tooltip="false" /></label>
-          </el-collapse-item>
-        </el-collapse>
+        <section class="inspector-section">
+          <div class="section-title">橡皮类型</div>
+          <div class="type-button-grid">
+            <button
+              v-for="eraser in eraserTypes"
+              :key="eraser.value"
+              class="type-choice"
+              :class="{ active: eraserType === eraser.value }"
+              type="button"
+              @click="selectEraserType(eraser.value)"
+            >
+              {{ eraser.label }}
+            </button>
+          </div>
+        </section>
+        <section class="inspector-section">
+          <div class="section-title">橡皮设置</div>
+          <label class="field"><span>大小 <em>{{ eraserSize }}px</em></span><el-slider v-model="eraserSize" :min="1" :max="96" :show-tooltip="false" /></label>
+        </section>
       </template>
 
       <div v-else-if="currentTool === 'pan'" class="tool-help">
-        <el-icon><Rank /></el-icon><strong>移动笔迹</strong><p>直接拖动画布中的笔迹进行移动。画布位置保持固定。</p>
+        <el-icon><Rank /></el-icon><strong>移动画布</strong><p>按住并拖动画布，可调整画布与外框在工作区中的位置。</p>
       </div>
-      <template v-else>
-        <el-collapse v-model="selectionSections">
-          <el-collapse-item title="选择设置" name="selection">
-            <div v-if="selectedObject" class="selection-controls">
-              <div class="field"><span>对象颜色</span><div class="color-control"><el-color-picker v-model="selectionColor" :predefine="presetColors" @change="changeSelectedColor" /><code>{{ selectionColor }}</code></div></div>
-              <el-button class="delete-selection" type="danger" plain @click="deleteSelectedObject"><el-icon><Delete /></el-icon>删除选中对象</el-button>
-              <p class="selection-hint">也可以按 Delete 或 Backspace 删除</p>
-            </div>
-            <div v-else class="tool-help compact">
-              <el-icon><Crop /></el-icon><strong>选择对象</strong><p>点击画布中的笔画或图像后，可调整颜色、移动、缩放或删除。</p>
-            </div>
-          </el-collapse-item>
-        </el-collapse>
-      </template>
     </aside>
     <el-dialog
       v-model="aiDialogVisible"
@@ -325,10 +384,10 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { ArrowDown, ArrowLeft, Back, Crop, Delete, Download, EditPen, FullScreen, MagicStick, Rank, RefreshRight, Right, Upload, UploadFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { Canvas as FabricCanvas, CircleBrush, FabricImage, PencilBrush, Shadow, SprayBrush } from 'fabric'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { ArrowDown, ArrowLeft, Back, Delete, Download, EditPen, FullScreen, MagicStick, Rank, RefreshRight, Right, Upload, UploadFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Canvas as FabricCanvas, Circle, CircleBrush, FabricImage, IText, Line, Path, PencilBrush, Rect, Shadow, SprayBrush } from 'fabric'
 import { uploadImage } from '@/api/image'
 import { refineDrawing } from '@/api/ai'
 
@@ -337,10 +396,12 @@ const canvasRef = ref(null)
 const canvasWrapperRef = ref(null)
 let fabricCanvas = null
 let isRestoring = false
+let shapeDraft = null
 const AI_PROMPT_LIMIT = 1500
 const ZOOM_MIN = 25
 const ZOOM_MAX = 400
 const ZOOM_STEP = 25
+const DRAFT_STORAGE_KEY = 'pixel-lab:creative-canvas-draft:v1'
 
 const documentName = ref('未命名作品')
 const currentTool = ref('brush')
@@ -348,10 +409,7 @@ const brushType = ref('hard')
 const eraserType = ref('hard')
 const brushSize = ref(8)
 const brushOpacity = ref(100)
-const brushPressure = ref(50)
 const eraserSize = ref(24)
-const eraserPressure = ref(50)
-const blendMode = ref('source-over')
 const brushColor = ref('#111827')
 const canvasWidth = ref(800)
 const canvasHeight = ref(600)
@@ -363,6 +421,9 @@ const backgroundColor = ref('#ffffff')
 const showGrid = ref(true)
 const pointerPosition = ref(null)
 const zoomLevel = ref(100)
+const panOffset = ref({ x: 0, y: 0 })
+const isCanvasPanning = ref(false)
+const shapeMenuVisible = ref(false)
 const aiDialogVisible = ref(false)
 const aiMode = ref('refine')
 const aiPrompt = ref('')
@@ -374,11 +435,7 @@ const aiResultText = ref('')
 const aiResultNotice = ref('')
 const aiLoading = ref(false)
 const isFullscreen = ref(false)
-const inspectorSections = ref(['brush', 'color', 'advanced'])
-const eraserSections = ref(['eraser'])
-const selectionSections = ref(['selection'])
-const selectedObject = ref(null)
-const selectionColor = ref('#111827')
+const hasUnsavedChanges = ref(false)
 const recentColors = ref(['#111827', '#ffffff', '#3b82f6', '#ef4444'])
 
 
@@ -391,6 +448,23 @@ const brushTypes = [
   { label: '像素笔', value: 'pixel' }
 ]
 
+const shapeMenuTools = [
+  { label: '空心矩形', value: 'rect', glyph: '□' },
+  { label: '实心矩形', value: 'rect-fill', glyph: '■' },
+  { label: '空心圆形', value: 'circle', glyph: '○' },
+  { label: '实心圆形', value: 'circle-fill', glyph: '●' }
+]
+
+const directDrawingTools = [
+  { label: '直线', shortLabel: '直线', value: 'line', glyph: '╱' },
+  { label: '箭头', shortLabel: '箭头', value: 'arrow', glyph: '↗' },
+  { label: '文字', shortLabel: '文字', value: 'text', glyph: 'T' }
+]
+
+const shapeTools = [...shapeMenuTools, ...directDrawingTools]
+const shapeBrushTypes = new Set(shapeTools.map((shape) => shape.value))
+const shapeMenuBrushTypes = new Set(shapeMenuTools.map((shape) => shape.value))
+
 const eraserTypes = [
   { label: '硬橡皮', value: 'hard' },
   { label: '软橡皮', value: 'soft' },
@@ -398,12 +472,6 @@ const eraserTypes = [
   { label: '喷点橡皮', value: 'spray' }
 ]
 
-const blendModes = [
-  { label: '正常', value: 'source-over' },
-  { label: '正片叠底', value: 'multiply' },
-  { label: '滤色', value: 'screen' },
-  { label: '叠加', value: 'overlay' }
-]
 const aiModeOptions = [
   { label: '润色建议', value: 'refine' },
   { label: '二次创作', value: 'draw' }
@@ -449,23 +517,27 @@ const maxHistory = 60
 const canUndo = computed(() => historyIndex.value > 0)
 const canRedo = computed(() => historyIndex.value < historyList.value.length - 1)
 const historyCount = computed(() => historyList.value.length)
-const activeBrushName = computed(() => brushTypes.find((brush) => brush.value === brushType.value)?.label || '硬圆笔')
+const isShapeToolActive = computed(() => currentTool.value === 'brush' && shapeBrushTypes.has(brushType.value))
+const activeBrushName = computed(() => (
+  brushTypes.find((brush) => brush.value === brushType.value)?.label ||
+  shapeTools.find((shape) => shape.value === brushType.value)?.label ||
+  '硬圆笔'
+))
 const activeEraserName = computed(() => eraserTypes.find((eraser) => eraser.value === eraserType.value)?.label || '硬橡皮')
 const currentToolLabel = computed(() => {
-  if (currentTool.value === 'pan') return '移动笔迹'
-  if (currentTool.value === 'select') return '选择对象'
+  if (currentTool.value === 'pan') return '移动画布'
   if (currentTool.value === 'eraser') return activeEraserName.value + ' ' + eraserSize.value + 'px'
   return activeBrushName.value + ' ' + brushSize.value + 'px / ' + brushOpacity.value + '%'
 })
-const inspectorTitle = computed(() => ({
-  brush: '画笔',
-  eraser: '橡皮',
-  pan: '移动',
-  select: '选择工具'
-}[currentTool.value] || '工具'))
-const currentToolShortcut = computed(() => ({ brush: 'B', eraser: 'E', pan: 'V', select: 'S' }[currentTool.value] || ''))
-const effectiveBrushWidth = computed(() => Math.max(1, Math.round(brushSize.value * (0.75 + brushPressure.value / 200))))
-const effectiveEraserWidth = computed(() => Math.max(1, Math.round(eraserSize.value * (0.75 + eraserPressure.value / 200))))
+const inspectorTitle = computed(() => {
+  if (isShapeToolActive.value) return activeBrushName.value
+  return ({ brush: '画笔', eraser: '橡皮', pan: '移动' }[currentTool.value] || '工具')
+})
+const currentToolShortcut = computed(() => (
+  isShapeToolActive.value ? '' : ({ brush: 'B', eraser: 'E', pan: 'V' }[currentTool.value] || '')
+))
+const effectiveBrushWidth = computed(() => brushSize.value)
+const effectiveEraserWidth = computed(() => eraserSize.value)
 const activeAiModels = computed(() => aiModelGroups[aiMode.value] || aiModelGroups.refine)
 const aiPromptLabel = computed(() => aiMode.value === 'draw' ? '创作要求' : '润色要求')
 const aiPromptPlaceholder = computed(() => (
@@ -482,7 +554,11 @@ const aiResultTitle = computed(() => {
 const zoomScale = computed(() => zoomLevel.value / 100)
 const canvasViewportStyle = computed(() => ({
   width: `${Math.round(canvasWidth.value * zoomScale.value)}px`,
-  height: `${Math.round(canvasHeight.value * zoomScale.value)}px`,
+  height: `${Math.round(canvasHeight.value * zoomScale.value)}px`
+}))
+
+const canvasCardStyle = computed(() => ({
+  transform: 'translate(' + panOffset.value.x + 'px, ' + panOffset.value.y + 'px)'
 }))
 
 const canvasShellStyle = computed(() => {
@@ -547,17 +623,17 @@ const initCanvas = async () => {
   })
 
   fabricCanvas.on('path:created', handlePathCreated)
+  fabricCanvas.on('mouse:down', handleEraserPointerDown)
+  fabricCanvas.on('mouse:move', handleEraserPointerMove)
+  fabricCanvas.on('mouse:up', handleEraserPointerUp)
+  fabricCanvas.on('mouse:down', handleShapePointerDown)
+  fabricCanvas.on('mouse:move', handleShapePointerMove)
+  fabricCanvas.on('mouse:up', handleShapePointerUp)
   fabricCanvas.on('mouse:move', updatePointerPosition)
   fabricCanvas.on('mouse:out', () => {
     pointerPosition.value = null
   })
 
-  fabricCanvas.on('selection:created', syncSelectedObject)
-  fabricCanvas.on('selection:updated', syncSelectedObject)
-  fabricCanvas.on('selection:cleared', () => {
-    selectedObject.value = null
-  })
-  fabricCanvas.on('object:modified', () => saveHistory('调整对象'))
   syncFabricCanvasLayout()
   updateBrush()
   saveHistory('初始画布')
@@ -582,43 +658,65 @@ const toggleFullscreen = async () => {
 const syncFullscreenState = () => {
   isFullscreen.value = Boolean(document.fullscreenElement)
 }
-const syncSelectedObject = (event) => {
-  const object = event?.selected?.[0] || fabricCanvas?.getActiveObject() || null
-  selectedObject.value = object
-  const objectColor = object?.stroke || object?.fill
-  selectionColor.value = typeof objectColor === 'string' && objectColor.startsWith('#') ? objectColor : '#111827'
-}
-
-const changeSelectedColor = (color) => {
-  if (!fabricCanvas || !color) return
-  const objects = fabricCanvas.getActiveObjects()
-  if (!objects.length) return
-  objects.forEach((object) => {
-    if (object.type === 'path' || object.stroke) {
-      object.set('stroke', color)
-    } else if (object.type !== 'image') {
-      object.set('fill', color)
-    }
-    object.setCoords()
-  })
-  selectionColor.value = color
-  fabricCanvas.requestRenderAll()
-  saveHistory('调整对象颜色')
-}
-
-const deleteSelectedObject = () => {
-  if (!fabricCanvas) return
-  const objects = fabricCanvas.getActiveObjects()
-  if (!objects.length) return
-  fabricCanvas.discardActiveObject()
-  objects.forEach((object) => fabricCanvas.remove(object))
-  selectedObject.value = null
-  fabricCanvas.requestRenderAll()
-  saveHistory('删除对象')
-}
 const selectTool = (tool) => {
+  if (tool === 'brush' && shapeBrushTypes.has(brushType.value)) {
+    brushType.value = 'hard'
+  }
   currentTool.value = tool
   updateBrush()
+  nextTick(refreshCanvasOffset)
+}
+
+const selectDrawingTool = (type) => {
+  brushType.value = type
+  currentTool.value = 'brush'
+  shapeMenuVisible.value = false
+  updateBrush()
+}
+
+const selectBrushType = (type) => {
+  brushType.value = type
+  updateBrush()
+}
+
+const selectEraserType = (type) => {
+  eraserType.value = type
+  updateBrush()
+}
+
+let panStart = null
+const startCanvasPan = (event) => {
+  const isMiddleButton = event.button === 1
+  const isMoveToolDrag = currentTool.value === 'pan' && event.button === 0
+  if (!isMiddleButton && !isMoveToolDrag) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+  panStart = {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    offsetX: panOffset.value.x,
+    offsetY: panOffset.value.y
+  }
+  isCanvasPanning.value = true
+}
+
+const moveCanvasPan = (event) => {
+  if (!isCanvasPanning.value || !panStart) return
+  event.preventDefault()
+  panOffset.value = {
+    x: panStart.offsetX + event.clientX - panStart.pointerX,
+    y: panStart.offsetY + event.clientY - panStart.pointerY
+  }
+}
+
+const endCanvasPan = (event) => {
+  if (!isCanvasPanning.value) return
+  event.currentTarget.releasePointerCapture?.(event.pointerId)
+  isCanvasPanning.value = false
+  panStart = null
+  refreshCanvasOffset()
 }
 
 const getBrushColor = (opacity = brushOpacity.value) => {
@@ -632,51 +730,8 @@ const getBrushColor = (opacity = brushOpacity.value) => {
   return `rgba(${red}, ${green}, ${blue}, ${opacity / 100})`
 }
 
-const configureEraserBrush = (brush) => {
-  const applyStyles = brush._setBrushStyles?.bind(brush)
-  if (applyStyles) {
-    brush._setBrushStyles = (context) => {
-      applyStyles(context)
-      context.globalCompositeOperation = 'destination-out'
-    }
-  }
-  return brush
-}
 const createBrush = () => {
   if (!fabricCanvas) return
-
-  if (currentTool.value === 'eraser') {
-    if (eraserType.value === 'spray') {
-      const brush = new SprayBrush(fabricCanvas)
-      brush.width = effectiveEraserWidth.value
-      brush.color = 'rgba(255, 255, 255, 1)'
-      brush.density = 36
-      brush.dotWidth = Math.max(2, Math.round(eraserSize.value / 6))
-      brush.dotWidthVariance = Math.max(1, Math.round(eraserSize.value / 4))
-      brush.randomOpacity = true
-      return configureEraserBrush(brush)
-    }
-
-    const brush = new PencilBrush(fabricCanvas)
-    brush.width = effectiveEraserWidth.value
-    brush.color = 'rgba(255, 255, 255, 1)'
-
-    if (eraserType.value === 'soft') {
-      brush.shadow = new Shadow({
-        color: 'rgba(255, 255, 255, 0.9)',
-        blur: Math.max(6, Math.round(eraserSize.value * 0.7)),
-        offsetX: 0,
-        offsetY: 0
-      })
-    }
-
-    if (eraserType.value === 'block') {
-      brush.strokeLineCap = 'square'
-      brush.strokeLineJoin = 'miter'
-    }
-
-    return configureEraserBrush(brush)
-  }
 
   const color = getBrushColor()
 
@@ -735,88 +790,318 @@ const createBrush = () => {
   return brush
 }
 
+const getEventPoint = (event) => {
+  if (!fabricCanvas) return null
+  return fabricCanvas.getScenePoint ? fabricCanvas.getScenePoint(event.e) : fabricCanvas.getPointer(event.e)
+}
+
+const getShapeStyles = (filled = false) => ({
+  fill: filled ? getBrushColor() : 'transparent',
+  stroke: getBrushColor(),
+  strokeWidth: effectiveBrushWidth.value,
+  strokeLineCap: 'round',
+  strokeLineJoin: 'round',
+  strokeUniform: true,
+  globalCompositeOperation: 'source-over',
+  selectable: false,
+  evented: false,
+  perPixelTargetFind: true,
+  padding: 0
+})
+
+const createShapeObject = (start, end) => {
+  const width = Math.abs(end.x - start.x)
+  const height = Math.abs(end.y - start.y)
+
+  if (brushType.value === 'rect' || brushType.value === 'rect-fill') {
+    return new Rect({
+      left: start.x,
+      top: start.y,
+      originX: 'center',
+      originY: 'center',
+      width: width * 2,
+      height: height * 2,
+      ...getShapeStyles(brushType.value === 'rect-fill')
+    })
+  }
+
+  if (brushType.value === 'circle' || brushType.value === 'circle-fill') {
+    const radius = Math.hypot(end.x - start.x, end.y - start.y)
+    return new Circle({
+      left: start.x,
+      top: start.y,
+      originX: 'center',
+      originY: 'center',
+      radius,
+      ...getShapeStyles(brushType.value === 'circle-fill')
+    })
+  }
+
+  if (brushType.value === 'line') {
+    return new Line([start.x, start.y, end.x, end.y], getShapeStyles())
+  }
+
+  if (brushType.value === 'arrow') {
+    const angle = Math.atan2(end.y - start.y, end.x - start.x)
+    const arrowSize = Math.max(10, effectiveBrushWidth.value * 4)
+    const wingA = {
+      x: end.x - arrowSize * Math.cos(angle - Math.PI / 6),
+      y: end.y - arrowSize * Math.sin(angle - Math.PI / 6)
+    }
+    const wingB = {
+      x: end.x - arrowSize * Math.cos(angle + Math.PI / 6),
+      y: end.y - arrowSize * Math.sin(angle + Math.PI / 6)
+    }
+    const path = 'M ' + start.x + ' ' + start.y +
+      ' L ' + end.x + ' ' + end.y +
+      ' M ' + end.x + ' ' + end.y +
+      ' L ' + wingA.x + ' ' + wingA.y +
+      ' M ' + end.x + ' ' + end.y +
+      ' L ' + wingB.x + ' ' + wingB.y
+    return new Path(path, getShapeStyles())
+  }
+
+  return null
+}
+
+const addEditableText = (point) => {
+  if (!fabricCanvas) return
+
+  const text = new IText('输入文字', {
+    left: point.x,
+    top: point.y,
+    fill: getBrushColor(),
+    fontFamily: 'Microsoft YaHei, sans-serif',
+    fontSize: Math.max(12, effectiveBrushWidth.value * 2),
+    globalCompositeOperation: 'source-over',
+    selectable: true,
+    evented: true
+  })
+
+  let historySaved = false
+  text.once('editing:exited', () => {
+    if (!fabricCanvas || historySaved) return
+    historySaved = true
+    if (!text.text?.trim()) {
+      fabricCanvas.remove(text)
+    } else {
+      text.set({ selectable: false, evented: false })
+    }
+    fabricCanvas.discardActiveObject()
+    fabricCanvas.requestRenderAll()
+    saveHistory('添加文字')
+  })
+
+  fabricCanvas.add(text)
+  fabricCanvas.setActiveObject(text)
+  text.enterEditing()
+  text.selectAll()
+  fabricCanvas.requestRenderAll()
+}
+
+let eraserSession = null
+
+const drawRoundEraser = (ctx, start, end, width, alpha = 1) => {
+  ctx.globalAlpha = alpha
+  ctx.lineWidth = width
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  ctx.lineTo(end.x, end.y)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(end.x, end.y, width / 2, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+const drawEraserSegment = (start, end) => {
+  if (!fabricCanvas) return
+  const ctx = fabricCanvas.contextContainer
+  ctx.save()
+  ctx.globalCompositeOperation = 'destination-out'
+  ctx.fillStyle = '#000000'
+  ctx.strokeStyle = '#000000'
+
+  if (eraserType.value === 'spray') {
+    const radius = effectiveEraserWidth.value / 2
+    for (let index = 0; index < 32; index += 1) {
+      const angle = Math.random() * Math.PI * 2
+      const distance = Math.sqrt(Math.random()) * radius
+      const size = Math.max(1, effectiveEraserWidth.value / 10)
+      ctx.globalAlpha = 0.45 + Math.random() * 0.55
+      ctx.fillRect(
+        end.x + Math.cos(angle) * distance - size / 2,
+        end.y + Math.sin(angle) * distance - size / 2,
+        size,
+        size
+      )
+    }
+  } else if (eraserType.value === 'soft') {
+    drawRoundEraser(ctx, start, end, effectiveEraserWidth.value * 1.45, 0.16)
+    drawRoundEraser(ctx, start, end, effectiveEraserWidth.value, 0.32)
+    drawRoundEraser(ctx, start, end, effectiveEraserWidth.value * 0.55, 0.62)
+  } else if (eraserType.value === 'block') {
+    ctx.globalAlpha = 1
+    ctx.lineWidth = effectiveEraserWidth.value
+    ctx.lineCap = 'square'
+    ctx.lineJoin = 'miter'
+    ctx.beginPath()
+    ctx.moveTo(start.x, start.y)
+    ctx.lineTo(end.x, end.y)
+    ctx.stroke()
+    const half = effectiveEraserWidth.value / 2
+    ctx.fillRect(end.x - half, end.y - half, effectiveEraserWidth.value, effectiveEraserWidth.value)
+  } else {
+    drawRoundEraser(ctx, start, end, effectiveEraserWidth.value)
+  }
+
+  ctx.restore()
+}
+
+const handleEraserPointerDown = (event) => {
+  if (!fabricCanvas || currentTool.value !== 'eraser') return
+  const point = getEventPoint(event)
+  if (!point) return
+  fabricCanvas.renderAll()
+  eraserSession = { lastPoint: point }
+  drawEraserSegment(point, point)
+}
+
+const handleEraserPointerMove = (event) => {
+  if (!eraserSession || currentTool.value !== 'eraser') return
+  const point = getEventPoint(event)
+  if (!point) return
+  drawEraserSegment(eraserSession.lastPoint, point)
+  eraserSession.lastPoint = point
+}
+
+const handleEraserPointerUp = async () => {
+  if (!fabricCanvas || !eraserSession) return
+  eraserSession = null
+
+  try {
+    const erasedUrl = fabricCanvas.lowerCanvasEl.toDataURL('image/png')
+    const image = await FabricImage.fromURL(erasedUrl)
+    image.set({
+      left: 0,
+      top: 0,
+      originX: 'left',
+      originY: 'top',
+      scaleX: canvasWidth.value / (image.width || canvasWidth.value),
+      scaleY: canvasHeight.value / (image.height || canvasHeight.value),
+      selectable: false,
+      evented: false,
+      imageSmoothing: true
+    })
+
+    isRestoring = true
+    fabricCanvas.clear()
+    fabricCanvas.add(image)
+    fabricCanvas.requestRenderAll()
+    isRestoring = false
+    saveHistory('擦除')
+  } catch (error) {
+    isRestoring = false
+    fabricCanvas.requestRenderAll()
+    console.error('[Draw] Eraser commit failed:', error)
+    ElMessage.error('擦除结果保存失败')
+  }
+}
+
+const handleShapePointerDown = (event) => {
+  if (!fabricCanvas || currentTool.value !== 'brush' || !shapeBrushTypes.has(brushType.value)) return
+  const point = getEventPoint(event)
+  if (!point) return
+  if (brushType.value === 'text') {
+    const activeObject = fabricCanvas.getActiveObject()
+    if (activeObject?.isEditing) {
+      activeObject.exitEditing()
+      fabricCanvas.discardActiveObject()
+      fabricCanvas.requestRenderAll()
+      return
+    }
+    addEditableText(point)
+    return
+  }
+  shapeDraft = { start: point, object: null }
+}
+
+const handleShapePointerMove = (event) => {
+  if (!fabricCanvas || !shapeDraft || currentTool.value !== 'brush') return
+  const point = getEventPoint(event)
+  if (!point) return
+  if (shapeDraft.object) fabricCanvas.remove(shapeDraft.object)
+  shapeDraft.object = createShapeObject(shapeDraft.start, point)
+  if (shapeDraft.object) fabricCanvas.add(shapeDraft.object)
+  fabricCanvas.requestRenderAll()
+}
+
+const handleShapePointerUp = (event) => {
+  if (!fabricCanvas || !shapeDraft) return
+  const point = getEventPoint(event)
+  const distance = point ? Math.hypot(point.x - shapeDraft.start.x, point.y - shapeDraft.start.y) : 0
+  if (!shapeDraft.object || distance < 2) {
+    if (shapeDraft.object) fabricCanvas.remove(shapeDraft.object)
+    shapeDraft = null
+    fabricCanvas.requestRenderAll()
+    return
+  }
+  shapeDraft.object.setCoords()
+  shapeDraft = null
+  fabricCanvas.requestRenderAll()
+  saveHistory('绘制图形')
+}
+
 const updateBrush = () => {
   if (!fabricCanvas) return
 
-  const isSelectionTool = currentTool.value === 'select'
   const isMoveTool = currentTool.value === 'pan'
-  const isObjectTool = isSelectionTool || isMoveTool
+  const isEraserTool = currentTool.value === 'eraser'
+  const isShapeTool = currentTool.value === 'brush' && shapeBrushTypes.has(brushType.value)
 
-  fabricCanvas.selection = isSelectionTool
+  fabricCanvas.selection = false
   fabricCanvas.perPixelTargetFind = true
   fabricCanvas.targetFindTolerance = 0
   fabricCanvas.forEachObject((object) => {
-    const canInteract = isObjectTool && !object.isEraserStroke
     object.set({
-      selectable: canInteract,
-      evented: canInteract,
-      perPixelTargetFind: true,
+      selectable: false,
+      evented: false,
+      perPixelTargetFind: false,
       padding: 0,
-      hoverCursor: canInteract ? 'move' : 'default'
+      hoverCursor: 'default'
     })
   })
 
-  if (!isObjectTool) {
-    fabricCanvas.discardActiveObject()
-  }
+  fabricCanvas.discardActiveObject()
 
-  if (isObjectTool) {
+  if (isMoveTool || isEraserTool) {
     fabricCanvas.isDrawingMode = false
-    fabricCanvas.defaultCursor = 'default'
-    fabricCanvas.hoverCursor = 'move'
-    if (isMoveTool) fabricCanvas.discardActiveObject()
+    fabricCanvas.defaultCursor = isMoveTool ? 'grab' : 'crosshair'
+    fabricCanvas.hoverCursor = fabricCanvas.defaultCursor
     fabricCanvas.requestRenderAll()
     return
   }
 
-  fabricCanvas.isDrawingMode = true
+  fabricCanvas.isDrawingMode = !isShapeTool
   fabricCanvas.defaultCursor = 'crosshair'
   fabricCanvas.hoverCursor = 'crosshair'
-  fabricCanvas.freeDrawingBrush = createBrush()
+  if (!isShapeTool) fabricCanvas.freeDrawingBrush = createBrush()
   fabricCanvas.requestRenderAll()
 }
 const handlePathCreated = (event) => {
-  if (!fabricCanvas || isRestoring) return
+  if (!fabricCanvas || isRestoring || currentTool.value !== 'brush' || !event.path) return
 
-  if (currentTool.value === 'eraser' && event.path) {
-    event.path.set({
-      globalCompositeOperation: 'destination-out',
-      stroke: '#000000',
-      opacity: 1,
-      selectable: false,
-      evented: false,
-      perPixelTargetFind: false,
-      isEraserStroke: true,
-      excludeFromExport: false
-    })
+  event.path.globalCompositeOperation = 'source-over'
+  event.path.set({ selectable: false, evented: false, perPixelTargetFind: false, padding: 0 })
 
-    if (eraserType.value === 'soft') {
-      event.path.shadow = new Shadow({
-        color: 'rgba(255, 255, 255, 0.9)',
-        blur: Math.max(6, Math.round(eraserSize.value * 0.7)),
-        offsetX: 0,
-        offsetY: 0
-      })
-    }
-
-    if (eraserType.value === 'block') {
-      event.path.strokeLineCap = 'square'
-      event.path.strokeLineJoin = 'miter'
-    }
-
-    fabricCanvas.requestRenderAll()
-  } else if (currentTool.value === 'brush' && event.path) {
-    event.path.globalCompositeOperation = blendMode.value
-    event.path.set({ selectable: false, evented: false, perPixelTargetFind: true, padding: 0, isEraserStroke: false })
-
-    if (brushType.value === 'pixel') {
+  if (brushType.value === 'pixel') {
     event.path.strokeLineCap = 'square'
-      event.path.strokeLineJoin = 'miter'
-    }
-    fabricCanvas.requestRenderAll()
+    event.path.strokeLineJoin = 'miter'
   }
 
-  saveHistory(currentTool.value === 'eraser' ? '擦除' : '绘制')
+  fabricCanvas.requestRenderAll()
+  saveHistory('绘制')
 }
 
 const updatePointerPosition = (event) => {
@@ -844,6 +1129,112 @@ const saveHistory = (name) => {
   }
 
   historyIndex.value = historyList.value.length - 1
+  if (name !== '初始画布') hasUnsavedChanges.value = true
+}
+
+const createDraftPayload = () => ({
+  version: 1,
+  savedAt: Date.now(),
+  documentName: documentName.value,
+  canvasWidth: canvasWidth.value,
+  canvasHeight: canvasHeight.value,
+  backgroundMode: backgroundMode.value,
+  backgroundColor: backgroundColor.value,
+  showGrid: showGrid.value,
+  canvasJson: fabricCanvas?.toJSON(['globalCompositeOperation', 'isEraserStroke'])
+})
+
+const clearStoredDraft = () => {
+  localStorage.removeItem(DRAFT_STORAGE_KEY)
+}
+
+const saveDraftLocally = (markSaved = true) => {
+  if (!fabricCanvas) return false
+
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(createDraftPayload()))
+    if (markSaved) hasUnsavedChanges.value = false
+    return true
+  } catch (error) {
+    console.error('[Draw] Save draft failed:', error)
+    return false
+  }
+}
+
+const readStoredDraft = () => {
+  try {
+    const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!rawDraft) return null
+    const draft = JSON.parse(rawDraft)
+    if (draft?.version !== 1 || !draft.canvasJson) throw new Error('Invalid draft data')
+    return draft
+  } catch (error) {
+    console.error('[Draw] Read draft failed:', error)
+    clearStoredDraft()
+    return null
+  }
+}
+
+const restoreStoredDraft = async (draft) => {
+  if (!fabricCanvas) return
+
+  isRestoring = true
+  try {
+    documentName.value = draft.documentName || '未命名作品'
+    canvasWidth.value = Number(draft.canvasWidth) || 800
+    canvasHeight.value = Number(draft.canvasHeight) || 600
+    draftWidth.value = canvasWidth.value
+    draftHeight.value = canvasHeight.value
+    backgroundMode.value = draft.backgroundMode || 'transparent'
+    backgroundColor.value = draft.backgroundColor || '#ffffff'
+    showGrid.value = draft.showGrid !== false
+    selectedPreset.value = canvasPresets.some((item) => item.width === canvasWidth.value && item.height === canvasHeight.value)
+      ? `${canvasWidth.value}x${canvasHeight.value}`
+      : 'custom'
+
+    fabricCanvas.setDimensions({ width: canvasWidth.value, height: canvasHeight.value })
+    syncFabricCanvasLayout()
+    await fabricCanvas.loadFromJSON(draft.canvasJson)
+    fabricCanvas.requestRenderAll()
+    updateBrush()
+    historyList.value = [{
+      name: '恢复草稿',
+      json: fabricCanvas.toJSON(['globalCompositeOperation', 'isEraserStroke'])
+    }]
+    historyIndex.value = 0
+    hasUnsavedChanges.value = false
+  } finally {
+    isRestoring = false
+  }
+}
+
+const offerDraftRestore = async () => {
+  const draft = readStoredDraft()
+  if (!draft) return
+
+  try {
+    await ElMessageBox.confirm(
+      `发现 ${new Date(draft.savedAt).toLocaleString()} 保存的草稿，是否恢复？`,
+      '恢复草稿',
+      {
+        confirmButtonText: '恢复草稿',
+        cancelButtonText: '放弃草稿',
+        type: 'info',
+        closeOnClickModal: false
+      }
+    )
+    await restoreStoredDraft(draft)
+    ElMessage.success('草稿已恢复')
+  } catch {
+    clearStoredDraft()
+  }
+}
+
+const handleBeforeUnload = (event) => {
+  if (!hasUnsavedChanges.value) return
+  saveDraftLocally(false)
+  event.preventDefault()
+  event.returnValue = ''
 }
 
 const undo = () => {
@@ -863,6 +1254,7 @@ const restoreHistory = async (index) => {
   fabricCanvas.requestRenderAll()
   updateBrush()
   isRestoring = false
+  hasUnsavedChanges.value = true
 }
 
 const clearCanvas = () => {
@@ -942,8 +1334,6 @@ const fitCanvasToView = () => {
 }
 
 const handleCanvasWheel = (event) => {
-  if (!event.ctrlKey && !event.metaKey) return
-
   event.preventDefault()
   if (event.deltaY < 0) {
     zoomIn()
@@ -1310,6 +1700,8 @@ const saveToGallery = async () => {
     const blob = await res.blob()
     const file = new File([blob], `${safeDocumentName()}_${Date.now()}.png`, { type: 'image/png' })
     await uploadImage(file)
+    clearStoredDraft()
+    hasUnsavedChanges.value = false
     ElMessage.success('已保存到个人中心')
   } catch (error) {
     console.error('[Draw] Save failed:', error)
@@ -1351,36 +1743,63 @@ const handleKeydown = (event) => {
     return
   }
 
-  if ((event.key === 'Delete' || event.key === 'Backspace') && currentTool.value === 'select') {
-    event.preventDefault()
-    deleteSelectedObject()
-    return
-  }
   if (event.key.toLowerCase() === 'b') selectTool('brush')
   if (event.key.toLowerCase() === 'e') selectTool('eraser')
   if (event.key.toLowerCase() === 'v') selectTool('pan')
-  if (event.key.toLowerCase() === 's') selectTool('select')
 }
 
 const handleWindowBlur = () => {
+  isCanvasPanning.value = false
+  panStart = null
   updateBrush()
 }
 
-watch([brushSize, brushColor, brushOpacity, brushPressure, eraserSize, eraserPressure, currentTool, brushType, eraserType], updateBrush)
+watch([brushSize, brushColor, brushOpacity, eraserSize, currentTool, brushType, eraserType], updateBrush)
+watch([documentName, backgroundMode, backgroundColor, showGrid], () => {
+  if (fabricCanvas && !isRestoring) hasUnsavedChanges.value = true
+})
 watch(brushColor, (color) => {
   recentColors.value = [color, ...recentColors.value.filter(item => item !== color)].slice(0, 8)
 })
 
-onMounted(() => {
-  initCanvas()
+onBeforeRouteLeave(async () => {
+  if (!hasUnsavedChanges.value) return true
+
+  try {
+    await ElMessageBox.confirm('当前画布尚未保存，是否保存为草稿后退出？', '保存草稿', {
+      confirmButtonText: '保存草稿并退出',
+      cancelButtonText: '不保存',
+      distinguishCancelAndClose: true,
+      closeOnClickModal: false,
+      type: 'warning'
+    })
+    if (!saveDraftLocally()) {
+      ElMessage.error('草稿保存失败，请检查浏览器存储空间')
+      return false
+    }
+    return true
+  } catch (action) {
+    if (action === 'cancel') {
+      clearStoredDraft()
+      return true
+    }
+    return false
+  }
+})
+
+onMounted(async () => {
+  await initCanvas()
+  await offerDraftRestore()
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('blur', handleWindowBlur)
+  window.addEventListener('beforeunload', handleBeforeUnload)
   document.addEventListener('fullscreenchange', syncFullscreenState)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('blur', handleWindowBlur)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   document.removeEventListener('fullscreenchange', syncFullscreenState)
   if (fabricCanvas) {
     fabricCanvas.dispose()
@@ -1551,6 +1970,9 @@ onUnmounted(() => {
   background: #202925;
   border-right: 1px solid #38413d;
   box-shadow: 5px 0 18px rgba(22, 30, 27, .12);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4b5751 transparent;
 }
 
 .rail-title {
@@ -1565,6 +1987,58 @@ onUnmounted(() => {
 .rail-group {
   display: grid;
   gap: 8px;
+}
+
+.shape-tools {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #3b4540;
+}
+
+.shape-tool {
+  min-height: 48px;
+}
+
+.tool-glyph {
+  font: 700 22px/1 ui-monospace, monospace;
+}
+
+.shape-menu-options {
+  display: grid;
+  gap: 6px;
+}
+
+.shape-menu-option {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  color: #58645e;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shape-menu-option:hover {
+  color: var(--editor-accent);
+  background: var(--editor-accent-soft);
+}
+
+.shape-menu-option.active {
+  color: #fff;
+  background: var(--editor-accent);
+}
+
+:global(.shape-menu-popper.el-popper) {
+  --editor-accent: #16a36a;
+  --editor-accent-soft: #e7f7ef;
+  padding: 8px;
+  border-radius: 10px;
 }
 
 .history-tools {
@@ -1639,10 +2113,7 @@ onUnmounted(() => {
   overflow: hidden;
   overscroll-behavior: contain;
   touch-action: none;
-  background:
-    radial-gradient(ellipse at center, rgba(255,255,255,.18) 0%, rgba(255,255,255,.04) 45%, rgba(23,31,28,.18) 100%),
-    #c9cecc;
-  box-shadow: inset 0 0 85px rgba(20, 28, 25, .16);
+  background: #c9cecc;
 }
 
 .shortcut-strip {
@@ -1679,16 +2150,16 @@ onUnmounted(() => {
   border-radius: 8px;
   background: rgba(236,239,238,.42);
   box-shadow: 0 20px 45px rgba(31, 41, 37, .18), inset 0 1px rgba(255,255,255,.55);
+  transition: transform .08s linear;
+  will-change: transform;
 }
 
 .canvas-viewport {
   position: relative;
   flex: 0 0 auto;
-  transition: transform .08s linear;
-  will-change: transform;
 }
 
-.canvas-stage.is-panning .canvas-viewport { transition: none; }
+.canvas-stage.is-panning .canvas-card { transition: none; }
 
 .canvas-shell {
   position: absolute;
@@ -1832,6 +2303,50 @@ onUnmounted(() => {
   color: #4f5c56 !important;
   text-align: center;
   font: 700 11px/1 ui-monospace, monospace !important;
+}
+
+.inspector-section {
+  padding: 16px 2px 18px;
+  border-bottom: 1px solid #e5e9e7;
+}
+
+.section-title {
+  margin-bottom: 12px;
+  color: #34413b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.type-button-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.type-choice {
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid #d9dfdc;
+  border-radius: 8px;
+  background: #fff;
+  color: #58645e;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: .16s ease;
+}
+
+.type-choice:hover {
+  border-color: #8ecdb0;
+  color: var(--editor-accent);
+}
+
+.type-choice.active {
+  border-color: var(--editor-accent);
+  color: #fff;
+  background: var(--editor-accent);
+  box-shadow: 0 4px 12px rgba(22, 163, 106, .18);
 }
 
 .inspector :deep(.el-collapse) {

@@ -30,31 +30,41 @@
         </el-button>
       </div>
     </div>
-    <div
-      ref="wrapperRef"
-      class="canvas-wrapper"
-    >
-      <canvas
-        ref="canvasRef"
-        class="editor-canvas"
-        :style="displayStyle"
-      />
-      <div class="compare-switch" aria-label="原图和效果图对比">
-        <button
-          type="button"
-          :class="{ active: previewMode === 'original' }"
-          @click="$emit('update:previewMode', 'original')"
-        >
-          原图
-        </button>
-        <button
-          type="button"
-          :class="{ active: previewMode === 'compare' }"
-          @click="$emit('update:previewMode', 'compare')"
-        >
-          效果图对比
-        </button>
+    <div ref="viewportRef" class="canvas-viewport">
+      <div
+        ref="wrapperRef"
+        class="canvas-wrapper"
+        :class="{ panning: isPanning }"
+        @wheel.prevent="handleWheel"
+        @pointerdown="startPan"
+        @pointermove="movePan"
+        @pointerup="stopPan"
+        @pointercancel="stopPan"
+        @auxclick.prevent
+      >
+        <canvas
+          ref="canvasRef"
+          class="editor-canvas"
+          :style="displayStyle"
+        />
       </div>
+      <button
+        class="compare-switch"
+        type="button"
+        :class="{ active: previewMode === 'original' }"
+        aria-label="按住查看原图"
+        @pointerdown="showOriginal"
+        @pointerup="showEffect"
+        @pointerleave="showEffect"
+        @pointercancel="showEffect"
+        @keydown.space.prevent="showOriginal"
+        @keyup.space.prevent="showEffect"
+        @keydown.enter.prevent="showOriginal"
+        @keyup.enter.prevent="showEffect"
+        @contextmenu.prevent
+      >
+        按住查看原图
+      </button>
     </div>
   </div>
 </template>
@@ -73,8 +83,12 @@ const props = defineProps({
 
 const emit = defineEmits(['canvas-ready', 'resize', 'zoom-in', 'zoom-out', 'fit', 'update:previewMode'])
 
+const viewportRef = ref(null)
 const wrapperRef = ref(null)
 const canvasRef = ref(null)
+const isPanning = ref(false)
+let panState = null
+let resizeObserver = null
 
 const canvasSizeText = computed(() => {
   const width = Math.round(props.canvasSize.width || 0)
@@ -94,18 +108,62 @@ defineExpose({
   wrapper: wrapperRef
 })
 
-// 监听窗口大小变化
+const handleWheel = (event) => {
+  emit(event.deltaY < 0 ? 'zoom-in' : 'zoom-out')
+}
+
+const startPan = (event) => {
+  if (event.button !== 1 || !wrapperRef.value) return
+  event.preventDefault()
+  isPanning.value = true
+  panState = {
+    pointerId: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    scrollLeft: wrapperRef.value.scrollLeft,
+    scrollTop: wrapperRef.value.scrollTop
+  }
+  wrapperRef.value.setPointerCapture?.(event.pointerId)
+}
+
+const movePan = (event) => {
+  if (!isPanning.value || !panState || event.pointerId !== panState.pointerId) return
+  wrapperRef.value.scrollLeft = panState.scrollLeft - (event.clientX - panState.x)
+  wrapperRef.value.scrollTop = panState.scrollTop - (event.clientY - panState.y)
+}
+
+const stopPan = (event) => {
+  if (!panState || event.pointerId !== panState.pointerId) return
+  if (wrapperRef.value?.hasPointerCapture?.(event.pointerId)) {
+    wrapperRef.value.releasePointerCapture(event.pointerId)
+  }
+  isPanning.value = false
+  panState = null
+}
+const showOriginal = (event) => {
+  if (event?.pointerId !== undefined) {
+    event.currentTarget?.setPointerCapture?.(event.pointerId)
+  }
+  emit('update:previewMode', 'original')
+}
+
+const showEffect = (event) => {
+  if (event?.pointerId !== undefined && event.currentTarget?.hasPointerCapture?.(event.pointerId)) {
+    event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+  emit('update:previewMode', 'compare')
+}
+
 onMounted(() => {
-  window.addEventListener('resize', handleResize)
+  resizeObserver = new ResizeObserver(() => emit('resize'))
+  if (viewportRef.value) resizeObserver.observe(viewportRef.value)
+  window.addEventListener('blur', showEffect)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+  resizeObserver?.disconnect()
+  window.removeEventListener('blur', showEffect)
 })
-
-const handleResize = () => {
-  emit('resize')
-}
 </script>
 
 <style scoped>
@@ -184,13 +242,22 @@ const handleResize = () => {
   cursor: pointer;
 }
 
-.canvas-wrapper {
+.canvas-viewport {
   position: relative;
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas-wrapper {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(38px, 5vw, 72px) clamp(28px, 6vw, 92px) 70px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 14px;
+  cursor: default;
   overflow: auto;
   background:
     linear-gradient(45deg, rgba(230, 234, 239, 0.62) 25%, transparent 25%),
@@ -202,8 +269,14 @@ const handleResize = () => {
   background-size: 24px 24px;
 }
 
+.canvas-wrapper.panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .editor-canvas {
   flex: 0 0 auto;
+  margin: auto;
   max-width: none;
   max-height: none;
   border: 1px solid rgba(204, 214, 224, 0.8);
@@ -216,12 +289,9 @@ const handleResize = () => {
 
 .compare-switch {
   position: absolute;
-  left: 50%;
+  right: 18px;
   bottom: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  transform: translateX(-50%);
+  z-index: 2;
   padding: 4px;
   border: 1px solid rgba(229, 233, 238, 0.92);
   border-radius: 999px;
@@ -230,22 +300,22 @@ const handleResize = () => {
   backdrop-filter: blur(12px);
 }
 
-.compare-switch button {
-  min-width: 74px;
-  min-height: 34px;
+.compare-switch {
+  min-width: 138px;
+  min-height: 38px;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: #4b5563;
+  color: #fff;
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  background: linear-gradient(135deg, #13c77f, #08aa68);
 }
 
-.compare-switch button.active {
-  background: linear-gradient(135deg, #13c77f, #08aa68);
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(18, 199, 127, 0.22);
+.compare-switch.active {
+  transform: scale(0.98);
+  background: linear-gradient(135deg, #0da96b, #078c57);
 }
 
 @media (max-width: 760px) {
