@@ -47,6 +47,28 @@ function Import-DotEnv {
   }
 }
 
+function Import-UserEnvironmentFallback {
+  param([string[]]$Names)
+
+  foreach ($name in $Names) {
+    $current = [Environment]::GetEnvironmentVariable($name, 'Process')
+    if (![string]::IsNullOrWhiteSpace($current)) {
+      continue
+    }
+
+    $userValue = [Environment]::GetEnvironmentVariable($name, 'User')
+    if (![string]::IsNullOrWhiteSpace($userValue)) {
+      [Environment]::SetEnvironmentVariable($name, $userValue.Trim(), 'Process')
+      continue
+    }
+
+    $machineValue = [Environment]::GetEnvironmentVariable($name, 'Machine')
+    if (![string]::IsNullOrWhiteSpace($machineValue)) {
+      [Environment]::SetEnvironmentVariable($name, $machineValue.Trim(), 'Process')
+    }
+  }
+}
+
 function Get-TomcatProcessIds {
   $ids = New-Object System.Collections.Generic.List[int]
 
@@ -175,6 +197,7 @@ function Wait-ForHealth {
 }
 
 Import-DotEnv $EnvFile
+Import-UserEnvironmentFallback @('QWEN_API_KEY', 'QWEN_BASE_URL', 'QWEN_CHAT_MODEL', 'QWEN_IMAGE_MODEL')
 $env:CATALINA_HOME = $TomcatHome
 $env:CATALINA_BASE = $TomcatHome
 

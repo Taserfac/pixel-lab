@@ -1,5 +1,11 @@
 <template>
   <div class="community-layout" :class="{ 'fixed-editor-layout': isFixedEditor }">
+    <DynamicBackground
+      :style-name="themeStore.backgroundStyle"
+      :motion="themeStore.backgroundMotion"
+      :mode="dynamicBackgroundMode"
+    />
+
     <header v-if="!isFullscreenEditor" class="top-bar">
       <router-link
         to="/dashboard"
@@ -136,18 +142,77 @@
             </div>
           </div>
         </el-popover>
-        <button
-          class="icon-action"
-          type="button"
-          :title="themeToggleLabel"
-          :aria-label="themeToggleLabel"
-          @click="themeStore.toggleTheme"
+        <el-popover
+          placement="bottom-end"
+          :width="324"
+          trigger="click"
+          popper-class="theme-menu-popper"
         >
-          <el-icon>
-            <Sunny v-if="isDarkTheme" />
-            <Moon v-else />
-          </el-icon>
-        </button>
+          <template #reference>
+            <button
+              class="icon-action"
+              type="button"
+              :title="themeToggleLabel"
+              :aria-label="themeToggleLabel"
+            >
+              <el-icon>
+                <Sunny v-if="isDarkTheme" />
+                <Moon v-else />
+              </el-icon>
+            </button>
+          </template>
+          <div class="theme-menu">
+            <div class="theme-menu-head">
+              <strong>主题外观</strong>
+              <span>{{ isDarkTheme ? '夜间模式' : '白天模式' }}</span>
+            </div>
+            <div class="theme-row">
+              <button
+                v-for="option in themeModeOptions"
+                :key="option.value"
+                type="button"
+                class="theme-chip"
+                :class="{ active: themeStore.theme === option.value }"
+                @click="themeStore.setTheme(option.value)"
+              >
+                <el-icon><component :is="option.icon" /></el-icon>
+                {{ option.label }}
+              </button>
+            </div>
+
+            <div class="theme-section-title">动态背景</div>
+            <div class="background-style-grid">
+              <button
+                v-for="option in backgroundStyleOptions"
+                :key="option.value"
+                type="button"
+                class="background-style-option"
+                :class="[`preview-${option.value}`, { active: themeStore.backgroundStyle === option.value }]"
+                @click="themeStore.setBackgroundStyle(option.value)"
+              >
+                <span class="style-preview" />
+                <span>
+                  <strong>{{ option.label }}</strong>
+                  <small>{{ option.desc }}</small>
+                </span>
+              </button>
+            </div>
+
+            <div class="theme-section-title">动态效果</div>
+            <div class="theme-row motion-row">
+              <button
+                v-for="option in backgroundMotionOptions"
+                :key="option.value"
+                type="button"
+                class="theme-chip"
+                :class="{ active: themeStore.backgroundMotion === option.value }"
+                @click="themeStore.setBackgroundMotion(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
+        </el-popover>
         <el-dropdown @command="handleCommand">
           <button
             class="user-avatar"
@@ -289,19 +354,6 @@
         <span class="dock-label">{{ item.label }}</span>
       </router-link>
 
-      <button
-        class="dock-item dock-upload"
-        type="button"
-        :disabled="uploading"
-        style="--dock-accent: var(--primary)"
-        @click="triggerUpload"
-      >
-        <span class="dock-icon">
-          <el-icon :size="22"><Upload /></el-icon>
-        </span>
-        <span class="dock-label">{{ $t('action.upload') }}</span>
-      </button>
-
       <el-popover
         v-model:visible="showCreateMenu"
         placement="top"
@@ -343,6 +395,19 @@
         <span class="dock-icon"><el-icon :size="22"><User /></el-icon></span>
         <span class="dock-label">{{ $t('nav.personal') }}</span>
       </router-link>
+
+      <button
+        class="dock-item dock-upload"
+        type="button"
+        :disabled="uploading"
+        style="--dock-accent: var(--primary)"
+        @click="triggerUpload"
+      >
+        <span class="dock-icon">
+          <el-icon :size="22"><Upload /></el-icon>
+        </span>
+        <span class="dock-label">{{ $t('action.upload') }}</span>
+      </button>
     </nav>
   </div>
 </template>
@@ -381,6 +446,7 @@ import { logout as logoutApi } from '@/api/auth'
 import { deleteImage, updateImageMetadata, uploadImage } from '@/api/image'
 import { getPublicImages } from '@/api/community'
 import BrandLogo from '@/components/common/BrandLogo.vue'
+import DynamicBackground from '@/components/common/DynamicBackground.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -405,7 +471,16 @@ const searchInputRef = ref(null)
 const showSearchSuggestions = ref(false)
 let searchSuggestionsCloseTimer
 const showCreateMenu = ref(false)
-const searchHistory = ref(JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]').slice(0, 5))
+const readSearchHistory = () => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem('pixel_lab_search_history') || '[]')
+    return Array.isArray(parsed) ? parsed.slice(0, 5) : []
+  } catch {
+    localStorage.removeItem('pixel_lab_search_history')
+    return []
+  }
+}
+const searchHistory = ref(readSearchHistory())
 const hotSearchTags = ['插画', '摄影', 'UI设计', '像素艺术', 'AI艺术']
 const notifications = computed(() => notificationStore.notifications.map(item => ({
   ...item,
@@ -426,6 +501,21 @@ const primaryNavItems = computed(() => [
 
 const isDarkTheme = computed(() => themeStore.theme === 'dark')
 const themeToggleLabel = computed(() => isDarkTheme.value ? '切换到白天模式' : '切换到夜间模式')
+const themeModeOptions = [
+  { label: '白天', value: 'light', icon: Sunny },
+  { label: '夜间', value: 'dark', icon: Moon }
+]
+const backgroundStyleOptions = [
+  { label: '像素网格', value: 'pixel-grid', desc: '发光像素与细网格' },
+  { label: '柔和极光', value: 'aurora', desc: '绿色与紫色流光' },
+  { label: '星点画布', value: 'star-canvas', desc: '粒子随鼠标牵引' },
+  { label: '光谱扫描', value: 'spectrum', desc: '色带与扫描线' }
+]
+const backgroundMotionOptions = [
+  { label: '完整', value: 'on' },
+  { label: '轻量', value: 'reduced' },
+  { label: '关闭', value: 'off' }
+]
 
 const isMenuActive = (path) => route.path === path || route.path.startsWith(`${path}/`)
 const isCreateRoute = computed(() => ['/draw', '/workbench'].some(isMenuActive))
@@ -437,6 +527,11 @@ const setWorkbenchEditing = value => {
 }
 const isFixedEditor = computed(() => isFullscreenEditor.value || isWorkbench.value)
 const isDockHidden = computed(() => isFullscreenEditor.value || (isWorkbench.value && isWorkbenchEditing.value))
+const dynamicBackgroundMode = computed(() => {
+  if (isFullscreenEditor.value) return 'hidden'
+  if (isWorkbench.value) return 'subtle'
+  return 'full'
+})
 
 const openSearchSuggestions = () => {
   if (searchSuggestionsCloseTimer) window.clearTimeout(searchSuggestionsCloseTimer)
@@ -707,6 +802,8 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
+  isolation: isolate;
   background: var(--background);
   color: var(--foreground);
 }
@@ -812,6 +909,182 @@ onBeforeUnmount(() => {
   color: var(--primary);
   transform: translateY(-1px);
   box-shadow: var(--shadow);
+}
+
+.theme-menu {
+  display: grid;
+  gap: 14px;
+  color: var(--foreground);
+}
+
+.theme-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.theme-menu-head strong {
+  font-size: 15px;
+}
+
+.theme-menu-head span,
+.theme-section-title,
+.background-style-option small {
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.theme-section-title {
+  margin-bottom: -4px;
+  font-weight: 700;
+}
+
+.theme-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.motion-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.theme-chip {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background-muted);
+  color: var(--foreground-muted);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.theme-chip:hover,
+.background-style-option:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-hover);
+  color: var(--primary);
+}
+
+.theme-chip.active {
+  border-color: var(--border-glow);
+  background: var(--primary-muted);
+  color: var(--primary);
+}
+
+.background-style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.background-style-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--background-card);
+  color: var(--foreground);
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.background-style-option.active {
+  border-color: var(--border-glow);
+  background: color-mix(in srgb, var(--primary) 9%, var(--background-card));
+  box-shadow: inset 0 0 0 1px rgba(22, 199, 132, 0.08);
+}
+
+.background-style-option strong,
+.background-style-option small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.background-style-option strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.background-style-option small {
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.style-preview {
+  width: 44px;
+  height: 34px;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(20, 26, 23, 0.04);
+}
+
+.preview-pixel-grid .style-preview {
+  background:
+    radial-gradient(circle at 28% 36%, rgba(22, 199, 132, 0.75) 0 3px, transparent 4px),
+    linear-gradient(rgba(20, 26, 23, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(20, 26, 23, 0.09) 1px, transparent 1px),
+    #eef9f4;
+  background-size: auto, 9px 9px, 9px 9px, auto;
+}
+
+.preview-aurora .style-preview {
+  background:
+    radial-gradient(circle at 22% 22%, rgba(255, 255, 255, 0.74), transparent 28%),
+    conic-gradient(from 150deg, rgba(22, 199, 132, 0.84), rgba(124, 90, 239, 0.72), rgba(91, 141, 239, 0.5), rgba(22, 199, 132, 0.82));
+}
+
+.preview-star-canvas .style-preview {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(22, 199, 132, 0.9) 0 2px, transparent 3px),
+    radial-gradient(circle at 64% 42%, rgba(124, 90, 239, 0.82) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 72%, rgba(91, 141, 239, 0.72) 0 2px, transparent 3px),
+    #edf6ff;
+}
+
+.preview-spectrum .style-preview {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 7px, rgba(22, 199, 132, 0.18) 7px 8px),
+    linear-gradient(135deg, rgba(22, 199, 132, 0.64), rgba(124, 90, 239, 0.34), rgba(255, 180, 84, 0.28));
+}
+
+:global(.theme-menu-popper.el-popover.el-popper) {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--background-float);
+  box-shadow: var(--shadow-md);
+  padding: 14px;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+:global(.theme-menu-popper .el-popper__arrow::before) {
+  border-color: var(--border);
+  background: var(--background-float);
 }
 
 .notice-badge {
@@ -1028,6 +1301,8 @@ onBeforeUnmount(() => {
   width: 100%;
   padding: clamp(var(--space-5), 4vw, var(--space-10));
   padding-bottom: 112px;
+  position: relative;
+  z-index: 1;
 }
 .main-area.workbench-mode {
   flex: 0 0 auto;

@@ -427,7 +427,7 @@ const shapeMenuVisible = ref(false)
 const aiDialogVisible = ref(false)
 const aiMode = ref('refine')
 const aiPrompt = ref('')
-const aiModel = ref('deepseek-v4-flash')
+const aiModel = ref('qwen-plus')
 const aiFileList = ref([])
 const aiPreviewUrl = ref('')
 const aiResultUrl = ref('')
@@ -479,12 +479,11 @@ const aiModeOptions = [
 
 const aiModelGroups = {
   refine: [
-    { label: 'DeepSeek V4 Flash - 润色建议', value: 'deepseek-v4-flash' },
-    { label: 'DeepSeek V4 Pro - 润色建议', value: 'deepseek-v4-pro' }
+    { label: 'Qwen Plus - 润色建议', value: 'qwen-plus' },
+    { label: 'Qwen Max - 润色建议', value: 'qwen-max' }
   ],
   draw: [
-    { label: 'DeepSeek V4 Flash - 绘图模型', value: 'deepseek-v4-flash-draw' },
-    { label: 'DeepSeek V4 Pro - 绘图模型', value: 'deepseek-v4-pro-draw' }
+    { label: 'Qwen Image Edit - 结果图', value: 'qwen-image-edit' }
   ]
 }
 
@@ -1415,7 +1414,7 @@ const ensureAiModelForMode = () => {
     return
   }
 
-  aiModel.value = activeAiModels.value[0]?.value || 'deepseek-v4-flash'
+  aiModel.value = activeAiModels.value[0]?.value || 'qwen-plus'
 }
 
 const handleAiModeChange = () => {

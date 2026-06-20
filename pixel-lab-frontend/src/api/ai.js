@@ -15,6 +15,6 @@ export const refineDrawing = ({ image, prompt, mode, model, attachments = [] }) 
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    timeout: 120000
+    timeout: 240000
   })
 }

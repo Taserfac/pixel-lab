@@ -22,7 +22,7 @@ public class HealthServlet extends BaseApiServlet {
     data.put("onlineUsers", SessionListener.getOnlineCount());
 
     AppConfig config = (AppConfig) getServletContext().getAttribute(AppContextKeys.APP_CONFIG);
-    data.put("deepseekConfigured", !config.get("deepseek.api.key", "").isBlank());
+    data.put("qwenConfigured", !config.get("qwen.api.key", "").isBlank());
 
     try (Connection ignored = ((DataSource) getServletContext().getAttribute(AppContextKeys.DATA_SOURCE)).getConnection()) {
       data.put("database", "ok");
