@@ -196,6 +196,68 @@
       @change="onFileSelected"
     >
 
+    <el-dialog
+      v-model="uploadSuccessVisible"
+      class="upload-success-dialog"
+      title="上传完成"
+      width="520px"
+      :close-on-click-modal="false"
+      @closed="resetUploadSuccess"
+    >
+      <template v-if="!editingUploadedMetadata">
+        <div class="upload-success-message">
+          <span class="upload-success-icon">✓</span>
+          <div>
+            <strong>上传成功！</strong>
+            <p>你可以继续编辑图片，或先补充标签和说明。</p>
+          </div>
+        </div>
+      </template>
+      <el-form v-else label-position="top" class="upload-metadata-form">
+        <el-form-item label="标签">
+          <el-select
+            v-model="uploadedMetadata.tags"
+            :loading="uploadTagOptionsLoading"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择已有标签，或输入新标签后按回车添加"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="tag in sortedUploadTagOptions"
+              :key="tag"
+              :label="tag"
+              :value="tag"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="说明">
+          <el-input
+            v-model="uploadedMetadata.description"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="写下这张图片的创作想法或内容说明..."
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <template v-if="editingUploadedMetadata">
+          <el-button :disabled="savingUploadedMetadata" @click="editingUploadedMetadata = false">返回</el-button>
+          <el-button type="primary" :loading="savingUploadedMetadata" @click="saveUploadedMetadata">保存</el-button>
+        </template>
+        <template v-else>
+          <el-button type="danger" plain :loading="cancelingUpload" @click="cancelUploadedImage">取消上传</el-button>
+          <el-button @click="leaveUploadDialog">留在个人中心</el-button>
+          <el-button @click="openUploadedMetadataEditor">编辑标签和说明</el-button>
+          <el-button type="primary" @click="openUploadedImageInWorkbench">进入图像工坊</el-button>
+        </template>
+      </template>
+    </el-dialog>
+
     <main class="main-area">
       <router-view v-slot="{ Component }">
         <transition
@@ -312,7 +374,8 @@ import { useUserStore } from '@/store/user'
 import { useThemeStore } from '@/store/theme'
 import { useNotificationStore } from '@/store/notification'
 import { logout as logoutApi } from '@/api/auth'
-import { uploadImage } from '@/api/image'
+import { deleteImage, updateImageMetadata, uploadImage } from '@/api/image'
+import { getPublicImages } from '@/api/community'
 import BrandLogo from '@/components/common/BrandLogo.vue'
 
 const route = useRoute()
@@ -324,6 +387,16 @@ const { t } = useI18n()
 const searchQuery = ref('')
 const fileInput = ref(null)
 const uploading = ref(false)
+const uploadSuccessVisible = ref(false)
+const editingUploadedMetadata = ref(false)
+const savingUploadedMetadata = ref(false)
+const cancelingUpload = ref(false)
+const uploadedImage = ref(null)
+const uploadedMetadata = ref({ tags: [], description: '' })
+const uploadTagOptions = ref([])
+const uploadTagOptionsLoading = ref(false)
+const uploadTagOptionsLoaded = ref(false)
+const sortedUploadTagOptions = computed(() => [...uploadTagOptions.value].sort((a, b) => a.localeCompare(b, 'zh-CN')))
 const searchInputRef = ref(null)
 const showSearchSuggestions = ref(false)
 let searchSuggestionsCloseTimer
@@ -424,6 +497,109 @@ const triggerUpload = () => {
   fileInput.value?.click()
 }
 
+const resetUploadSuccess = () => {
+  editingUploadedMetadata.value = false
+  savingUploadedMetadata.value = false
+  cancelingUpload.value = false
+  uploadedImage.value = null
+  uploadedMetadata.value = { tags: [], description: '' }
+}
+
+const cancelUploadedImage = async () => {
+  if (!uploadedImage.value?.id) return
+
+  try {
+    await ElMessageBox.confirm('取消上传后，这张图片将被删除，且无法恢复。', '确认取消上传', {
+      confirmButtonText: '删除图片',
+      cancelButtonText: '保留图片',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+
+  cancelingUpload.value = true
+  try {
+    await deleteImage(uploadedImage.value.id)
+    uploadSuccessVisible.value = false
+    ElMessage.success('已取消上传')
+  } catch (error) {
+    console.error('取消上传失败:', error)
+    ElMessage.error('取消上传失败')
+  } finally {
+    cancelingUpload.value = false
+  }
+}
+const leaveUploadDialog = () => {
+  uploadSuccessVisible.value = false
+  router.push('/personal')
+}
+
+const openUploadedImageInWorkbench = () => {
+  if (uploadedImage.value?.url) {
+    localStorage.setItem('pixel_lab_workbench_image', uploadedImage.value.url)
+  }
+  uploadSuccessVisible.value = false
+  router.push('/workbench')
+}
+
+const imageTagList = (image = {}) => (
+  Array.isArray(image.tags)
+    ? image.tags
+    : String(image.tags || '').split(',')
+).map(tag => tag.trim()).filter(Boolean)
+
+const fetchUploadTagOptions = async () => {
+  if (uploadTagOptionsLoaded.value || uploadTagOptionsLoading.value) return
+
+  uploadTagOptionsLoading.value = true
+  try {
+    const pageSize = 200
+    const firstPage = await getPublicImages({ page: 1, pageSize }, { silent: true })
+    const works = [...(firstPage.list || [])]
+    const totalPages = Math.max(1, Number(firstPage.totalPages || 1))
+    for (let page = 2; page <= totalPages; page += 1) {
+      const result = await getPublicImages({ page, pageSize }, { silent: true })
+      works.push(...(result.list || []))
+    }
+    uploadTagOptions.value = [...new Set(works.flatMap(imageTagList))]
+    uploadTagOptionsLoaded.value = true
+  } catch (error) {
+    console.error('获取全站标签失败:', error)
+    ElMessage.error('获取全站标签失败')
+  } finally {
+    uploadTagOptionsLoading.value = false
+  }
+}
+
+const openUploadedMetadataEditor = () => {
+  editingUploadedMetadata.value = true
+  fetchUploadTagOptions()
+}
+
+const saveUploadedMetadata = async () => {
+  if (!uploadedImage.value?.id) return
+
+  savingUploadedMetadata.value = true
+  try {
+    const tags = [...new Set(uploadedMetadata.value.tags.map(tag => tag.trim()).filter(Boolean))]
+    await updateImageMetadata(uploadedImage.value.id, {
+      title: '',
+      description: uploadedMetadata.value.description.trim(),
+      tags: tags.join(',')
+    })
+    uploadedMetadata.value.tags = tags
+    uploadTagOptions.value = [...new Set([...uploadTagOptions.value, ...tags])]
+    editingUploadedMetadata.value = false
+    ElMessage.success('标签和说明已保存')
+  } catch (error) {
+    console.error('更新图片信息失败:', error)
+    ElMessage.error('标签和说明保存失败')
+  } finally {
+    savingUploadedMetadata.value = false
+  }
+}
+
 const onFileSelected = async (event) => {
   const file = event.target.files?.[0]
   if (!file) return
@@ -444,19 +620,12 @@ const onFileSelected = async (event) => {
   try {
     const res = await uploadImage(file)
     ElMessage.success('上传成功')
-    const imageUrl = res?.url || res?.data?.url || ''
-    ElMessageBox.confirm('上传成功！是否进入图像工坊编辑此图片？', '上传完成', {
-      confirmButtonText: '进入图像工坊',
-      cancelButtonText: '留在个人中心',
-      type: 'success'
-    }).then(() => {
-      if (imageUrl) {
-        localStorage.setItem('pixel_lab_workbench_image', imageUrl)
-      }
-      router.push('/workbench')
-    }).catch(() => {
-      router.push('/personal')
-    })
+    uploadedImage.value = {
+      id: res?.id || res?.data?.id,
+      url: res?.url || res?.data?.url || ''
+    }
+    uploadedMetadata.value = { tags: [], description: '' }
+    uploadSuccessVisible.value = true
   } catch (error) {
     console.error('上传失败:', error)
     ElMessage.error('上传失败')
@@ -1004,6 +1173,51 @@ onBeforeUnmount(() => {
   background: var(--background-card);
 }
 
+.upload-success-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.upload-success-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.upload-success-message strong {
+  color: var(--foreground);
+  font-size: 15px;
+}
+
+.upload-success-message p {
+  margin: 5px 0 0;
+  color: var(--foreground-muted);
+  line-height: 1.6;
+}
+
+.upload-metadata-form {
+  padding-top: 2px;
+}
+
+:deep(.upload-success-dialog .el-dialog__footer) {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+:deep(.upload-success-dialog .el-dialog__footer .el-button) {
+  margin-left: 0;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
