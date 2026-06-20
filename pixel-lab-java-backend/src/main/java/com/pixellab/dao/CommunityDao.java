@@ -86,6 +86,9 @@ public class CommunityDao {
         }
         execute(conn, "INSERT INTO likes (user_id, image_id) VALUES (?, ?)", List.of(userId, imageId));
         execute(conn, "UPDATE image SET like_count = like_count + 1 WHERE id = ?", List.of(imageId));
+        Map<String, Object> image = imageOwnerInfo(conn, imageId);
+        notifyImageOwner(conn, image, userId, "like",
+            actorName(conn, userId) + "点赞了你的作品《" + imageTitle(image) + "》", imageId);
         conn.commit();
         return Map.of("liked", true);
       } catch (Exception ex) {
@@ -108,6 +111,9 @@ public class CommunityDao {
         }
         execute(conn, "INSERT INTO collections (user_id, image_id) VALUES (?, ?)", List.of(userId, imageId));
         execute(conn, "UPDATE image SET collect_count = collect_count + 1 WHERE id = ?", List.of(imageId));
+        Map<String, Object> image = imageOwnerInfo(conn, imageId);
+        notifyImageOwner(conn, image, userId, "collect",
+            actorName(conn, userId) + "收藏了你的作品《" + imageTitle(image) + "》", imageId);
         conn.commit();
         return Map.of("collected", true);
       } catch (Exception ex) {
@@ -164,25 +170,57 @@ public class CommunityDao {
   public long addComment(long userId, long imageId, String content, Long parentId) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
       conn.setAutoCommit(false);
-      try (PreparedStatement stmt = conn.prepareStatement(
-          "INSERT INTO comments (user_id, image_id, content, parent_id) VALUES (?, ?, ?, ?)",
-          Statement.RETURN_GENERATED_KEYS)) {
-        stmt.setLong(1, userId);
-        stmt.setLong(2, imageId);
-        stmt.setString(3, content);
-        if (parentId == null) {
-          stmt.setNull(4, java.sql.Types.INTEGER);
-        } else {
-          stmt.setLong(4, parentId);
-        }
-        stmt.executeUpdate();
-        execute(conn, "UPDATE image SET comment_count = comment_count + 1 WHERE id = ?", List.of(imageId));
-        long id = 0;
-        try (ResultSet rs = stmt.getGeneratedKeys()) {
-          if (rs.next()) {
-            id = rs.getLong(1);
+      try {
+        Map<String, Object> parent = null;
+        if (parentId != null) {
+          parent = queryOne(conn,
+              "SELECT c.*, u.nickname FROM comments c LEFT JOIN `user` u ON c.user_id = u.id "
+                  + "WHERE c.id = ? AND c.image_id = ? AND c.status = 1",
+              List.of(parentId, imageId));
+          if (parent == null) {
+            parentId = null;
           }
         }
+
+        long id = 0;
+        try (PreparedStatement stmt = conn.prepareStatement(
+            "INSERT INTO comments (user_id, image_id, content, parent_id) VALUES (?, ?, ?, ?)",
+            Statement.RETURN_GENERATED_KEYS)) {
+          stmt.setLong(1, userId);
+          stmt.setLong(2, imageId);
+          stmt.setString(3, content);
+          if (parentId == null) {
+            stmt.setNull(4, java.sql.Types.INTEGER);
+          } else {
+            stmt.setLong(4, parentId);
+          }
+          stmt.executeUpdate();
+          try (ResultSet rs = stmt.getGeneratedKeys()) {
+            if (rs.next()) {
+              id = rs.getLong(1);
+            }
+          }
+        }
+
+        execute(conn, "UPDATE image SET comment_count = comment_count + 1 WHERE id = ?", List.of(imageId));
+        Map<String, Object> image = imageOwnerInfo(conn, imageId);
+        String actor = actorName(conn, userId);
+        String text = snippet(content);
+
+        if (parent != null) {
+          long targetUserId = number(parent.get("user_id"));
+          createNotificationIfNeeded(conn, targetUserId, userId, "reply",
+              actor + "回复了你的评论：" + text, imageId, "image");
+          long imageOwnerId = number(image == null ? null : image.get("user_id"));
+          if (imageOwnerId != targetUserId) {
+            notifyImageOwner(conn, image, userId, "comment",
+                actor + "评论了你的作品《" + imageTitle(image) + "》：" + text, imageId);
+          }
+        } else {
+          notifyImageOwner(conn, image, userId, "comment",
+              actor + "评论了你的作品《" + imageTitle(image) + "》：" + text, imageId);
+        }
+
         conn.commit();
         return id;
       } catch (Exception ex) {
@@ -407,6 +445,62 @@ public class CommunityDao {
   private void execute(Connection conn, String sql, List<Object> params) throws Exception {
     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
       bind(stmt, params);
+      stmt.executeUpdate();
+    }
+  }
+
+  private Map<String, Object> imageOwnerInfo(Connection conn, long imageId) throws Exception {
+    return queryOne(conn,
+        "SELECT id, user_id, title, original_name FROM image WHERE id = ? AND status = 1",
+        List.of(imageId));
+  }
+
+  private String imageTitle(Map<String, Object> image) {
+    if (image == null) return "未命名作品";
+    Object title = image.get("title");
+    if (title != null && !String.valueOf(title).isBlank()) return String.valueOf(title);
+    Object originalName = image.get("original_name");
+    if (originalName != null && !String.valueOf(originalName).isBlank()) return String.valueOf(originalName);
+    return "未命名作品";
+  }
+
+  private String actorName(Connection conn, long userId) throws Exception {
+    Map<String, Object> user = queryOne(conn, "SELECT nickname, username FROM `user` WHERE id = ?", List.of(userId));
+    if (user == null) return "有人";
+    Object nickname = user.get("nickname");
+    if (nickname != null && !String.valueOf(nickname).isBlank()) return String.valueOf(nickname);
+    Object username = user.get("username");
+    if (username != null && !String.valueOf(username).isBlank()) return String.valueOf(username);
+    return "有人";
+  }
+
+  private String snippet(String content) {
+    String text = content == null ? "" : content.trim().replaceAll("\\s+", " ");
+    if (text.length() <= 80) return text;
+    return text.substring(0, 80) + "...";
+  }
+
+  private long number(Object value) {
+    if (value instanceof Number) return ((Number) value).longValue();
+    if (value == null) return 0;
+    return Long.parseLong(String.valueOf(value));
+  }
+
+  private void notifyImageOwner(Connection conn, Map<String, Object> image, long senderId, String type, String content, long imageId) throws Exception {
+    if (image == null) return;
+    createNotificationIfNeeded(conn, number(image.get("user_id")), senderId, type, content, imageId, "image");
+  }
+
+  private void createNotificationIfNeeded(Connection conn, long userId, long senderId, String type, String content, long referenceId, String referenceType) throws Exception {
+    if (userId <= 0 || userId == senderId) return;
+    try (PreparedStatement stmt = conn.prepareStatement(
+        "INSERT INTO notifications (user_id, sender_id, type, content, reference_id, reference_type) VALUES (?, ?, ?, ?, ?, ?)")) {
+      stmt.setLong(1, userId);
+      stmt.setLong(2, senderId);
+      stmt.setString(3, type);
+      stmt.setString(4, content);
+      stmt.setLong(5, referenceId);
+      stmt.setString(6, referenceType);
       stmt.executeUpdate();
     }
   }

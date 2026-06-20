@@ -148,13 +148,13 @@
                 v-model="commentContent"
                 type="textarea"
                 :rows="2"
-                :placeholder="replyTo ? `回复 @${replyTo}...` : $t('community.commentPlaceholder')"
+                :placeholder="replyTarget ? `回复 @${replyTarget.nickname}...` : $t('community.commentPlaceholder')"
                 maxlength="500"
                 show-word-limit
               />
               <div class="comment-input-actions">
                 <el-button
-                  v-if="replyTo"
+                  v-if="replyTarget"
                   text
                   @click="cancelReply"
                 >
@@ -215,9 +215,16 @@
                       </el-avatar>
                       <div class="reply-content">
                         <span class="reply-author">{{ reply.nickname || $t('workDetail.anonymous') }}</span>
-                        <span v-if="reply.replyTo" class="reply-to"> 回复 {{ reply.replyTo }}</span>
+                        <span v-if="reply.replyToName" class="reply-to"> 回复 @{{ reply.replyToName }}</span>
                         <p>{{ reply.content }}</p>
                         <span class="reply-time">{{ formatTime(reply.created_at) }}</span>
+                        <button
+                          type="button"
+                          class="reply-btn"
+                          @click="setReplyTo(reply, comment)"
+                        >
+                          回复
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -307,7 +314,7 @@ const detailVisible = ref(false)
 const currentWork = ref(null)
 const comments = ref([])
 const commentContent = ref('')
-const replyTo = ref('')
+const replyTarget = ref(null)
 const similarWorks = ref([])
 
 // 无限滚动
@@ -392,10 +399,32 @@ const openDetail = async (work) => {
 const loadComments = async (imageId) => {
   try {
     const res = await getComments(imageId, { page: 1, pageSize: 50 })
-    comments.value = res.list
+    comments.value = normalizeComments(res.list || [])
   } catch (error) {
     console.error('加载评论失败:', error)
   }
+}
+
+const normalizeComments = (list = []) => {
+  const items = list.map(item => ({ ...item, replies: [] }))
+  const byId = new Map(items.map(item => [Number(item.id), item]))
+  const roots = []
+
+  items.forEach(item => {
+    const parentId = Number(item.parent_id || item.parentId || 0)
+    if (parentId && byId.has(parentId)) {
+      const parent = byId.get(parentId)
+      item.replyToName = parent.nickname || '匿名'
+      parent.replies.push(item)
+    } else {
+      roots.push(item)
+    }
+  })
+
+  roots.forEach(comment => {
+    comment.replies.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  })
+  return roots
 }
 
 const loadSimilarWorks = async (imageId) => {
@@ -504,13 +533,16 @@ const handleShare = async () => {
   }
 }
 
-const setReplyTo = (comment) => {
-  replyTo.value = comment.nickname || '匿名'
+const setReplyTo = (comment, rootComment = comment) => {
+  replyTarget.value = {
+    id: rootComment.id,
+    nickname: comment.nickname || '匿名'
+  }
   commentContent.value = ''
 }
 
 const cancelReply = () => {
-  replyTo.value = ''
+  replyTarget.value = null
   commentContent.value = ''
 }
 
@@ -524,13 +556,13 @@ const submitComment = async () => {
       imageId: currentWork.value.id,
       content: commentContent.value
     }
-    if (replyTo.value) {
-      data.replyTo = replyTo.value
+    if (replyTarget.value?.id) {
+      data.parentId = replyTarget.value.id
     }
     await addComment(data)
     ElMessage.success('评论成功')
     commentContent.value = ''
-    replyTo.value = ''
+    replyTarget.value = null
     loadComments(currentWork.value.id)
     currentWork.value.comment_count++
   } catch (error) {

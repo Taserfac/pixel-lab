@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="visible"
-    title="选择图片"
+    title="选择个人中心图片"
     width="800px"
     @update:model-value="$emit('update:visible', $event)"
   >
@@ -82,31 +82,35 @@ const confirm = () => {
 
 <style scoped>
 .image-selector {
-  max-height: 400px;
+  max-height: min(62vh, 560px);
   overflow-y: auto;
 }
 
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-4);
 }
 
 .image-item {
   cursor: pointer;
   overflow: hidden;
-  border: 4px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background-card);
   transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .image-item:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 6px 6px 0px 0px var(--border);
+  transform: translateY(-2px);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow);
 }
 
 .image-item.selected {
   border-color: var(--primary);
-  box-shadow: 6px 6px 0px 0px var(--primary);
+  box-shadow: var(--glow-sm);
 }
 
 .image-item img {
@@ -117,15 +121,14 @@ const confirm = () => {
 
 .image-name {
   padding: var(--space-3);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 650;
   text-align: center;
-  background: var(--background-muted);
-  border-top: 4px solid var(--border);
+  background: var(--background-card);
+  border-top: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  color: var(--foreground);
 }
 </style>

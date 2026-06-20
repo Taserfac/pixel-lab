@@ -61,13 +61,13 @@
           <!-- 类型图标 -->
           <div
             class="notification-icon"
-            :style="{ backgroundColor: typeConfig[item.type].bgColor }"
+            :style="{ backgroundColor: getTypeConfig(item.type).bgColor }"
           >
             <el-icon
               :size="16"
-              :color="typeConfig[item.type].color"
+              :color="getTypeConfig(item.type).color"
             >
-              <component :is="typeConfig[item.type].icon" />
+              <component :is="getTypeConfig(item.type).icon" />
             </el-icon>
           </div>
 
@@ -101,7 +101,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Bell, ChatDotRound, Star, UserFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Bell, ChatDotRound, CollectionTag, Star, UserFilled, InfoFilled } from '@element-plus/icons-vue'
 
 // Props
 const props = defineProps({
@@ -122,10 +122,20 @@ const typeConfig = {
     color: '#FF6B6B',
     bgColor: 'rgba(255, 107, 107, 0.1)'
   },
+  collect: {
+    icon: CollectionTag,
+    color: '#FFB454',
+    bgColor: 'rgba(255, 180, 84, 0.1)'
+  },
   comment: {
     icon: ChatDotRound,
     color: '#5B8DEF',
     bgColor: 'rgba(91, 141, 239, 0.1)'
+  },
+  reply: {
+    icon: ChatDotRound,
+    color: '#7C5AEF',
+    bgColor: 'rgba(124, 90, 239, 0.1)'
   },
   follow: {
     icon: UserFilled,
@@ -138,6 +148,7 @@ const typeConfig = {
     bgColor: 'rgba(255, 180, 84, 0.1)'
   }
 }
+const getTypeConfig = (type) => typeConfig[type] || typeConfig.system
 
 // 模拟通知数据
 const notifications = ref([

@@ -92,8 +92,20 @@
                   :rows="2"
                   maxlength="500"
                   show-word-limit
-                  placeholder="说说你对这件作品的想法…"
+                  :placeholder="replyTarget ? `回复 @${replyTarget.nickname}…` : '说说你对这件作品的想法…'"
                 />
+                <div
+                  v-if="replyTarget"
+                  class="replying-tip"
+                >
+                  <span>正在回复 @{{ replyTarget.nickname }}</span>
+                  <button
+                    type="button"
+                    @click="cancelReply"
+                  >
+                    取消回复
+                  </button>
+                </div>
                 <el-button
                   type="primary"
                   :loading="commenting"
@@ -118,6 +130,11 @@
                     <div class="comment-tools">
                       <span>{{ formatDate(comment.created_at) }}</span>
                       <button
+                        type="button"
+                        class="reply-comment"
+                        @click="setReplyTo(comment)"
+                      >回复</button>
+                      <button
                         v-if="canDeleteComment(comment)"
                         type="button"
                         class="delete-comment"
@@ -126,6 +143,46 @@
                     </div>
                   </div>
                   <p>{{ comment.content }}</p>
+                  <div
+                    v-if="comment.replies?.length"
+                    class="reply-list"
+                  >
+                    <article
+                      v-for="reply in comment.replies"
+                      :key="reply.id"
+                      class="reply-item"
+                    >
+                      <button type="button" class="comment-avatar" @click="openCommentAuthor(reply)">
+                        <el-avatar :size="28" :src="reply.avatar">
+                          {{ (reply.nickname || '匿').charAt(0) }}
+                        </el-avatar>
+                      </button>
+                      <div>
+                        <div class="comment-meta">
+                          <button type="button" @click="openCommentAuthor(reply)">
+                            {{ reply.nickname || '匿名用户' }}
+                          </button>
+                          <div class="comment-tools">
+                            <span>{{ formatDate(reply.created_at) }}</span>
+                            <button
+                              type="button"
+                              class="reply-comment"
+                              @click="setReplyTo(reply, comment)"
+                            >回复</button>
+                            <button
+                              v-if="canDeleteComment(reply)"
+                              type="button"
+                              class="delete-comment"
+                              @click="removeComment(reply)"
+                            >删除</button>
+                          </div>
+                        </div>
+                        <p>
+                          <span v-if="reply.replyToName" class="reply-to">回复 @{{ reply.replyToName }}：</span>{{ reply.content }}
+                        </p>
+                      </div>
+                    </article>
+                  </div>
                 </div>
               </article>
             </div>
@@ -205,6 +262,7 @@ const commenting = ref(false)
 const post = ref(null)
 const comments = ref([])
 const commentContent = ref('')
+const replyTarget = ref(null)
 const editVisible = ref(false)
 const saving = ref(false)
 const editForm = ref({ title: '', tags: [], description: '' })
@@ -233,7 +291,7 @@ const loadPost = async () => {
       getComments(id, { page: 1, pageSize: 100 })
     ])
     post.value = detail
-    comments.value = commentData.list || []
+    comments.value = normalizeComments(commentData.list || [])
   } catch (error) {
     console.error('加载作品失败:', error)
   } finally {
@@ -311,6 +369,28 @@ const canDeleteComment = (comment) => (
   isOwner.value || Number(comment.user_id) === Number(userStore.userInfo?.id)
 )
 
+const normalizeComments = (list = []) => {
+  const items = list.map(item => ({ ...item, replies: [] }))
+  const byId = new Map(items.map(item => [Number(item.id), item]))
+  const roots = []
+
+  items.forEach(item => {
+    const parentId = Number(item.parent_id || item.parentId || 0)
+    if (parentId && byId.has(parentId)) {
+      const parent = byId.get(parentId)
+      item.replyToName = parent.nickname || '匿名用户'
+      parent.replies.push(item)
+    } else {
+      roots.push(item)
+    }
+  })
+
+  roots.forEach(comment => {
+    comment.replies.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  })
+  return roots
+}
+
 const removeComment = async (comment) => {
   await ElMessageBox.confirm('确定删除这条评论吗？', '删除评论', {
     confirmButtonText: '删除',
@@ -318,9 +398,28 @@ const removeComment = async (comment) => {
     type: 'warning'
   })
   await deleteComment(comment.id)
-  comments.value = comments.value.filter(item => item.id !== comment.id)
-  post.value.comment_count = Math.max(0, Number(post.value.comment_count || 0) - 1)
+  const removedCount = 1 + (comment.replies?.length || 0)
+  comments.value = comments.value
+    .filter(item => item.id !== comment.id)
+    .map(item => ({
+      ...item,
+      replies: (item.replies || []).filter(reply => reply.id !== comment.id)
+    }))
+  post.value.comment_count = Math.max(0, Number(post.value.comment_count || 0) - removedCount)
   ElMessage.success('评论已删除')
+}
+
+const setReplyTo = (comment, rootComment = comment) => {
+  replyTarget.value = {
+    id: rootComment.id,
+    nickname: comment.nickname || '匿名用户'
+  }
+  commentContent.value = ''
+}
+
+const cancelReply = () => {
+  replyTarget.value = null
+  commentContent.value = ''
 }
 
 const openEditor = () => {
@@ -356,10 +455,13 @@ const submitComment = async () => {
   if (!content) return
   commenting.value = true
   try {
-    await addComment({ imageId: post.value.id, content })
+    const payload = { imageId: post.value.id, content }
+    if (replyTarget.value?.id) payload.parentId = replyTarget.value.id
+    await addComment(payload)
     commentContent.value = ''
+    replyTarget.value = null
     const result = await getComments(post.value.id, { page: 1, pageSize: 100 })
-    comments.value = result.list || []
+    comments.value = normalizeComments(result.list || [])
     post.value.comment_count = Number(post.value.comment_count || 0) + 1
     ElMessage.success('评论已发布')
   } finally {
@@ -525,6 +627,45 @@ watch(() => route.params.id, loadPost, { immediate: true })
 .comment-meta span { color: var(--foreground-subtle); font-size: 12px; }
 .comment-item p { margin: 6px 0 0; color: var(--foreground-muted); line-height: 1.6; white-space: pre-wrap; }
 .empty-comments { clear: both; padding: var(--space-8) 0; color: var(--foreground-muted); text-align: center; }
+
+.replying-tip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--foreground-muted);
+  font-size: 12px;
+}
+
+.replying-tip button,
+.comment-tools .reply-comment {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reply-list {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--border-light);
+}
+
+.reply-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.reply-to {
+  color: var(--foreground);
+  font-weight: 700;
+}
 
 .owner-row {
   display: flex;

@@ -11,7 +11,6 @@
     <template v-else>
       <div class="editor-container">
         <div class="main-content">
-          <!-- 左侧工具栏 -->
           <ToolBar
             :filters="filters"
             :current-filter="currentFilter"
@@ -24,6 +23,7 @@
             @rotate="rotateImage"
             @flip="flipImage"
             @crop="openCropDialog"
+            @reset-adjustments="resetAdjustments"
             @apply-pixel="applyPixelate"
             @reset-pixel="resetPixelate"
             @update:pixel-size="pixelSize = $event"
@@ -34,7 +34,14 @@
           <CanvasArea
             ref="canvasAreaRef"
             :canvas-style="canvasStyle"
+            :zoom="viewZoom"
+            v-model:preview-mode="previewMode"
+            :image-name="currentImage?.name || ''"
+            :canvas-size="currentCanvasSize"
             @resize="initCanvas"
+            @zoom-in="zoomIn"
+            @zoom-out="zoomOut"
+            @fit="fitCanvasToView"
           />
         </div>
 
@@ -45,9 +52,11 @@
           @undo="undo"
           @redo="redo"
           @reset="resetImage"
+          @fit="fitCanvasToView"
           @templates="templatePanelVisible = true"
           @change-image="showImageSelector"
           @save="saveToGallery"
+          @publish="openPublishDialog"
           @download="downloadImage"
         />
       </div>
@@ -112,6 +121,67 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 发布到社区信息弹窗 -->
+    <el-dialog
+      v-model="publishDialogVisible"
+      title="发布到社区"
+      width="min(520px, 92vw)"
+      class="publish-dialog"
+      :close-on-click-modal="!publishing"
+      :close-on-press-escape="!publishing"
+    >
+      <el-form
+        label-position="top"
+        class="publish-form"
+      >
+        <el-form-item label="标题">
+          <el-input
+            v-model="publishForm.title"
+            maxlength="100"
+            show-word-limit
+            placeholder="给作品起一个标题"
+          />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-select
+            v-model="publishForm.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入标签后按回车添加"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input
+            v-model="publishForm.description"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="写下这张作品的创作想法、处理方式或灵感来源"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button
+          :disabled="publishing"
+          @click="publishDialogVisible = false"
+        >
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="publishing"
+          :disabled="!publishForm.title.trim()"
+          @click="publishToCommunity"
+        >
+          确认发布
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -125,7 +195,7 @@ import ActionBar from './components/ActionBar.vue'
 import ImageSelector from './components/ImageSelector.vue'
 import CropDialog from './components/CropDialog.vue'
 import TemplatePanel from './components/TemplatePanel.vue'
-import { getUserImages, uploadImage } from '@/api/image'
+import { getUserImages, uploadImage, updateImageVisibility, updateImageMetadata } from '@/api/image'
 import { useHistory } from './composables/useHistory'
 
 // ========== 自动加载图片 ==========
@@ -144,6 +214,11 @@ const canvasAreaRef = ref(null)
 const currentImage = ref(null)
 const originalImage = ref(null)
 const thumbnailUrl = ref('')
+const viewZoom = ref(1)
+const currentCanvasSize = reactive({ width: 0, height: 0 })
+const templateSourceDataUrl = ref('')
+const baseImageDataUrl = ref('')
+const previewMode = ref('compare')
 
 // 图片选择器
 const imageSelectorVisible = ref(false)
@@ -160,17 +235,24 @@ const templatePanelVisible = ref(false)
 const exportDialogVisible = ref(false)
 const exportFormat = ref('png')
 const exportQuality = ref(90)
+const publishDialogVisible = ref(false)
+const publishing = ref(false)
+const publishForm = reactive({
+  title: '',
+  tags: [],
+  description: ''
+})
 
 // 滤镜选项
 const filters = [
   { label: '原图', value: 'none' },
   { label: '黑白', value: 'grayscale' },
   { label: '复古', value: 'sepia' },
-  { label: '反转', value: 'invert' },
-  { label: '模糊', value: 'blur' },
-  { label: '锐化', value: 'sharpen' },
+  { label: '冷色', value: 'cool' },
   { label: '暖色', value: 'warm' },
-  { label: '冷色', value: 'cool' }
+  { label: '胶片', value: 'film' },
+  { label: '反转', value: 'invert' },
+  { label: '锐化', value: 'sharpen' }
 ]
 const currentFilter = ref('none')
 
@@ -178,7 +260,8 @@ const currentFilter = ref('none')
 const adjustments = reactive({
   brightness: 0,
   contrast: 0,
-  saturate: 0
+  saturate: 0,
+  sharpen: 0
 })
 
 // 像素画参数
@@ -205,16 +288,22 @@ const canvasStyle = computed(() => {
   case 'blur':
     filter += 'blur(3px) '
     break
+  case 'sharpen':
+    filter += 'contrast(118%) saturate(112%) '
+    break
   case 'warm':
     filter += 'sepia(30%) saturate(140%) '
     break
   case 'cool':
     filter += 'saturate(80%) hue-rotate(20deg) '
     break
+  case 'film':
+    filter += 'contrast(108%) saturate(92%) sepia(18%) '
+    break
   }
 
   const brightness = 100 + adjustments.brightness
-  const contrast = 100 + adjustments.contrast
+  const contrast = 100 + adjustments.contrast + adjustments.sharpen * 0.25
   const saturate = 100 + adjustments.saturate
 
   filter += `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`
@@ -252,6 +341,8 @@ const loadImage = async (url, name) => {
       originalImage.value = img
       currentImage.value = { url, name }
       thumbnailUrl.value = url
+      templateSourceDataUrl.value = ''
+      baseImageDataUrl.value = url
 
       nextTick(() => {
         initCanvas()
@@ -287,29 +378,29 @@ const handleCropConfirm = async ({ url, blob }) => {
 // ========== 画布操作 ==========
 const initCanvas = () => {
   const canvas = canvasAreaRef.value?.canvas
-  const wrapper = canvasAreaRef.value?.wrapper
-  if (!canvas || !originalImage.value || !wrapper) return
+  if (!canvas || !originalImage.value) return
 
-  const maxWidth = Math.max(wrapper.clientWidth - 20, 400)
-  const maxHeight = Math.max(wrapper.clientHeight - 20, 300)
+  const maxEdge = 2400
 
   let width = originalImage.value.width
   let height = originalImage.value.height
 
-  const ratio = Math.min(maxWidth / width, maxHeight / height)
+  const ratio = Math.min(maxEdge / width, maxEdge / height, 1)
 
   if (ratio < 1) {
-    width = width * ratio
-    height = height * ratio
+    width = Math.round(width * ratio)
+    height = Math.round(height * ratio)
   }
 
-  width = Math.max(width, 200)
-  height = Math.max(height, 150)
+  width = Math.max(Math.round(width), 1)
+  height = Math.max(Math.round(height), 1)
 
   canvas.width = width
   canvas.height = height
 
   drawImage()
+  updateCanvasSize()
+  nextTick(fitCanvasToView)
 }
 
 const drawImage = () => {
@@ -327,6 +418,77 @@ const drawImage = () => {
     canvas.width,
     canvas.height
   )
+  updateCanvasSize()
+}
+
+const updateCanvasSize = () => {
+  const canvas = canvasAreaRef.value?.canvas
+  currentCanvasSize.width = canvas?.width || 0
+  currentCanvasSize.height = canvas?.height || 0
+}
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
+const fitCanvasToView = () => {
+  const canvas = canvasAreaRef.value?.canvas
+  const wrapper = canvasAreaRef.value?.wrapper
+  if (!canvas || !wrapper || !canvas.width || !canvas.height) return
+
+  const maxWidth = Math.max(wrapper.clientWidth - 64, 120)
+  const maxHeight = Math.max(wrapper.clientHeight - 64, 120)
+  const ratio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height, 1)
+  viewZoom.value = clamp(Number(ratio.toFixed(2)), 0.08, 2)
+}
+
+const zoomIn = () => {
+  viewZoom.value = clamp(Number((viewZoom.value + 0.1).toFixed(2)), 0.08, 3)
+}
+
+const zoomOut = () => {
+  viewZoom.value = clamp(Number((viewZoom.value - 0.1).toFixed(2)), 0.08, 3)
+}
+
+const buildRenderedCanvas = () => {
+  const canvas = canvasAreaRef.value?.canvas
+  if (!canvas) return null
+
+  const rendered = document.createElement('canvas')
+  rendered.width = canvas.width
+  rendered.height = canvas.height
+
+  const ctx = rendered.getContext('2d')
+  ctx.filter = canvasStyle.value.filter || 'none'
+  ctx.drawImage(canvas, 0, 0)
+  ctx.filter = 'none'
+
+  return rendered
+}
+
+const createCanvasFromUrl = (url) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      canvas.getContext('2d').drawImage(img, 0, 0)
+      resolve(canvas)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+const getTemplateSourceCanvas = async () => {
+  if (templateSourceDataUrl.value) {
+    return createCanvasFromUrl(templateSourceDataUrl.value)
+  }
+
+  const canvas = buildRenderedCanvas()
+  if (canvas) {
+    templateSourceDataUrl.value = canvas.toDataURL('image/png')
+  }
+  return canvas
 }
 
 // ========== 滤镜与调整 ==========
@@ -345,6 +507,7 @@ const resetAdjustments = () => {
   adjustments.brightness = 0
   adjustments.contrast = 0
   adjustments.saturate = 0
+  adjustments.sharpen = 0
   currentFilter.value = 'none'
 }
 
@@ -388,6 +551,9 @@ const rotateImage = (degree) => {
   ctx.restore()
 
   updateOriginalFromCanvas()
+  templateSourceDataUrl.value = ''
+  updateCanvasSize()
+  nextTick(fitCanvasToView)
   saveToHistory()
 }
 
@@ -418,6 +584,8 @@ const flipImage = (direction) => {
   ctx.restore()
 
   updateOriginalFromCanvas()
+  templateSourceDataUrl.value = ''
+  updateCanvasSize()
   saveToHistory()
 }
 
@@ -434,54 +602,152 @@ const updateOriginalFromCanvas = () => {
 // ========== 像素画功能 ==========
 const applyPixelate = () => {
   const canvas = canvasAreaRef.value?.canvas
-  if (!canvas || !originalImage.value) return
+  const renderedCanvas = buildRenderedCanvas()
+  if (!canvas || !renderedCanvas || !originalImage.value) return
 
-  // 简化版像素化
+  const size = Math.max(2, Math.round(pixelSize.value))
+  const scaledWidth = Math.max(1, Math.ceil(canvas.width / size))
+  const scaledHeight = Math.max(1, Math.ceil(canvas.height / size))
+  const pixelCanvas = document.createElement('canvas')
+  pixelCanvas.width = scaledWidth
+  pixelCanvas.height = scaledHeight
+
+  const pixelCtx = pixelCanvas.getContext('2d')
+  pixelCtx.imageSmoothingEnabled = true
+  pixelCtx.imageSmoothingQuality = 'low'
+  pixelCtx.drawImage(renderedCanvas, 0, 0, scaledWidth, scaledHeight)
+
+  quantizeCanvasColors(pixelCanvas, colorCount.value)
+
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(pixelCanvas, 0, 0, canvas.width, canvas.height)
+  ctx.imageSmoothingEnabled = true
+
+  resetAdjustments()
+  updateOriginalFromCanvas()
+  templateSourceDataUrl.value = ''
+  saveToHistory()
+  ElMessage.success('已应用像素画效果')
+}
+
+const quantizeCanvasColors = (canvas, colors) => {
   const ctx = canvas.getContext('2d')
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  
-  const size = pixelSize.value
   const data = imageData.data
+  const maxColors = Math.min(Math.max(2, Math.round(colors)), 256)
+  const opaquePixels = []
 
-  for (let y = 0; y < canvas.height; y += size) {
-    for (let x = 0; x < canvas.width; x += size) {
-      let r = 0, g = 0, b = 0, count = 0
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 8) continue
+    opaquePixels.push([data[i], data[i + 1], data[i + 2], data[i + 3]])
+  }
 
-      for (let py = y; py < y + size && py < canvas.height; py++) {
-        for (let px = x; px < x + size && px < canvas.width; px++) {
-          const idx = (py * canvas.width + px) * 4
-          r += data[idx]
-          g += data[idx + 1]
-          b += data[idx + 2]
-          count++
-        }
-      }
+  if (opaquePixels.length === 0) return
 
-      r = Math.round(r / count)
-      g = Math.round(g / count)
-      b = Math.round(b / count)
+  const palette = buildMedianCutPalette(opaquePixels, maxColors)
 
-      for (let py = y; py < y + size && py < canvas.height; py++) {
-        for (let px = x; px < x + size && px < canvas.width; px++) {
-          const idx = (py * canvas.width + px) * 4
-          data[idx] = r
-          data[idx + 1] = g
-          data[idx + 2] = b
-        }
-      }
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 8) {
+      data[i + 3] = 0
+      continue
     }
+
+    const nearest = findNearestColor([data[i], data[i + 1], data[i + 2], data[i + 3]], palette)
+    data[i] = nearest[0]
+    data[i + 1] = nearest[1]
+    data[i + 2] = nearest[2]
+    data[i + 3] = nearest[3]
   }
 
   ctx.putImageData(imageData, 0, 0)
-  updateOriginalFromCanvas()
-  saveToHistory()
-  ElMessage.success('已应用像素画效果')
+}
+
+const buildMedianCutPalette = (pixels, maxColors) => {
+  let boxes = [pixels]
+
+  while (boxes.length < maxColors) {
+    let splitIndex = -1
+    let splitRange = -1
+
+    boxes.forEach((box, index) => {
+      if (box.length < 2) return
+      const range = getBoxRange(box).range
+      if (range > splitRange) {
+        splitRange = range
+        splitIndex = index
+      }
+    })
+
+    if (splitIndex === -1) break
+
+    const box = boxes[splitIndex]
+    const { channel } = getBoxRange(box)
+    box.sort((a, b) => a[channel] - b[channel])
+
+    const middle = Math.floor(box.length / 2)
+    boxes.splice(splitIndex, 1, box.slice(0, middle), box.slice(middle))
+  }
+
+  return boxes.map(getAverageColor)
+}
+
+const getBoxRange = (pixels) => {
+  const min = [255, 255, 255, 255]
+  const max = [0, 0, 0, 0]
+
+  pixels.forEach(pixel => {
+    for (let channel = 0; channel < 4; channel++) {
+      min[channel] = Math.min(min[channel], pixel[channel])
+      max[channel] = Math.max(max[channel], pixel[channel])
+    }
+  })
+
+  const ranges = max.map((value, index) => value - min[index])
+  let channel = 0
+  for (let index = 1; index < 3; index++) {
+    if (ranges[index] > ranges[channel]) channel = index
+  }
+
+  return { channel, range: ranges[channel] }
+}
+
+const getAverageColor = (pixels) => {
+  const total = pixels.reduce((sum, pixel) => {
+    sum[0] += pixel[0]
+    sum[1] += pixel[1]
+    sum[2] += pixel[2]
+    sum[3] += pixel[3]
+    return sum
+  }, [0, 0, 0, 0])
+
+  return total.map(value => Math.round(value / pixels.length))
+}
+
+const findNearestColor = (pixel, palette) => {
+  let nearest = palette[0]
+  let nearestDistance = Number.POSITIVE_INFINITY
+
+  palette.forEach(color => {
+    const distance =
+      (pixel[0] - color[0]) ** 2 +
+      (pixel[1] - color[1]) ** 2 +
+      (pixel[2] - color[2]) ** 2 +
+      ((pixel[3] - color[3]) ** 2 * 0.25)
+
+    if (distance < nearestDistance) {
+      nearest = color
+      nearestDistance = distance
+    }
+  })
+
+  return nearest
 }
 
 const resetPixelate = () => {
   pixelSize.value = 8
   colorCount.value = 32
-  drawImage()
 }
 
 // ========== 历史记录 ==========
@@ -498,47 +764,70 @@ const redo = () => {
 const restoreHistory = (state) => {
   currentFilter.value = state.filter
   Object.assign(adjustments, state.adjustments)
+  templateSourceDataUrl.value = ''
 
   const canvas = canvasAreaRef.value?.canvas
   if (!canvas) return
 
   const img = new Image()
+  img.crossOrigin = 'anonymous'
   img.onload = () => {
     canvas.width = img.width
     canvas.height = img.height
     const ctx = canvas.getContext('2d')
     ctx.drawImage(img, 0, 0)
     originalImage.value = img
+    updateCanvasSize()
+    nextTick(fitCanvasToView)
   }
   img.src = state.imageData
 }
 
 const resetImage = () => {
   resetAdjustments()
-  initCanvas()
-  saveToHistory()
+  templateSourceDataUrl.value = ''
+  const state = {
+    imageData: baseImageDataUrl.value || currentImage.value?.url,
+    filter: 'none',
+    adjustments: { ...adjustments }
+  }
+
+  if (!state.imageData) return
+
+  restoreHistory(state)
+  saveHistory(state)
   ElMessage.success('已重置')
 }
 
 // ========== 导出保存 ==========
+const createEditedImageFile = async () => {
+  const canvas = buildRenderedCanvas()
+  if (!canvas) return null
+
+  const blob = await new Promise(resolve => {
+    canvas.toBlob(resolve, 'image/png', 1.0)
+  })
+
+  return new File([blob], `edited_${currentImage.value?.name || 'image.png'}`, {
+    type: 'image/png'
+  })
+}
+
+const getUploadedImageId = (res) => res?.id || res?.data?.id
+const filenameWithoutExt = (name = '') => name.replace(/\.[^.]+$/, '')
+
 const saveToGallery = async () => {
-  const canvas = canvasAreaRef.value?.canvas
-  if (!canvas) return
-
   try {
-    const blob = await new Promise(resolve => {
-      canvas.toBlob(resolve, 'image/png', 1.0)
-    })
-
-    const file = new File([blob], `edited_${currentImage.value?.name || 'image.png'}`, {
-      type: 'image/png'
-    })
+    const file = await createEditedImageFile()
+    if (!file) return false
 
     await uploadImage(file)
     ElMessage.success('已保存到个人中心')
+    return true
   } catch (error) {
     console.error('保存失败:', error)
     ElMessage.error('保存失败')
+    return false
   }
 }
 
@@ -547,7 +836,7 @@ const downloadImage = () => {
 }
 
 const confirmExport = () => {
-  const canvas = canvasAreaRef.value?.canvas
+  const canvas = buildRenderedCanvas()
   if (!canvas) return
 
   const mimeType = `image/${exportFormat.value}`
@@ -562,18 +851,92 @@ const confirmExport = () => {
   ElMessage.success('下载成功')
 }
 
-const applyTemplate = (template) => {
-  ElMessage.success(`已应用模板: ${template.name} (${template.width}×${template.height})`)
+const applyTemplate = async (template) => {
+  const canvas = canvasAreaRef.value?.canvas
+  if (!canvas || !originalImage.value) return
+
+  const sourceCanvas = await getTemplateSourceCanvas()
+  if (!sourceCanvas) return
+
+  const targetWidth = Math.min(Math.max(Math.round(template.width), 1), 4096)
+  const targetHeight = Math.min(Math.max(Math.round(template.height), 1), 4096)
+  const ratio = Math.min(targetWidth / sourceCanvas.width, targetHeight / sourceCanvas.height)
+  const drawWidth = Math.round(sourceCanvas.width * ratio)
+  const drawHeight = Math.round(sourceCanvas.height * ratio)
+  const offsetX = Math.round((targetWidth - drawWidth) / 2)
+  const offsetY = Math.round((targetHeight - drawHeight) / 2)
+
+  canvas.width = targetWidth
+  canvas.height = targetHeight
+
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, targetWidth, targetHeight)
+  ctx.drawImage(sourceCanvas, offsetX, offsetY, drawWidth, drawHeight)
+
+  resetAdjustments()
+  updateOriginalFromCanvas()
+  updateCanvasSize()
+  nextTick(fitCanvasToView)
+  saveToHistory()
+  ElMessage.success(`已应用模板: ${template.name} (${targetWidth}×${targetHeight})`)
+}
+
+const openPublishDialog = () => {
+  publishForm.title = filenameWithoutExt(currentImage.value?.name || '未命名作品')
+  publishForm.tags = []
+  publishForm.description = ''
+  publishDialogVisible.value = true
+}
+
+const publishToCommunity = async () => {
+  if (!publishForm.title.trim()) {
+    ElMessage.warning('请先填写作品标题')
+    return
+  }
+
+  publishing.value = true
+  try {
+    const file = await createEditedImageFile()
+    if (!file) return
+
+    const res = await uploadImage(file)
+    const imageId = getUploadedImageId(res)
+    if (!imageId) {
+      ElMessage.warning('图片已上传，但未拿到作品ID，无法自动发布到社区')
+      return
+    }
+
+    const tags = [...new Set(publishForm.tags.map(tag => tag.trim()).filter(Boolean))]
+    await updateImageMetadata(imageId, {
+      title: publishForm.title.trim(),
+      tags: tags.join(','),
+      description: publishForm.description.trim()
+    })
+    await updateImageVisibility(imageId, true)
+    publishDialogVisible.value = false
+    ElMessage.success('已发布到社区')
+  } catch (error) {
+    console.error('发布到社区失败:', error)
+    ElMessage.error('发布到社区失败')
+  } finally {
+    publishing.value = false
+  }
 }
 </script>
 
 <style scoped>
 .workbench-page {
-  height: calc(100vh - 72px - 80px);
+  height: calc(100vh - 184px);
   display: flex;
   flex-direction: column;
-  padding: var(--space-6);
+  padding: clamp(var(--space-3), 1.5vw, var(--space-5));
   overflow: hidden;
+  min-height: 640px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(22, 199, 132, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(246, 248, 250, 0.88));
 }
 
 .editor-container {
@@ -587,7 +950,7 @@ const applyTemplate = (template) => {
 .main-content {
   flex: 1;
   display: flex;
-  gap: var(--space-6);
+  gap: clamp(var(--space-3), 1.4vw, var(--space-5));
   min-height: 0;
   overflow: hidden;
 }
@@ -604,5 +967,28 @@ const applyTemplate = (template) => {
   margin-bottom: var(--space-2);
   font-weight: 600;
   font-size: 14px;
+}
+
+@media (max-width: 1024px) {
+  .workbench-page {
+    height: auto;
+    min-height: calc(100vh - 184px);
+    overflow: visible;
+  }
+
+  .editor-container,
+  .main-content {
+    overflow: visible;
+  }
+
+  .main-content {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .workbench-page {
+    padding: var(--space-4);
+  }
 }
 </style>

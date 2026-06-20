@@ -2,16 +2,21 @@
   <el-dialog
     v-model="visible"
     title="裁剪图片"
-    width="800px"
+    width="min(1080px, 94vw)"
     :close-on-click-modal="false"
+    class="crop-dialog"
     @close="handleClose"
   >
     <div class="crop-container">
-      <div class="crop-wrapper">
+      <div
+        ref="cropWrapperRef"
+        class="crop-wrapper"
+      >
         <img
           ref="imageRef"
           :src="imageSrc"
-          style="display: none;"
+          alt="待裁剪图片"
+          class="crop-image"
         >
       </div>
     </div>
@@ -72,15 +77,17 @@ const emit = defineEmits(['update:modelValue', 'confirm'])
 
 const visible = ref(false)
 const imageRef = ref(null)
+const cropWrapperRef = ref(null)
 const aspectRatio = ref('free')
 let cropper = null
+const FIXED_CROP_COVERAGE = 0.55
 
 // 监听弹窗显示
 watch(() => props.modelValue, async (val) => {
   visible.value = val
   if (val && props.imageSrc) {
     await nextTick()
-    initCropper()
+    await initCropper()
   }
 })
 
@@ -89,25 +96,49 @@ watch(visible, (val) => {
 })
 
 // 初始化裁剪器
-const initCropper = () => {
+const initCropper = async () => {
   if (cropper) {
     cropper.destroy()
   }
 
-  if (!imageRef.value) return
+  if (!imageRef.value || !cropWrapperRef.value) return
+
+  if (!imageRef.value.complete) {
+    await new Promise((resolve, reject) => {
+      imageRef.value.onload = resolve
+      imageRef.value.onerror = reject
+    })
+  }
+
+  await imageRef.value.decode?.().catch(() => {})
 
   cropper = new Cropper(imageRef.value, {
-    viewMode: 1,
-    dragMode: 'move',
-    autoCropArea: 0.8,
-    restore: false,
-    guides: true,
-    center: true,
-    highlight: false,
-    cropBoxMovable: true,
-    cropBoxResizable: true,
-    toggleDragModeOnDblclick: true,
-    aspectRatio: getAspectRatio()
+    container: cropWrapperRef.value,
+    template: `
+      <cropper-canvas background>
+        <cropper-image rotatable scalable skewable translatable></cropper-image>
+        <cropper-shade hidden></cropper-shade>
+        <cropper-handle action="select" plain></cropper-handle>
+        <cropper-selection initial-coverage="0.55" movable resizable>
+          <cropper-grid role="grid" bordered covered></cropper-grid>
+          <cropper-crosshair centered></cropper-crosshair>
+          <cropper-handle action="move" theme-color="rgba(255, 255, 255, 0.35)"></cropper-handle>
+          <cropper-handle action="n-resize"></cropper-handle>
+          <cropper-handle action="e-resize"></cropper-handle>
+          <cropper-handle action="s-resize"></cropper-handle>
+          <cropper-handle action="w-resize"></cropper-handle>
+          <cropper-handle action="ne-resize"></cropper-handle>
+          <cropper-handle action="nw-resize"></cropper-handle>
+          <cropper-handle action="se-resize"></cropper-handle>
+          <cropper-handle action="sw-resize"></cropper-handle>
+        </cropper-selection>
+      </cropper-canvas>
+    `
+  })
+
+  await nextTick()
+  requestAnimationFrame(() => {
+    changeAspectRatio()
   })
 }
 
@@ -126,23 +157,58 @@ const getAspectRatio = () => {
 
 // 改变比例
 const changeAspectRatio = () => {
-  if (cropper) {
-    cropper.setAspectRatio(getAspectRatio())
+  const selection = cropper?.getCropperSelection?.()
+  if (!selection) return
+
+  const ratio = getAspectRatio()
+  selection.aspectRatio = ratio
+  applyFixedCropBox(ratio)
+}
+
+const applyFixedCropBox = (ratio) => {
+  const selection = cropper?.getCropperSelection?.()
+  const cropperCanvas = cropper?.getCropperCanvas?.()
+  if (!selection || !cropperCanvas) return
+
+  const canvasWidth = cropperCanvas.offsetWidth
+  const canvasHeight = cropperCanvas.offsetHeight
+  if (!canvasWidth || !canvasHeight) return
+
+  let nextWidth = canvasWidth * FIXED_CROP_COVERAGE
+  let nextHeight = canvasHeight * FIXED_CROP_COVERAGE
+
+  if (Number.isFinite(ratio)) {
+    if (nextWidth / nextHeight > ratio) {
+      nextWidth = nextHeight * ratio
+    } else {
+      nextHeight = nextWidth / ratio
+    }
   }
+
+  const nextX = (canvasWidth - nextWidth) / 2
+  const nextY = (canvasHeight - nextHeight) / 2
+
+  selection.$change(nextX, nextY, nextWidth, nextHeight, ratio, true)
 }
 
 // 确认裁剪
-const handleConfirm = () => {
+const handleConfirm = async () => {
   if (!cropper) return
 
-  const canvas = cropper.getCroppedCanvas({
-    maxWidth: 4096,
-    maxHeight: 4096,
-    imageSmoothingEnabled: true,
-    imageSmoothingQuality: 'high'
-  })
+  const selection = cropper.getCropperSelection?.()
+  if (!selection || !selection.width || !selection.height) return
+
+  const maxEdge = 4096
+  const scale = Math.min(maxEdge / selection.width, maxEdge / selection.height, 1)
+  const canvas = await selection.$toCanvas(scale < 1
+    ? {
+      width: Math.round(selection.width * scale),
+      height: Math.round(selection.height * scale)
+    }
+    : undefined)
 
   canvas.toBlob((blob) => {
+    if (!blob) return
     const url = URL.createObjectURL(blob)
     emit('confirm', { url, blob })
     handleClose()
@@ -162,16 +228,29 @@ const handleClose = () => {
 <style scoped>
 .crop-container {
   width: 100%;
-  height: 450px;
-  background: #1a1a1a;
+  height: min(62vh, 560px);
+  min-height: 360px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .crop-wrapper {
   width: 100%;
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crop-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .crop-options {
@@ -185,6 +264,7 @@ const handleClose = () => {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .aspect-ratios .label {
@@ -196,291 +276,49 @@ const handleClose = () => {
   padding: 8px 16px;
 }
 
-/* Cropper 样式 */
-:deep(.cropper-container) {
-  width: 100% !important;
-  height: 100% !important;
-  direction: ltr;
-}
-
-:deep(.cropper-container img) {
-  display: block;
-  image-orientation: 0deg;
-  max-height: none !important;
-  max-width: none !important;
-  min-height: 0 !important;
-  min-width: 0 !important;
-  height: 100%;
+:deep(cropper-canvas) {
   width: 100%;
+  height: 100%;
 }
 
-:deep(.cropper-wrap-box),
-:deep(.cropper-canvas),
-:deep(.cropper-drag-box),
-:deep(.cropper-crop-box),
-:deep(.cropper-modal) {
-  bottom: 0;
-  left: 0;
-  position: absolute;
-  right: 0;
-  top: 0;
-}
-
-:deep(.cropper-wrap-box),
-:deep(.cropper-canvas) {
-  overflow: hidden;
-}
-
-:deep(.cropper-drag-box) {
-  background-color: #fff;
-  opacity: 0;
-}
-
-:deep(.cropper-modal) {
-  background-color: rgba(0, 0, 0, 0.5);
+:deep(cropper-image) {
+  max-width: none;
+  max-height: none;
 }
 
 :deep(.cropper-view-box) {
-  display: block;
-  height: 100%;
   outline: 2px solid #39c5bb;
   outline-color: var(--primary, #39c5bb);
-  overflow: hidden;
-  width: 100%;
-}
-
-:deep(.cropper-dashed) {
-  border: 0 dashed #eee;
-  display: block;
-  opacity: 0.5;
-  position: absolute;
-}
-
-:deep(.cropper-dashed.dashed-h) {
-  border-bottom-width: 1px;
-  border-top-width: 1px;
-  height: 33.33333%;
-  left: 0;
-  top: 33.33333%;
-  width: 100%;
-}
-
-:deep(.cropper-dashed.dashed-v) {
-  border-left-width: 1px;
-  border-right-width: 1px;
-  height: 100%;
-  left: 33.33333%;
-  top: 0;
-  width: 33.33333%;
-}
-
-:deep(.cropper-center) {
-  display: block;
-  height: 0;
-  left: 50%;
-  opacity: 0.75;
-  position: absolute;
-  top: 50%;
-  width: 0;
-}
-
-:deep(.cropper-center::before),
-:deep(.cropper-center::after) {
-  background-color: #eee;
-  content: " ";
-  display: block;
-  position: absolute;
-}
-
-:deep(.cropper-center::before) {
-  height: 1px;
-  left: -3px;
-  top: 0;
-  width: 7px;
-}
-
-:deep(.cropper-center::after) {
-  height: 7px;
-  left: 0;
-  top: -3px;
-  width: 1px;
-}
-
-:deep(.cropper-face),
-:deep(.cropper-line,
-.cropper-point) {
-  display: block;
-  height: 100%;
-  opacity: 0.1;
-  position: absolute;
-  width: 100%;
 }
 
 :deep(.cropper-face) {
-  background-color: #fff;
-  left: 0;
-  top: 0;
+  background-color: var(--primary);
 }
 
 :deep(.cropper-line) {
-  background-color: #39c5bb;
-}
-
-:deep(.cropper-line.line-e) {
-  cursor: ew-resize;
-  right: -3px;
-  top: 0;
-  width: 5px;
-}
-
-:deep(.cropper-line.line-n) {
-  cursor: ns-resize;
-  height: 5px;
-  left: 0;
-  top: -3px;
-}
-
-:deep(.cropper-line.line-w) {
-  cursor: ew-resize;
-  left: -3px;
-  top: 0;
-  width: 5px;
-}
-
-:deep(.cropper-line.line-s) {
-  bottom: -3px;
-  cursor: ns-resize;
-  height: 5px;
-  left: 0;
+  background-color: var(--primary);
 }
 
 :deep(.cropper-point) {
-  background-color: #39c5bb;
-  height: 5px;
-  opacity: 0.75;
-  width: 5px;
-}
-
-:deep(.cropper-point.point-e) {
-  cursor: ew-resize;
-  margin-top: -3px;
-  right: -3px;
-  top: 50%;
-}
-
-:deep(.cropper-point.point-n) {
-  cursor: ns-resize;
-  left: 50%;
-  margin-left: -3px;
-  top: -3px;
-}
-
-:deep(.cropper-point.point-w) {
-  cursor: ew-resize;
-  left: -3px;
-  margin-top: -3px;
-  top: 50%;
-}
-
-:deep(.cropper-point.point-s) {
-  bottom: -3px;
-  cursor: s-resize;
-  left: 50%;
-  margin-left: -3px;
-}
-
-:deep(.cropper-point.point-ne) {
-  cursor: nesw-resize;
-  right: -3px;
-  top: -3px;
-}
-
-:deep(.cropper-point.point-nw) {
-  cursor: nwse-resize;
-  left: -3px;
-  top: -3px;
-}
-
-:deep(.cropper-point.point-sw) {
-  bottom: -3px;
-  cursor: nesw-resize;
-  left: -3px;
-}
-
-:deep(.cropper-point.point-se) {
-  bottom: -3px;
-  cursor: nwse-resize;
-  height: 20px;
+  background-color: var(--primary);
+  width: 8px;
+  height: 8px;
   opacity: 1;
-  right: -3px;
-  width: 20px;
-}
-
-@media (min-width: 768px) {
-  :deep(.cropper-point.point-se) {
-    height: 15px;
-    width: 15px;
-  }
-}
-
-@media (min-width: 992px) {
-  :deep(.cropper-point.point-se) {
-    height: 10px;
-    width: 10px;
-  }
-}
-
-@media (min-width: 1200px) {
-  :deep(.cropper-point.point-se) {
-    height: 5px;
-    opacity: 0.75;
-    width: 5px;
-  }
-}
-
-:deep(.cropper-point.point-se::before) {
-  background-color: #39c5bb;
-  bottom: -50%;
-  content: " ";
-  display: block;
-  height: 200%;
-  opacity: 0;
-  position: absolute;
-  right: -50%;
-  width: 200%;
-}
-
-:deep(.cropper-invisible) {
-  opacity: 0;
 }
 
 :deep(.cropper-bg) {
   background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA3NCSVQICAjb4U/gAAAABlBMVEXMzMz////TjRV2AAAACXBIWXMAAArrAAAK6wGCiw1aAAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAABFJREFUCJlj+M/AgBVhF/0PAH6/D/HkDxOGAAAAAElFTkSuQmCC");
 }
 
-:deep(.cropper-hide) {
-  display: block;
-  height: 0;
-  position: absolute;
-  width: 0;
-}
+@media (max-width: 640px) {
+  .crop-container {
+    height: 52vh;
+    min-height: 280px;
+  }
 
-:deep(.cropper-hidden) {
-  display: none !important;
-}
-
-:deep(.cropper-move) {
-  cursor: move;
-}
-
-:deep(.cropper-crop) {
-  cursor: crosshair;
-}
-
-:deep(.cropper-disabled .cropper-drag-box),
-:deep(.cropper-disabled .cropper-face),
-:deep(.cropper-disabled .cropper-line),
-:deep(.cropper-disabled .cropper-point) {
-  cursor: not-allowed;
+  .aspect-ratios {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

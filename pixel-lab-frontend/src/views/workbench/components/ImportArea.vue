@@ -4,11 +4,14 @@
       class="import-box"
       @click="$emit('select')"
     >
-      <el-icon :size="64">
-        <Upload />
-      </el-icon>
+      <div class="import-icon">
+        <el-icon :size="34">
+          <Upload />
+        </el-icon>
+      </div>
+      <p class="import-kicker">Image Workshop</p>
       <h3>导入图片开始编辑</h3>
-      <p>从个人中心选择图片，或上传新图片</p>
+      <p class="import-copy">从个人中心继续处理旧作品，或直接上传本地图片进行裁剪、滤镜、像素化与导出。</p>
       <div class="import-buttons">
         <el-button
           type="primary"
@@ -20,11 +23,17 @@
           本地上传
         </el-button>
       </div>
+      <div class="import-tips">
+        <span>支持 JPG / PNG / WebP</span>
+        <span>最大 10MB</span>
+        <span>可导出 PNG / JPG / WebP</span>
+      </div>
       <input
         ref="fileInput"
         type="file"
         accept="image/*"
         style="display: none"
+        @click.stop
         @change="handleUpload"
       >
     </div>
@@ -71,41 +80,99 @@ const handleUpload = (e) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 0;
 }
 
 .import-box {
+  width: min(720px, 100%);
   text-align: center;
-  padding: 60px 80px;
-  background: var(--background-soft);
-  border: 4px solid var(--border);
-  box-shadow: 12px 12px 0px 0px var(--border);
+  padding: var(--space-12);
+  background: var(--background-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .import-box:hover {
-  transform: translate(-4px, -4px);
-  box-shadow: 16px 16px 0px 0px var(--border);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.import-icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--primary-muted);
+  color: var(--primary);
+  box-shadow: var(--glow-sm);
+}
+
+.import-kicker {
+  margin: 0 0 var(--space-2);
+  color: var(--foreground-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 .import-box h3 {
-  margin: var(--space-4) 0 var(--space-2);
-  font-size: 28px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 800;
 }
 
-.import-box p {
+.import-copy {
+  max-width: 520px;
   color: var(--foreground-muted);
-  margin-bottom: var(--space-6);
+  margin: var(--space-4) auto var(--space-6);
   font-size: 16px;
+  line-height: 1.8;
 }
 
 .import-buttons {
   display: flex;
   gap: var(--space-4);
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+.import-tips {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.import-tips span {
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  background: var(--background-muted);
+  color: var(--foreground-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .import-box {
+    padding: var(--space-8) var(--space-5);
+  }
+
+  .import-box h3 {
+    font-size: 26px;
+  }
+
+  .import-buttons .el-button {
+    width: 100%;
+  }
 }
 </style>

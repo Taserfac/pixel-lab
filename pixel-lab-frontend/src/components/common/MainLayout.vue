@@ -114,13 +114,13 @@
                 :key="n.id"
                 class="notification-item"
                 :class="{ unread: !n.read }"
-                @click="markNotificationRead(n.id)"
+                @click="openNotification(n)"
               >
                 <span
                   class="notification-icon"
-                  :style="{ color: notificationColorMap[n.type] }"
+                  :style="{ color: getNotificationColor(n.type) }"
                 >
-                  <el-icon><component :is="notificationIconMap[n.type]" /></el-icon>
+                  <el-icon><component :is="getNotificationIcon(n.type)" /></el-icon>
                 </span>
                 <div class="notification-content">
                   <p>{{ n.text }}</p>
@@ -353,6 +353,7 @@ import {
   ArrowDown,
   Bell,
   ChatDotRound,
+  CollectionTag,
   Clock,
   Compass,
   EditPen,
@@ -409,8 +410,10 @@ const notifications = computed(() => notificationStore.notifications.map(item =>
 })))
 const unreadCount = computed(() => notificationStore.unreadCount)
 
-const notificationIconMap = { like: Star, comment: ChatDotRound, follow: UserFilled, system: InfoFilled }
-const notificationColorMap = { like: '#FF6B6B', comment: '#5B8DEF', follow: '#16C784', system: '#FFB454' }
+const notificationColorMap = { like: '#FF6B6B', collect: '#FFB454', comment: '#5B8DEF', reply: '#7C5AEF', follow: '#16C784', system: '#FFB454' }
+const notificationIconMap = { like: Star, collect: CollectionTag, comment: ChatDotRound, reply: ChatDotRound, follow: UserFilled, system: InfoFilled }
+const getNotificationIcon = (type) => notificationIconMap[type] || InfoFilled
+const getNotificationColor = (type) => notificationColorMap[type] || '#FFB454'
 
 const primaryNavItems = computed(() => [
     { path: '/dashboard', label: t('nav.home'), icon: HomeFilled, accent: '#16C784' },
@@ -487,6 +490,19 @@ const markAllRead = async () => {
 const markNotificationRead = async (id) => {
   const item = notificationStore.notifications.find(n => n.id === id)
   if (!item?.read) await notificationStore.markRead(id).catch(() => {})
+}
+
+const openNotification = async (notification) => {
+  if (!notification) return
+  await markNotificationRead(notification.id)
+  const referenceId = notification.reference_id || notification.referenceId
+  const referenceType = notification.reference_type || notification.referenceType
+  if (!referenceId) return
+  if (referenceType === 'image' || ['like', 'collect', 'comment', 'reply'].includes(notification.type)) {
+    router.push(`/post/${referenceId}`)
+  } else if (referenceType === 'user' || notification.type === 'follow') {
+    router.push(`/user/${referenceId}`)
+  }
 }
 
 const openCreation = (path) => {

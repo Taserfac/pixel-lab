@@ -39,6 +39,8 @@ public class SocialDao {
         execute(conn,
             "INSERT INTO follows (follower_id, followed_id) VALUES (?, ?)",
             List.of(followerId, followedId));
+        createNotificationIfNeeded(conn, followedId, followerId, "follow",
+            actorName(conn, followerId) + "关注了你", followerId, "user");
         conn.commit();
         return Map.of("following", true);
       } catch (Exception ex) {
@@ -281,6 +283,30 @@ public class SocialDao {
   private void execute(Connection conn, String sql, List<Object> params) throws Exception {
     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
       bind(stmt, params);
+      stmt.executeUpdate();
+    }
+  }
+
+  private String actorName(Connection conn, long userId) throws Exception {
+    Map<String, Object> user = queryOne(conn, "SELECT nickname, username FROM `user` WHERE id = ?", List.of(userId));
+    if (user == null) return "有人";
+    Object nickname = user.get("nickname");
+    if (nickname != null && !String.valueOf(nickname).isBlank()) return String.valueOf(nickname);
+    Object username = user.get("username");
+    if (username != null && !String.valueOf(username).isBlank()) return String.valueOf(username);
+    return "有人";
+  }
+
+  private void createNotificationIfNeeded(Connection conn, long userId, long senderId, String type, String content, long referenceId, String referenceType) throws Exception {
+    if (userId <= 0 || userId == senderId) return;
+    try (PreparedStatement stmt = conn.prepareStatement(
+        "INSERT INTO notifications (user_id, sender_id, type, content, reference_id, reference_type) VALUES (?, ?, ?, ?, ?, ?)")) {
+      stmt.setLong(1, userId);
+      stmt.setLong(2, senderId);
+      stmt.setString(3, type);
+      stmt.setString(4, content);
+      stmt.setLong(5, referenceId);
+      stmt.setString(6, referenceType);
       stmt.executeUpdate();
     }
   }
