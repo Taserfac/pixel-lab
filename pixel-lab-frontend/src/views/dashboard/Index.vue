@@ -96,7 +96,7 @@
         <section class="rail-card tag-card">
           <div class="rail-title">
             <h3>{{ $t('dashboard.hotTags') }}</h3>
-            <button type="button" @click="router.push('/community')">
+            <button type="button" @click="router.push('/tags')">
               {{ $t('dashboard.more') }} <el-icon><ArrowRight /></el-icon>
             </button>
           </div>
@@ -162,9 +162,6 @@
         <section class="rail-card stats-card">
           <div class="rail-title">
             <h3>{{ $t('dashboard.communityStats') }}</h3>
-            <button type="button" @click="router.push('/community')">
-              {{ $t('dashboard.more') }} <el-icon><ArrowRight /></el-icon>
-            </button>
           </div>
           <div class="community-stat-list">
             <div
@@ -202,13 +199,14 @@ import {
 import EmptyState from '@/components/common/EmptyState.vue'
 import StableMasonry from '@/components/community/StableMasonry.vue'
 import { getUserStats } from '@/api/auth'
-import { getActivities, getPublicImages } from '@/api/community'
+import { getActivities, getPublicImages, getPublicTags } from '@/api/community'
 
 const router = useRouter()
 const { t } = useI18n()
 const loading = ref(false)
 const works = ref([])
 const activities = ref([])
+const publicTags = ref({ systemTags: [], trendingTags: [] })
 const activeFeedTab = ref('推荐')
 const activeHeroIndex = ref(0)
 let heroTimer
@@ -218,14 +216,7 @@ const userStats = ref({
   views: 0
 })
 
-const defaultFeedTabs = ['推荐', '最新', '关注', '插画', '摄影', '设计', '像素艺术', 'AI艺术']
-const defaultPopularTags = [
-  { name: '插画', count: '12.4万', tone: 'green' },
-  { name: '摄影', count: '8.7万', tone: 'purple' },
-  { name: 'UI设计', count: '7.9万', tone: 'blue' },
-  { name: '像素艺术', count: '5.6万', tone: 'rose' },
-  { name: 'AI艺术', count: '4.2万', tone: 'orange' }
-]
+const defaultSystemTags = ['摄影', '插画', 'AI艺术', '设计', '旅行', '像素艺术', '城市', '生活']
 const tagTones = ['green', 'purple', 'blue', 'rose', 'orange']
 const sampleWorks = [
   {
@@ -318,29 +309,20 @@ const currentHeroWork = computed(() => (
 ))
 
 const feedTabs = computed(() => {
-  if (!works.value.length) return defaultFeedTabs
-  const tagSet = new Set()
-  works.value.forEach(work => {
-    normalizeTags(work.tags).forEach(tag => tagSet.add(tag))
-  })
-  const dynamicTabs = [...tagSet]
-  return ['推荐', '最新', '关注', ...dynamicTabs.filter(t => !['推荐', '最新', '关注'].includes(t))]
+  const systemTags = publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags
+  const trendingNames = publicTags.value.trendingTags.map(tag => tag.name)
+  return ['推荐', '最新', '关注', ...new Set([...systemTags, ...trendingNames])]
 })
 
 const popularTags = computed(() => {
-  if (!works.value.length) return defaultPopularTags
-  const tagCount = {}
-  works.value.forEach(work => {
-    normalizeTags(work.tags).forEach(tag => {
-      tagCount[tag] = (tagCount[tag] || 0) + 1
-    })
-  })
-  return Object.entries(tagCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([name, count], i) => ({
-      name,
-      count: count >= 10000 ? `${(count / 10000).toFixed(1)}万` : String(count),
+  const source = publicTags.value.trendingTags.length
+    ? publicTags.value.trendingTags
+    : (publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags)
+        .map(name => ({ name, usageCount: 0 }))
+  return source.slice(0, 5)
+    .map((tag, i) => ({
+      name: tag.name,
+      count: String(tag.usageCount || 0),
       tone: tagTones[i % tagTones.length]
     }))
 })
@@ -487,21 +469,23 @@ const openCreator = (creator) => {
 }
 
 const searchTag = (tag) => {
-  router.push({ path: '/community', query: { keyword: tag.name || tag } })
+  router.push({ path: '/tags', query: { tag: tag.name || tag } })
 }
 
 onMounted(async () => {
   loading.value = true
   try {
-    const [imagesRes, statsRes, activitiesRes] = await Promise.all([
+    const [imagesRes, statsRes, activitiesRes, tagsRes] = await Promise.all([
       getPublicImages({ page: 1, pageSize: 16, sortBy: 'popular' }, { silent: true }).catch(() => ({ list: [] })),
       getUserStats({}, { silent: true }).catch(() => ({ works: 0, likes: 0, views: 0 })),
-      getActivities({ limit: 8 }, { silent: true }).catch(() => [])
+      getActivities({ limit: 8 }, { silent: true }).catch(() => []),
+      getPublicTags({ limit: 20 }, { silent: true }).catch(() => ({ systemTags: [], trendingTags: [] }))
     ])
 
     works.value = imagesRes.list || []
     userStats.value = normalizeStats(statsRes)
     activities.value = activitiesRes || []
+    publicTags.value = tagsRes
   } catch (error) {
     console.error('获取首页数据失败:', error)
   } finally {

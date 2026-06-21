@@ -56,6 +56,7 @@ public class AuthFilter implements Filter {
 
     if ("GET".equalsIgnoreCase(method)) {
       return path.equals("/api/community/images")
+          || path.equals("/api/community/tags")
           || path.matches("^/api/community/images/\\d+$")
           || path.matches("^/api/community/images/\\d+/comments$")
           || path.matches("^/api/community/images/\\d+/similar$")

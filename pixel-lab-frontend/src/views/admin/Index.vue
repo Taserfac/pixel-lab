@@ -64,10 +64,26 @@
             v-model="userSearch"
             placeholder="搜索用户名/昵称"
             clearable
-            @keyup.enter="fetchUsers"
-            @clear="fetchUsers"
+            @keyup.enter="applyUserFilters"
+            @clear="applyUserFilters"
           />
-          <el-button @click="fetchUsers">搜索</el-button>
+          <el-select v-model="userRole" placeholder="角色" clearable @change="applyUserFilters">
+            <el-option label="普通用户" value="user" />
+            <el-option label="管理员" value="admin" />
+          </el-select>
+          <el-select v-model="userStatus" placeholder="账号状态" clearable @change="applyUserFilters">
+            <el-option label="正常" value="1" />
+            <el-option label="已封禁" value="0" />
+          </el-select>
+          <el-select v-model="userDeleted" placeholder="删除状态" clearable @change="applyUserFilters">
+            <el-option label="未删除" value="0" />
+            <el-option label="已删除" value="1" />
+          </el-select>
+          <el-select v-model="userSort" placeholder="排序" @change="applyUserFilters">
+            <el-option label="最新注册" value="newest" />
+            <el-option label="最早注册" value="oldest" />
+          </el-select>
+          <el-button @click="applyUserFilters">搜索</el-button>
         </div>
         <el-table :data="users" v-loading="loadingUsers" stripe>
           <el-table-column prop="id" label="ID" width="80" />
@@ -91,7 +107,8 @@
           </el-table-column>
           <el-table-column label="状态" width="140">
             <template #default="{ row }">
-              <el-tag v-if="row.status === 1" type="success">正常</el-tag>
+              <el-tag v-if="row.is_deleted" type="info">已删除</el-tag>
+              <el-tag v-else-if="row.status === 1" type="success">正常</el-tag>
               <el-tag v-else-if="row.ban_end_at" type="danger">
                 封禁至 {{ formatDate(row.ban_end_at) }}
               </el-tag>
@@ -105,7 +122,8 @@
           </el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <template v-if="row.id === userStore.userInfo?.id">
+              <span v-if="row.is_deleted" class="deleted-text">不可操作</span>
+              <template v-else-if="row.id === userStore.userInfo?.id">
                 <span class="self-label">当前用户</span>
               </template>
               <template v-else>
@@ -155,16 +173,36 @@
             v-model="imageSearch"
             placeholder="搜索作品名称"
             clearable
-            @keyup.enter="fetchImages"
-            @clear="fetchImages"
+            @keyup.enter="applyImageFilters"
+            @clear="applyImageFilters"
           />
-          <el-select v-model="imageStatus" placeholder="状态" clearable @change="fetchImages">
-            <el-option label="全部" value="" />
+          <el-input
+            v-model="imageUserSearch"
+            placeholder="搜索作者用户名/昵称"
+            clearable
+            @keyup.enter="applyImageFilters"
+            @clear="applyImageFilters"
+          />
+          <el-select v-model="imageStatus" placeholder="管理状态" clearable @change="applyImageFilters">
             <el-option label="正常" value="1" />
             <el-option label="已封禁" value="2" />
-            <el-option label="已删除" value="0" />
           </el-select>
-          <el-button @click="fetchImages">搜索</el-button>
+          <el-select v-model="imagePublic" placeholder="公开状态" clearable @change="applyImageFilters">
+            <el-option label="公开" value="1" />
+            <el-option label="私有" value="0" />
+          </el-select>
+          <el-select v-model="imageDeleted" placeholder="删除状态" clearable @change="applyImageFilters">
+            <el-option label="未删除" value="0" />
+            <el-option label="已删除" value="1" />
+          </el-select>
+          <el-select v-model="imageSort" placeholder="排序" @change="applyImageFilters">
+            <el-option label="最新发布" value="newest" />
+            <el-option label="最早发布" value="oldest" />
+            <el-option label="点赞最多" value="likes" />
+            <el-option label="收藏最多" value="collects" />
+            <el-option label="浏览最多" value="views" />
+          </el-select>
+          <el-button @click="applyImageFilters">搜索</el-button>
         </div>
         <el-table :data="images" v-loading="loadingImages" stripe>
           <el-table-column prop="id" label="ID" width="80" />
@@ -183,6 +221,7 @@
             <template #default="{ row }">
               <span class="data-item">👀 {{ row.view_count || 0 }}</span>
               <span class="data-item">❤️ {{ row.like_count || 0 }}</span>
+              <span class="data-item">⭐ {{ row.collect_count || 0 }}</span>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="80">
@@ -410,6 +449,10 @@ const platformStats = ref({
 // 用户管理
 const users = ref([])
 const userSearch = ref('')
+const userRole = ref('')
+const userStatus = ref('')
+const userDeleted = ref('0')
+const userSort = ref('newest')
 const userPage = ref(1)
 const userTotal = ref(0)
 const loadingUsers = ref(false)
@@ -417,7 +460,11 @@ const loadingUsers = ref(false)
 // 作品管理
 const images = ref([])
 const imageSearch = ref('')
+const imageUserSearch = ref('')
 const imageStatus = ref('')
+const imagePublic = ref('')
+const imageDeleted = ref('0')
+const imageSort = ref('newest')
 const imagePage = ref(1)
 const imageTotal = ref(0)
 const loadingImages = ref(false)
@@ -478,7 +525,11 @@ const fetchUsers = async () => {
     const res = await getUsers({
       page: userPage.value,
       pageSize: 10,
-      keyword: userSearch.value
+      keyword: userSearch.value,
+      role: userRole.value,
+      status: userStatus.value,
+      isDeleted: userDeleted.value,
+      sortBy: userSort.value
     })
     users.value = res.list || []
     userTotal.value = res.total || 0
@@ -487,6 +538,11 @@ const fetchUsers = async () => {
   } finally {
     loadingUsers.value = false
   }
+}
+
+const applyUserFilters = () => {
+  userPage.value = 1
+  fetchUsers()
 }
 
 // 封禁用户
@@ -545,7 +601,11 @@ const fetchImages = async () => {
       page: imagePage.value,
       pageSize: 10,
       keyword: imageSearch.value,
-      status: imageStatus.value
+      userKeyword: imageUserSearch.value,
+      status: imageStatus.value,
+      isPublic: imagePublic.value,
+      isDeleted: imageDeleted.value,
+      sortBy: imageSort.value
     })
     images.value = res.list || []
     imageTotal.value = res.total || 0
@@ -554,6 +614,11 @@ const fetchImages = async () => {
   } finally {
     loadingImages.value = false
   }
+}
+
+const applyImageFilters = () => {
+  imagePage.value = 1
+  fetchImages()
 }
 
 // 删除作品
@@ -818,6 +883,7 @@ onMounted(() => {
 
 /* 表格 */
 .user-cell {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: var(--space-2);

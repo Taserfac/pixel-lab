@@ -18,9 +18,10 @@ public class AdminDao {
     this.dataSource = dataSource;
   }
 
-  public Map<String, Object> users(int page, int pageSize, String keyword) throws Exception {
+  public Map<String, Object> users(int page, int pageSize, String keyword, String role,
+                                   String status, String isDeleted, String sortBy) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
-    StringBuilder where = new StringBuilder(" WHERE is_deleted = 0 ");
+    StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
     List<Object> params = new ArrayList<>();
     if (keyword != null && !keyword.isBlank()) {
       where.append(" AND (username LIKE ? OR nickname LIKE ?) ");
@@ -28,14 +29,27 @@ public class AdminDao {
       params.add(like);
       params.add(like);
     }
+    if (role != null && !role.isBlank()) {
+      where.append(" AND role = ? ");
+      params.add(role);
+    }
+    if (status != null && !status.isBlank()) {
+      where.append(" AND status = ? ");
+      params.add(Integer.parseInt(status));
+    }
+    if (isDeleted != null && !isDeleted.isBlank()) {
+      where.append(" AND is_deleted = ? ");
+      params.add(Integer.parseInt(isDeleted));
+    }
+    String orderBy = "oldest".equals(sortBy) ? "created_at ASC" : "created_at DESC";
     try (Connection conn = dataSource.getConnection()) {
       long total = count(conn, "SELECT COUNT(*) FROM `user` " + where, params);
       List<Object> pageParams = new ArrayList<>(params);
       pageParams.add(pageSize);
       pageParams.add(offset);
       List<Map<String, Object>> rows = query(conn,
-          "SELECT id, username, nickname, avatar, role, status, ban_days, ban_reason, ban_end_at, created_at FROM `user` "
-              + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+          "SELECT id, username, nickname, avatar, role, status, is_deleted, ban_days, ban_reason, ban_end_at, created_at FROM `user` "
+              + where + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?",
           pageParams);
       return pageResult(rows, total, page, pageSize);
     }
@@ -60,7 +74,8 @@ public class AdminDao {
     return update("UPDATE `user` SET role = ? WHERE id = ? AND is_deleted = 0", List.of(role, userId)) > 0;
   }
 
-  public Map<String, Object> images(int page, int pageSize, String keyword, String status) throws Exception {
+  public Map<String, Object> images(int page, int pageSize, String keyword, String userKeyword,
+                                    String status, String isPublic, String isDeleted, String sortBy) throws Exception {
     int offset = (Math.max(page, 1) - 1) * Math.max(pageSize, 1);
     StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
     List<Object> params = new ArrayList<>();
@@ -71,10 +86,30 @@ public class AdminDao {
       params.add(like);
       params.add(like);
     }
-    if (status != null && !status.isBlank()) {
+    if (!"1".equals(isDeleted) && status != null && !status.isBlank()) {
       where.append(" AND i.status = ? ");
       params.add(Integer.parseInt(status));
     }
+    if (userKeyword != null && !userKeyword.isBlank()) {
+      where.append(" AND (u.username LIKE ? OR u.nickname LIKE ?) ");
+      String like = "%" + userKeyword.trim() + "%";
+      params.add(like);
+      params.add(like);
+    }
+    if (isPublic != null && !isPublic.isBlank()) {
+      where.append(" AND i.is_public = ? ");
+      params.add(Integer.parseInt(isPublic));
+    }
+    if (isDeleted != null && !isDeleted.isBlank()) {
+      where.append("1".equals(isDeleted) ? " AND i.status = 0 " : " AND i.status != 0 ");
+    }
+    String orderBy = switch (sortBy == null ? "" : sortBy) {
+      case "oldest" -> "i.created_at ASC";
+      case "likes" -> "i.like_count DESC, i.created_at DESC";
+      case "collects" -> "i.collect_count DESC, i.created_at DESC";
+      case "views" -> "i.view_count DESC, i.created_at DESC";
+      default -> "i.created_at DESC";
+    };
     try (Connection conn = dataSource.getConnection()) {
       long total = count(conn, "SELECT COUNT(*) FROM image i LEFT JOIN `user` u ON i.user_id = u.id " + where, params);
       List<Object> pageParams = new ArrayList<>(params);
@@ -82,7 +117,7 @@ public class AdminDao {
       pageParams.add(offset);
       List<Map<String, Object>> rows = query(conn,
           "SELECT i.*, u.username, u.nickname AS author_name FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
-              + where + " ORDER BY i.created_at DESC LIMIT ? OFFSET ?",
+              + where + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?",
           pageParams);
       return pageResult(rows, total, page, pageSize);
     }

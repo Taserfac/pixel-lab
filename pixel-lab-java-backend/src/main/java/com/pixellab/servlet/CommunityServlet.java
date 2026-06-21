@@ -30,6 +30,11 @@ public class CommunityServlet extends BaseApiServlet {
             userId));
         return;
       }
+      if (segments.size() == 1 && "tags".equals(segments.get(0))) {
+        ok(response, dao.publicTags(RequestUtil.intParam(request, "limit", 20)));
+        return;
+      }
+
       if (segments.size() == 2 && "images".equals(segments.get(0))) {
         SessionUser user = currentUser(request);
         Long userId = user == null ? null : user.getId();

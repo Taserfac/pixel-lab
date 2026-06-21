@@ -23,7 +23,11 @@ public class AdminServlet extends BaseApiServlet {
         ok(response, dao.users(
             RequestUtil.intParam(request, "page", 1),
             RequestUtil.intParam(request, "pageSize", 20),
-            request.getParameter("keyword")));
+            request.getParameter("keyword"),
+            request.getParameter("role"),
+            request.getParameter("status"),
+            request.getParameter("isDeleted"),
+            request.getParameter("sortBy")));
         return;
       }
       if (segments.size() == 1 && "images".equals(segments.get(0))) {
@@ -31,7 +35,11 @@ public class AdminServlet extends BaseApiServlet {
             RequestUtil.intParam(request, "page", 1),
             RequestUtil.intParam(request, "pageSize", 20),
             request.getParameter("keyword"),
-            request.getParameter("status")));
+            request.getParameter("userKeyword"),
+            request.getParameter("status"),
+            request.getParameter("isPublic"),
+            request.getParameter("isDeleted"),
+            request.getParameter("sortBy")));
         return;
       }
       if (segments.size() == 1 && "albums".equals(segments.get(0))) {

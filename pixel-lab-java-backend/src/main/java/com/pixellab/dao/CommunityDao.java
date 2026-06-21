@@ -8,11 +8,19 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class CommunityDao {
+  private static final List<String> SYSTEM_TAGS = List.of(
+      "摄影", "插画", "AI艺术", "设计", "旅行", "像素艺术", "城市", "生活");
+  private static final int MIN_TRENDING_USAGE = 2;
+  private static final int MIN_TRENDING_LIKES = 3;
+
   private final DataSource dataSource;
 
   public CommunityDao(DataSource dataSource) {
@@ -50,6 +58,50 @@ public class CommunityDao {
       addUserState(conn, rows, userId);
       return pageResult(rows, total, page, pageSize);
     }
+  }
+
+  public Map<String, Object> publicTags(int limit) throws Exception {
+    int safeLimit = Math.max(1, Math.min(limit, 50));
+    Map<String, TagStats> statsByTag = new LinkedHashMap<>();
+
+    try (Connection conn = dataSource.getConnection()) {
+      List<Map<String, Object>> rows = query(conn,
+          "SELECT tags, like_count FROM image "
+              + "WHERE is_public = 1 AND status = 1 AND tags IS NOT NULL AND tags != ''",
+          List.of());
+
+      for (Map<String, Object> row : rows) {
+        String rawTags = String.valueOf(row.get("tags"));
+        long likes = number(row.get("like_count"));
+        Set<String> uniquePostTags = new HashSet<>();
+        for (String rawTag : rawTags.split("[,，]")) {
+          String tagName = rawTag.trim().replaceFirst("^#+", "");
+          if (tagName.isEmpty() || !uniquePostTags.add(tagName)) continue;
+          statsByTag.computeIfAbsent(tagName, ignored -> new TagStats()).addPost(likes);
+        }
+      }
+    }
+
+    List<Map<String, Object>> trendingTags = statsByTag.entrySet().stream()
+        .filter(entry -> entry.getValue().usageCount >= MIN_TRENDING_USAGE
+            || entry.getValue().likeCount >= MIN_TRENDING_LIKES)
+        .sorted(Comparator
+            .<Map.Entry<String, TagStats>>comparingDouble(entry -> entry.getValue().score()).reversed()
+            .thenComparing(Map.Entry::getKey))
+        .limit(safeLimit)
+        .map(entry -> {
+          Map<String, Object> tag = new LinkedHashMap<>();
+          tag.put("name", entry.getKey());
+          tag.put("usageCount", entry.getValue().usageCount);
+          tag.put("score", entry.getValue().score());
+          return tag;
+        })
+        .toList();
+
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("systemTags", SYSTEM_TAGS);
+    result.put("trendingTags", trendingTags);
+    return result;
   }
 
   public Map<String, Object> imageDetail(long imageId, Long userId) throws Exception {
@@ -508,6 +560,20 @@ public class CommunityDao {
   private void bind(PreparedStatement stmt, List<Object> params) throws Exception {
     for (int i = 0; i < params.size(); i++) {
       stmt.setObject(i + 1, params.get(i));
+    }
+  }
+
+  private static final class TagStats {
+    private long usageCount;
+    private long likeCount;
+
+    private void addPost(long likes) {
+      usageCount++;
+      likeCount += likes;
+    }
+
+    private double score() {
+      return usageCount * 1.5 + likeCount * 2;
     }
   }
 }

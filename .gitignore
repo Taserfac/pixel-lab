@@ -49,6 +49,7 @@ html-tools-master
 # 其他临时文件
 .tmp-playwright-profile
 ~*.*
+.patch-test.txt
 
 # ppt文件
 projects/

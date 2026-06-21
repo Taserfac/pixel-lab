@@ -5,6 +5,12 @@ export function getPublicImages(params, config = {}) {
   return request.get('/api/community/images', { params, ...config })
 }
 
+// 获取系统标签与达到展示门槛的热门标签
+export function getPublicTags(params = {}, config = {}) {
+  return request.get('/api/community/tags', { params, ...config })
+}
+
+
 // 获取作品详情
 export function getImageDetail(id) {
   return request.get(`/api/community/images/${id}`)

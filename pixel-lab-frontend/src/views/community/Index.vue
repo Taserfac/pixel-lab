@@ -276,6 +276,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import StableMasonry from '@/components/community/StableMasonry.vue'
 import {
   getPublicImages,
+  getPublicTags,
   getImageDetail,
   toggleLike,
   toggleCollect,
@@ -299,13 +300,12 @@ const page = ref(1)
 const pageSize = ref(12)
 const total = ref(0)
 const activeTag = ref('')
-const normalizeTags = (value) => (
-  Array.isArray(value) ? value : String(value || '').split(/[,，]/)
-).map(tag => tag.trim()).filter(Boolean)
+const publicTags = ref({ systemTags: [], trendingTags: [] })
 const tagList = computed(() => {
-  const defaults = ['插画', '摄影', '设计', '像素艺术', 'AI艺术']
-  const discovered = works.value.flatMap(work => normalizeTags(work.tags))
-  return ['全部', ...new Set([...defaults, ...discovered])]
+  const defaults = ['摄影', '插画', 'AI艺术', '设计', '旅行', '像素艺术', '城市', '生活']
+  const systemTags = publicTags.value.systemTags.length ? publicTags.value.systemTags : defaults
+  const trendingNames = publicTags.value.trendingTags.map(tag => tag.name)
+  return ['全部', ...new Set([...systemTags, ...trendingNames])]
 })
 
 const hasMore = computed(() => works.value.length < total.value)
@@ -614,7 +614,11 @@ onMounted(async () => {
   if (route.query.keyword) {
     keyword.value = String(route.query.keyword)
   }
-  await loadWorks(true)
+  const [, tagsRes] = await Promise.all([
+    loadWorks(true),
+    getPublicTags({ limit: 20 }, { silent: true }).catch(() => ({ systemTags: [], trendingTags: [] }))
+  ])
+  publicTags.value = tagsRes
   setupInfiniteScroll()
   if (route.query.id) {
     openDetail({ id: route.query.id })
