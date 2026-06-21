@@ -42,11 +42,35 @@
         @pointercancel="stopPan"
         @auxclick.prevent
       >
-        <canvas
-          ref="canvasRef"
-          class="editor-canvas"
-          :style="displayStyle"
-        />
+        <div class="canvas-stack" :style="displayStyle" @pointerdown.self="clearTextSelection">
+          <canvas ref="canvasRef" class="editor-canvas" :style="previewMode === 'original' ? {} : canvasStyle" @pointerdown="clearTextSelection" />
+          <div class="text-layer" aria-label="文字图层">
+            <div
+              v-for="layer in textLayers"
+              :key="layer.id"
+              class="text-object"
+              :class="{ selected: layer.id === selectedTextId }"
+              :style="textLayerStyle(layer)"
+              role="button"
+              tabindex="0"
+              @pointerdown.stop="startTextDrag($event, layer)"
+              @click.stop="$emit('select-text', layer.id)"
+              @keydown.delete.prevent="$emit('delete-text', layer.id)"
+              @keydown.backspace.prevent="$emit('delete-text', layer.id)"
+            >
+              {{ layer.text }}
+              <button
+                v-if="layer.id === selectedTextId"
+                class="delete-text"
+                type="button"
+                title="删除文字"
+                aria-label="删除文字"
+                @pointerdown.stop
+                @click.stop="$emit('delete-text', layer.id)"
+              >×</button>
+            </div>
+          </div>
+        </div>
       </div>
       <button
         class="compare-switch"
@@ -78,10 +102,15 @@ const props = defineProps({
   zoom: { type: Number, default: 1 },
   previewMode: { type: String, default: 'effect' },
   imageName: { type: String, default: '' },
-  canvasSize: { type: Object, default: () => ({ width: 0, height: 0 }) }
+  canvasSize: { type: Object, default: () => ({ width: 0, height: 0 }) },
+  textLayers: { type: Array, default: () => [] },
+  selectedTextId: { type: [String, Number], default: null }
 })
 
-const emit = defineEmits(['canvas-ready', 'resize', 'zoom-in', 'zoom-out', 'fit', 'update:previewMode'])
+const emit = defineEmits([
+  'canvas-ready', 'resize', 'zoom-in', 'zoom-out', 'fit', 'update:previewMode',
+  'select-text', 'move-text', 'commit-text-move', 'delete-text'
+])
 
 const viewportRef = ref(null)
 const wrapperRef = ref(null)
@@ -89,6 +118,7 @@ const canvasRef = ref(null)
 const isPanning = ref(false)
 let panState = null
 let resizeObserver = null
+let textDragState = null
 
 const canvasSizeText = computed(() => {
   const width = Math.round(props.canvasSize.width || 0)
@@ -97,10 +127,21 @@ const canvasSizeText = computed(() => {
 })
 
 const displayStyle = computed(() => ({
-  ...(props.previewMode === 'original' ? {} : props.canvasStyle),
   width: props.canvasSize.width ? `${Math.round(props.canvasSize.width * props.zoom)}px` : undefined,
   height: props.canvasSize.height ? `${Math.round(props.canvasSize.height * props.zoom)}px` : undefined
 }))
+
+const textLayerStyle = (layer) => ({
+  left: `${layer.x * props.zoom}px`,
+  top: `${layer.y * props.zoom}px`,
+  fontSize: `${layer.fontSize * props.zoom}px`,
+  color: layer.color || '#ffffff',
+  textShadow: layer.strokeEnabled
+    ? `-1px -1px 0 ${layer.strokeColor || '#000000'}, 1px -1px 0 ${layer.strokeColor || '#000000'}, -1px 1px 0 ${layer.strokeColor || '#000000'}, 1px 1px 0 ${layer.strokeColor || '#000000'}`
+    : 'none',
+  opacity: layer.opacity,
+  visibility: props.previewMode === 'original' ? 'hidden' : 'visible'
+})
 
 // 暴露 refs 给父组件
 defineExpose({
@@ -124,6 +165,38 @@ const startPan = (event) => {
     scrollTop: wrapperRef.value.scrollTop
   }
   wrapperRef.value.setPointerCapture?.(event.pointerId)
+}
+
+const clearTextSelection = () => emit('select-text', null)
+
+const startTextDrag = (event, layer) => {
+  if (event.button !== 0) return
+  event.preventDefault()
+  emit('select-text', layer.id)
+  textDragState = {
+    pointerId: event.pointerId,
+    id: layer.id,
+    startX: event.clientX,
+    startY: event.clientY,
+    x: layer.x,
+    y: layer.y
+  }
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+}
+
+const moveTextDrag = (event) => {
+  if (!textDragState || event.pointerId !== textDragState.pointerId) return
+  emit('move-text', {
+    id: textDragState.id,
+    x: textDragState.x + (event.clientX - textDragState.startX) / props.zoom,
+    y: textDragState.y + (event.clientY - textDragState.startY) / props.zoom
+  })
+}
+
+const stopTextDrag = (event) => {
+  if (!textDragState || event.pointerId !== textDragState.pointerId) return
+  emit('commit-text-move', textDragState.id)
+  textDragState = null
 }
 
 const movePan = (event) => {
@@ -158,11 +231,17 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(() => emit('resize'))
   if (viewportRef.value) resizeObserver.observe(viewportRef.value)
   window.addEventListener('blur', showEffect)
+  window.addEventListener('pointermove', moveTextDrag)
+  window.addEventListener('pointerup', stopTextDrag)
+  window.addEventListener('pointercancel', stopTextDrag)
 })
 
 onUnmounted(() => {
   resizeObserver?.disconnect()
   window.removeEventListener('blur', showEffect)
+  window.removeEventListener('pointermove', moveTextDrag)
+  window.removeEventListener('pointerup', stopTextDrag)
+  window.removeEventListener('pointercancel', stopTextDrag)
 })
 </script>
 
@@ -274,17 +353,66 @@ onUnmounted(() => {
   user-select: none;
 }
 
-.editor-canvas {
+.canvas-stack {
+  position: relative;
   flex: 0 0 auto;
   margin: auto;
   max-width: none;
   max-height: none;
+  transition: width var(--transition-fast), height var(--transition-fast);
+}
+
+.editor-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
   border: 1px solid rgba(204, 214, 224, 0.8);
   border-radius: 12px;
   box-shadow: 0 20px 46px rgba(17, 24, 39, 0.16);
-  transition:
-    width var(--transition-fast),
-    height var(--transition-fast);
+}
+
+.text-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.text-object {
+  position: absolute;
+  z-index: 1;
+  padding: 2px 4px;
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+  cursor: move;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+
+.text-object.selected {
+  outline: 2px solid #13c77f;
+  outline-offset: 3px;
+}
+
+.delete-text {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 17px;
+  line-height: 22px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .compare-switch {

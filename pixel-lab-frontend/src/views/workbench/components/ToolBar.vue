@@ -141,26 +141,76 @@
         <button type="button" @click="requestText('text')">添加文字</button>
         <button type="button" @click="requestText('watermark')">添加水印</button>
       </div>
+      <div v-if="selectedTextLayer" class="selected-layer-hint">
+        正在编辑：{{ selectedTextLayer.watermark ? '水印' : '文字' }}
+      </div>
       <div class="adjust-row compact">
         <div class="adjust-label">
-          <label>透明度</label>
+          <label>大小</label>
+          <span>{{ textSize }}%</span>
+        </div>
+        <el-slider
+          v-model="textSize"
+          :min="2"
+          :max="30"
+          :step="1"
+          :show-tooltip="false"
+          @input="updateSelectedStyle({ fontScale: $event })"
+          @change="commitSelectedStyle"
+        />
+      </div>
+      <div class="text-color-row">
+        <label>颜色</label>
+        <div class="text-color-control">
+          <el-color-picker
+            v-model="textColor"
+            show-alpha
+            @active-change="updateTextColor"
+            @change="commitTextColor"
+          />
+          <code>{{ textColor }}</code>
+        </div>
+      </div>
+      <div class="text-border-row">
+        <label>边框</label>
+        <el-switch v-model="strokeEnabled" @change="toggleTextStroke" />
+      </div>
+      <div v-if="strokeEnabled" class="text-color-row border-color-row">
+        <label>边框颜色</label>
+        <div class="text-color-control">
+          <el-color-picker
+            v-model="strokeColor"
+            show-alpha
+            @active-change="updateStrokeColor"
+            @change="commitStrokeColor"
+          />
+          <code>{{ strokeColor }}</code>
+        </div>
+      </div>
+      <div v-if="!selectedTextLayer || selectedTextLayer.watermark" class="adjust-row compact">
+        <div class="adjust-label">
+          <label>水印透明度</label>
           <span>{{ watermarkOpacity }}%</span>
         </div>
         <el-slider
           v-model="watermarkOpacity"
           :min="10"
           :max="100"
-          :step="5"
+          :step="1"
           :show-tooltip="false"
+          @input="updateSelectedStyle({ opacity: $event / 100 })"
+          @change="commitSelectedStyle"
         />
       </div>
-      <div class="position-grid" aria-label="水印位置">
+      <div class="position-label">文字 / 水印位置</div>
+      <div class="position-grid" aria-label="文字和水印位置">
         <button
           v-for="position in positions"
           :key="position"
           type="button"
-          :class="{ active: watermarkPosition === position }"
-          @click="watermarkPosition = position"
+          :class="{ active: textPosition === position }"
+          :aria-label="positionLabels[position]"
+          @click="selectTextPosition(position)"
         />
       </div>
     </section>
@@ -168,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import {
   Crop,
@@ -187,7 +237,8 @@ const props = defineProps({
   adjustments: { type: Object, required: true },
   pixelSize: { type: Number, default: 8 },
   colorCount: { type: Number, default: 32 },
-  thumbnailUrl: { type: String, default: '' }
+  thumbnailUrl: { type: String, default: '' },
+  selectedTextLayer: { type: Object, default: null }
 })
 
 const emit = defineEmits([
@@ -200,6 +251,8 @@ const emit = defineEmits([
   'reset-pixel',
   'add-text',
   'add-watermark',
+  'update-selected-text',
+  'commit-selected-text',
   'update:pixel-size',
   'update:color-count'
 ])
@@ -211,8 +264,67 @@ const adjustmentItems = [
   { key: 'sharpen', label: '锐化', min: 0, max: 100, step: 1 }
 ]
 const positions = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br']
+const positionLabels = {
+  tl: '左上', tc: '上中', tr: '右上',
+  ml: '左中', mc: '居中', mr: '右中',
+  bl: '左下', bc: '下中', br: '右下'
+}
 const watermarkOpacity = ref(60)
-const watermarkPosition = ref('mc')
+const textPosition = ref('mc')
+const textSize = ref(10)
+const textColor = ref('#ffffff')
+const strokeEnabled = ref(false)
+const strokeColor = ref('#000000')
+
+watch(() => props.selectedTextLayer, layer => {
+  if (!layer) return
+  textSize.value = Math.round(layer.fontScale || 10)
+  textColor.value = layer.color || '#ffffff'
+  strokeEnabled.value = Boolean(layer.strokeEnabled)
+  strokeColor.value = layer.strokeColor || '#000000'
+  textPosition.value = layer.position || ''
+  if (layer.watermark) watermarkOpacity.value = Math.round((layer.opacity ?? 0.6) * 100)
+}, { immediate: true })
+
+const updateSelectedStyle = (patch) => {
+  if (props.selectedTextLayer) emit('update-selected-text', patch)
+}
+
+const commitSelectedStyle = () => {
+  if (props.selectedTextLayer) emit('commit-selected-text')
+}
+
+const updateTextColor = (color) => {
+  textColor.value = color || '#ffffff'
+  updateSelectedStyle({ color: textColor.value })
+}
+
+const commitTextColor = (color) => {
+  updateTextColor(color)
+  commitSelectedStyle()
+}
+
+const toggleTextStroke = (enabled) => {
+  strokeEnabled.value = enabled
+  updateSelectedStyle({ strokeEnabled: enabled })
+  commitSelectedStyle()
+}
+
+const updateStrokeColor = (color) => {
+  strokeColor.value = color || '#000000'
+  updateSelectedStyle({ strokeColor: strokeColor.value })
+}
+
+const commitStrokeColor = (color) => {
+  updateStrokeColor(color)
+  commitSelectedStyle()
+}
+
+const selectTextPosition = (position) => {
+  textPosition.value = position
+  updateSelectedStyle({ position })
+  commitSelectedStyle()
+}
 
 const updateAdjustment = (key, value) => {
   emit('update-adjustment', { key, value })
@@ -240,10 +352,14 @@ const requestText = async (type) => {
       emit('add-watermark', {
         text,
         opacity: watermarkOpacity.value,
-        position: watermarkPosition.value
+        position: textPosition.value || 'mc',
+        fontScale: textSize.value,
+        color: textColor.value,
+        strokeEnabled: strokeEnabled.value,
+        strokeColor: strokeColor.value
       })
     } else {
-      emit('add-text', { text })
+      emit('add-text', { text, position: textPosition.value || 'mc', fontScale: textSize.value, color: textColor.value, strokeEnabled: strokeEnabled.value, strokeColor: strokeColor.value })
     }
   } catch {
     // 用户取消输入
@@ -541,6 +657,60 @@ const getPreviewStyle = (filterValue) => {
 
 .flip-h {
   transform: rotate(90deg);
+}
+
+.selected-layer-hint {
+  margin-top: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #effcf6;
+  color: #078c57;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.text-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.text-border-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.border-color-row {
+  margin-top: 8px;
+}
+
+.text-color-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.text-color-control code {
+  color: #596270;
+  font-size: 10px;
+}
+
+.position-label {
+  margin-top: 12px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .position-grid {

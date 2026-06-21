@@ -198,6 +198,15 @@
       </div>
 
       <template v-if="currentTool === 'brush'">
+        <section v-if="brushType === 'text'" class="inspector-section selection-controls">
+          <div class="section-title">文字操作</div>
+          <el-button class="delete-selection" type="danger" plain :disabled="!selectedText" @click="deleteSelectedText">
+            <el-icon><Delete /></el-icon>
+            删除选中文字
+          </el-button>
+          <p class="selection-hint">单击文字后拖动；按 Delete 或 Backspace 也可删除</p>
+        </section>
+
         <section v-if="!isShapeToolActive" class="inspector-section">
           <div class="section-title">笔刷类型</div>
           <div class="type-button-grid">
@@ -216,19 +225,19 @@
 
         <section class="inspector-section">
           <div class="section-title">{{ isShapeToolActive ? '线条设置' : '画笔设置' }}</div>
-          <label class="field"><span>大小 <em>{{ brushSize }}px</em></span><el-slider v-model="brushSize" :min="1" :max="96" :show-tooltip="false" /></label>
+          <label class="field"><span>大小 <em>{{ brushSize }}px</em></span><el-slider v-model="brushSize" :min="1" :max="96" :show-tooltip="false" @change="commitSelectedTextStyle" /></label>
         </section>
 
         <section class="inspector-section">
           <div class="section-title">颜色</div>
-          <div class="field"><span>当前颜色</span><div class="color-control"><el-color-picker v-model="brushColor" :predefine="presetColors" /><code>{{ brushColor }}</code></div></div>
+          <div class="field"><span>当前颜色</span><div class="color-control"><el-color-picker v-model="brushColor" :predefine="presetColors" @change="commitSelectedTextStyle" /><code>{{ brushColor }}</code></div></div>
           <div class="field"><span>色板</span><div class="quick-colors"><button v-for="color in quickColors" :key="color" class="color-dot" :class="{ active: brushColor === color }" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
           <div class="field"><span>最近颜色</span><div class="quick-colors recent-colors"><button v-for="color in recentColors" :key="color" class="color-dot" :style="{ backgroundColor: color }" type="button" :aria-label="color" @click="selectBrushColor(color)" /></div></div>
         </section>
 
         <section class="inspector-section">
           <div class="section-title">透明度</div>
-          <label class="field"><span>透明度 <em>{{ brushOpacity }}%</em></span><el-slider v-model="brushOpacity" :min="10" :max="100" :step="5" :show-tooltip="false" /></label>
+          <label class="field"><span>透明度 <em>{{ brushOpacity }}%</em></span><el-slider v-model="brushOpacity" :min="10" :max="100" :step="5" :show-tooltip="false" @change="commitSelectedTextStyle" /></label>
         </section>
       </template>
 
@@ -379,16 +388,62 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="saveDialogVisible"
+      title="保存到个人中心"
+      width="min(520px, 92vw)"
+      :close-on-click-modal="!savingToGallery"
+      :close-on-press-escape="!savingToGallery"
+    >
+      <el-form label-position="top" class="save-form">
+        <el-form-item label="标题">
+          <el-input v-model="saveForm.title" maxlength="100" show-word-limit placeholder="给作品起一个标题" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-select
+            v-model="saveForm.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="输入标签后按回车添加"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="说明">
+          <el-input
+            v-model="saveForm.description"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="写下作品的创作想法或说明"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button :disabled="savingToGallery" @click="saveDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="savingToGallery"
+          :disabled="!saveForm.title.trim()"
+          @click="confirmSaveToGallery"
+        >
+          确认保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ArrowDown, ArrowLeft, Back, Delete, Download, EditPen, FullScreen, MagicStick, Rank, RefreshRight, Right, Upload, UploadFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Canvas as FabricCanvas, Circle, CircleBrush, FabricImage, IText, Line, Path, PencilBrush, Rect, Shadow, SprayBrush } from 'fabric'
-import { uploadImage } from '@/api/image'
+import { Canvas as FabricCanvas, Circle, CircleBrush, Control, FabricImage, IText, Line, Path, PencilBrush, Rect, Shadow, SprayBrush } from 'fabric'
+import { updateImageMetadata, uploadImage } from '@/api/image'
 import { refineDrawing } from '@/api/ai'
 
 const router = useRouter()
@@ -407,10 +462,32 @@ const documentName = ref('未命名作品')
 const currentTool = ref('brush')
 const brushType = ref('hard')
 const eraserType = ref('hard')
-const brushSize = ref(8)
-const brushOpacity = ref(100)
+const drawingToolStyles = reactive({
+  brush: { size: 8, opacity: 100, color: '#111827' },
+  shape: { size: 8, opacity: 100, color: '#111827' },
+  line: { size: 8, opacity: 100, color: '#111827' },
+  arrow: { size: 8, opacity: 100, color: '#111827' },
+  text: { size: 8, opacity: 100, color: '#111827' }
+})
+const activeDrawingStyleKey = computed(() => {
+  if (['rect', 'rect-fill', 'circle', 'circle-fill'].includes(brushType.value)) return 'shape'
+  if (['line', 'arrow', 'text'].includes(brushType.value)) return brushType.value
+  return 'brush'
+})
+const activeDrawingStyle = computed(() => drawingToolStyles[activeDrawingStyleKey.value])
+const brushSize = computed({
+  get: () => activeDrawingStyle.value.size,
+  set: value => { activeDrawingStyle.value.size = value }
+})
+const brushOpacity = computed({
+  get: () => activeDrawingStyle.value.opacity,
+  set: value => { activeDrawingStyle.value.opacity = value }
+})
+const brushColor = computed({
+  get: () => activeDrawingStyle.value.color,
+  set: value => { activeDrawingStyle.value.color = value }
+})
 const eraserSize = ref(24)
-const brushColor = ref('#111827')
 const canvasWidth = ref(800)
 const canvasHeight = ref(600)
 const draftWidth = ref(800)
@@ -437,6 +514,14 @@ const aiLoading = ref(false)
 const isFullscreen = ref(false)
 const hasUnsavedChanges = ref(false)
 const recentColors = ref(['#111827', '#ffffff', '#3b82f6', '#ef4444'])
+const selectedText = ref(null)
+const saveDialogVisible = ref(false)
+const savingToGallery = ref(false)
+const saveForm = reactive({
+  title: '',
+  tags: [],
+  description: ''
+})
 
 
 const brushTypes = [
@@ -632,6 +717,10 @@ const initCanvas = async () => {
   fabricCanvas.on('mouse:out', () => {
     pointerPosition.value = null
   })
+  fabricCanvas.on('selection:created', syncSelectedText)
+  fabricCanvas.on('selection:updated', syncSelectedText)
+  fabricCanvas.on('selection:cleared', () => { selectedText.value = null })
+  fabricCanvas.on('object:modified', handleTextModified)
 
   syncFabricCanvasLayout()
   updateBrush()
@@ -644,6 +733,7 @@ const goBack = () => {
 
 const selectBrushColor = (color) => {
   brushColor.value = color
+  nextTick(commitSelectedTextStyle)
 }
 
 const toggleFullscreen = async () => {
@@ -863,6 +953,85 @@ const createShapeObject = (start, end) => {
   return null
 }
 
+const renderDeleteTextControl = (ctx, left, top, _styleOverride, object) => {
+  ctx.save()
+  ctx.translate(left, top)
+  ctx.rotate((object.angle || 0) * Math.PI / 180)
+  ctx.beginPath()
+  ctx.arc(0, 0, 11, 0, Math.PI * 2)
+  ctx.fillStyle = '#ef4444'
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(-4, -4)
+  ctx.lineTo(4, 4)
+  ctx.moveTo(4, -4)
+  ctx.lineTo(-4, 4)
+  ctx.stroke()
+  ctx.restore()
+}
+
+const getSelectedTextObject = () => {
+  const activeObject = fabricCanvas?.getActiveObject()
+  if (activeObject instanceof IText) return activeObject
+  return selectedText.value instanceof IText ? selectedText.value : null
+}
+
+const removeTextObject = (text) => {
+  if (!fabricCanvas || !(text instanceof IText)) return false
+  fabricCanvas.remove(text)
+  fabricCanvas.discardActiveObject()
+  selectedText.value = null
+  fabricCanvas.requestRenderAll()
+  saveHistory('删除文字')
+  return true
+}
+
+const configureTextObject = (text) => {
+  if (!(text instanceof IText)) return
+  text.set({
+    hasControls: true,
+    borderColor: '#13c77f',
+    cornerColor: '#ffffff',
+    cornerStrokeColor: '#13c77f',
+    cornerStyle: 'circle',
+    transparentCorners: false,
+    cornerSize: 10
+  })
+  text.controls = { ...text.controls, mtr: new Control({
+    x: 0.5,
+    y: -0.5,
+    offsetX: 12,
+    offsetY: -12,
+    cursorStyle: 'pointer',
+    cornerSize: 24,
+    mouseUpHandler: (_eventData, transform) => removeTextObject(transform.target),
+    render: renderDeleteTextControl
+  }) }
+  text.setCoords()
+}
+
+const applySelectedTextStyle = () => {
+  if (currentTool.value !== 'brush' || brushType.value !== 'text') return
+  const text = getSelectedTextObject()
+  if (!text) return
+  text.set({
+    fill: getBrushColor(),
+    fontSize: Math.max(12, effectiveBrushWidth.value * 2)
+  })
+  text.setCoords()
+  selectedText.value = text
+  fabricCanvas?.requestRenderAll()
+}
+
+const commitSelectedTextStyle = () => {
+  if (getSelectedTextObject() && currentTool.value === 'brush' && brushType.value === 'text') {
+    saveHistory('调整文字属性')
+  }
+}
+
 const addEditableText = (point) => {
   if (!fabricCanvas) return
 
@@ -877,16 +1046,14 @@ const addEditableText = (point) => {
     evented: true
   })
 
+  configureTextObject(text)
+
   let historySaved = false
   text.once('editing:exited', () => {
     if (!fabricCanvas || historySaved) return
     historySaved = true
-    if (!text.text?.trim()) {
-      fabricCanvas.remove(text)
-    } else {
-      text.set({ selectable: false, evented: false })
-    }
-    fabricCanvas.discardActiveObject()
+    if (!text.text?.trim()) fabricCanvas.remove(text)
+    selectedText.value = text.text?.trim() ? text : null
     fabricCanvas.requestRenderAll()
     saveHistory('添加文字')
   })
@@ -1013,6 +1180,14 @@ const handleShapePointerDown = (event) => {
   const point = getEventPoint(event)
   if (!point) return
   if (brushType.value === 'text') {
+    if (event.target instanceof IText) {
+      if (event.target.isEditing) event.target.exitEditing()
+      configureTextObject(event.target)
+      fabricCanvas.setActiveObject(event.target)
+      selectedText.value = event.target
+      fabricCanvas.requestRenderAll()
+      return
+    }
     const activeObject = fabricCanvas.getActiveObject()
     if (activeObject?.isEditing) {
       activeObject.exitEditing()
@@ -1058,21 +1233,28 @@ const updateBrush = () => {
   const isMoveTool = currentTool.value === 'pan'
   const isEraserTool = currentTool.value === 'eraser'
   const isShapeTool = currentTool.value === 'brush' && shapeBrushTypes.has(brushType.value)
+  const isTextTool = currentTool.value === 'brush' && brushType.value === 'text'
 
   fabricCanvas.selection = false
-  fabricCanvas.perPixelTargetFind = true
-  fabricCanvas.targetFindTolerance = 0
+  fabricCanvas.perPixelTargetFind = !isTextTool
+  fabricCanvas.targetFindTolerance = isTextTool ? 6 : 0
   fabricCanvas.forEachObject((object) => {
+    const isEditableText = isTextTool && object instanceof IText
+    if (object instanceof IText) configureTextObject(object)
     object.set({
-      selectable: false,
-      evented: false,
+      selectable: isEditableText,
+      evented: isEditableText,
       perPixelTargetFind: false,
       padding: 0,
-      hoverCursor: 'default'
+      hoverCursor: isEditableText ? 'move' : 'default'
     })
   })
 
-  fabricCanvas.discardActiveObject()
+  const activeObject = fabricCanvas.getActiveObject()
+  if (!(isTextTool && activeObject instanceof IText)) {
+    fabricCanvas.discardActiveObject()
+    selectedText.value = null
+  }
 
   if (isMoveTool || isEraserTool) {
     fabricCanvas.isDrawingMode = false
@@ -1088,6 +1270,42 @@ const updateBrush = () => {
   if (!isShapeTool) fabricCanvas.freeDrawingBrush = createBrush()
   fabricCanvas.requestRenderAll()
 }
+
+const colorChannelToHex = value => Math.round(Number(value)).toString(16).padStart(2, '0')
+
+const syncTextStyleControls = (text) => {
+  if (!(text instanceof IText)) return
+  const fill = String(text.fill || '#111827')
+  const rgba = fill.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i)
+  if (rgba) {
+    brushColor.value = `#${colorChannelToHex(rgba[1])}${colorChannelToHex(rgba[2])}${colorChannelToHex(rgba[3])}`
+    brushOpacity.value = Math.round((rgba[4] === undefined ? 1 : Number(rgba[4])) * 100)
+  } else if (/^#[0-9a-f]{6}$/i.test(fill)) {
+    brushColor.value = fill
+    brushOpacity.value = Math.round((text.opacity ?? 1) * 100)
+  }
+  brushSize.value = Math.max(1, Math.min(96, Math.round((text.fontSize || 16) / 2)))
+}
+
+const syncSelectedText = () => {
+  const activeObject = fabricCanvas?.getActiveObject()
+  selectedText.value = activeObject instanceof IText ? activeObject : null
+  if (selectedText.value) {
+    configureTextObject(selectedText.value)
+    syncTextStyleControls(selectedText.value)
+  }
+}
+
+const handleTextModified = (event) => {
+  if (isRestoring || !(event.target instanceof IText)) return
+  selectedText.value = event.target
+  saveHistory('移动文字')
+}
+
+const deleteSelectedText = () => {
+  removeTextObject(getSelectedTextObject())
+}
+
 const handlePathCreated = (event) => {
   if (!fabricCanvas || isRestoring || currentTool.value !== 'brush' || !event.path) return
 
@@ -1140,6 +1358,9 @@ const createDraftPayload = () => ({
   backgroundMode: backgroundMode.value,
   backgroundColor: backgroundColor.value,
   showGrid: showGrid.value,
+  drawingToolStyles: Object.fromEntries(
+    Object.entries(drawingToolStyles).map(([key, style]) => [key, { ...style }])
+  ),
   canvasJson: fabricCanvas?.toJSON(['globalCompositeOperation', 'isEraserStroke'])
 })
 
@@ -1187,6 +1408,11 @@ const restoreStoredDraft = async (draft) => {
     backgroundMode.value = draft.backgroundMode || 'transparent'
     backgroundColor.value = draft.backgroundColor || '#ffffff'
     showGrid.value = draft.showGrid !== false
+    if (draft.drawingToolStyles) {
+      Object.entries(drawingToolStyles).forEach(([key, style]) => {
+        if (draft.drawingToolStyles[key]) Object.assign(style, draft.drawingToolStyles[key])
+      })
+    }
     selectedPreset.value = canvasPresets.some((item) => item.width === canvasWidth.value && item.height === canvasHeight.value)
       ? `${canvasWidth.value}x${canvasHeight.value}`
       : 'custom'
@@ -1690,21 +1916,47 @@ const applyAiResult = async () => {
   }
 }
 
-const saveToGallery = async () => {
-  if (!fabricCanvas) return
+const getUploadedImageId = (res) => res?.id || res?.data?.id
 
+const saveToGallery = () => {
+  if (!fabricCanvas) return
+  saveForm.title = documentName.value.trim() || '未命名作品'
+  saveForm.tags = []
+  saveForm.description = ''
+  saveDialogVisible.value = true
+}
+
+const confirmSaveToGallery = async () => {
+  if (!fabricCanvas || !saveForm.title.trim()) return
+
+  savingToGallery.value = true
   try {
     const dataURL = await drawToCanvas('png', backgroundMode.value !== 'transparent')
     const res = await fetch(dataURL)
     const blob = await res.blob()
     const file = new File([blob], `${safeDocumentName()}_${Date.now()}.png`, { type: 'image/png' })
-    await uploadImage(file)
+    const uploadResult = await uploadImage(file)
+    const imageId = getUploadedImageId(uploadResult)
+    if (!imageId) {
+      ElMessage.warning('图片已上传，但未拿到作品ID，无法保存作品信息')
+      return
+    }
+
+    const tags = [...new Set(saveForm.tags.map(tag => tag.trim()).filter(Boolean))]
+    await updateImageMetadata(imageId, {
+      title: saveForm.title.trim(),
+      tags: tags.join(','),
+      description: saveForm.description.trim()
+    })
     clearStoredDraft()
     hasUnsavedChanges.value = false
+    saveDialogVisible.value = false
     ElMessage.success('已保存到个人中心')
   } catch (error) {
     console.error('[Draw] Save failed:', error)
     ElMessage.error('保存失败，请确认后端服务和登录状态')
+  } finally {
+    savingToGallery.value = false
   }
 }
 
@@ -1713,6 +1965,11 @@ const handleKeydown = (event) => {
   const isTyping = ['INPUT', 'TEXTAREA'].includes(target?.tagName) || target?.isContentEditable
   if (isTyping) return
 
+  if ((event.key === 'Delete' || event.key === 'Backspace') && getSelectedTextObject()) {
+    event.preventDefault()
+    deleteSelectedText()
+    return
+  }
 
   if (event.ctrlKey || event.metaKey) {
     if (event.key.toLowerCase() === 's') {
@@ -1753,7 +2010,11 @@ const handleWindowBlur = () => {
   updateBrush()
 }
 
-watch([brushSize, brushColor, brushOpacity, eraserSize, currentTool, brushType, eraserType], updateBrush)
+watch([brushSize, brushColor, brushOpacity], () => {
+  applySelectedTextStyle()
+  updateBrush()
+})
+watch([eraserSize, currentTool, brushType, eraserType], updateBrush)
 watch([documentName, backgroundMode, backgroundColor, showGrid], () => {
   if (fabricCanvas && !isRestoring) hasUnsavedChanges.value = true
 })

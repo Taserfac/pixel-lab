@@ -33,6 +33,12 @@ body {
   min-height: 100vh;
 }
 
+[data-theme='dark'] body {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(17, 23, 19, 0) 320px),
+    var(--background);
+}
+
 body::before {
   display: none;
 }

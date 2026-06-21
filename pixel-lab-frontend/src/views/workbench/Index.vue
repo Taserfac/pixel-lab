@@ -18,6 +18,9 @@
             :pixel-size="pixelSize"
             :color-count="colorCount"
             :thumbnail-url="thumbnailUrl"
+            :selected-text-layer="selectedTextLayer"
+            @update-selected-text="updateSelectedTextLayer"
+            @commit-selected-text="commitSelectedTextLayer"
             @apply-filter="applyFilter"
             @update-adjustment="updateAdjustment"
             @rotate="rotateImage"
@@ -39,6 +42,12 @@
             v-model:preview-mode="previewMode"
             :image-name="currentImage?.name || ''"
             :canvas-size="currentCanvasSize"
+            :text-layers="textLayers"
+            :selected-text-id="selectedTextId"
+            @select-text="selectedTextId = $event"
+            @move-text="moveTextLayer"
+            @commit-text-move="commitTextLayerMove"
+            @delete-text="deleteTextLayer"
             @resize="fitCanvasToView"
             @zoom-in="zoomIn"
             @zoom-out="zoomOut"
@@ -121,7 +130,7 @@
     <!-- 发布到社区信息弹窗 -->
     <el-dialog
       v-model="publishDialogVisible"
-      title="发布到社区"
+      :title="artworkDialogMode === 'gallery' ? '保存到个人中心' : '发布到社区'"
       width="min(520px, 92vw)"
       class="publish-dialog"
       :close-on-click-modal="!publishing"
@@ -150,7 +159,7 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="描述">
+        <el-form-item label="说明">
           <el-input
             v-model="publishForm.description"
             type="textarea"
@@ -172,9 +181,9 @@
           type="primary"
           :loading="publishing"
           :disabled="!publishForm.title.trim()"
-          @click="publishToCommunity"
+          @click="submitArtwork"
         >
-          确认发布
+          {{ artworkDialogMode === 'gallery' ? '确认保存' : '确认发布' }}
         </el-button>
       </template>
     </el-dialog>
@@ -216,6 +225,18 @@ const viewZoom = ref(1)
 const currentCanvasSize = reactive({ width: 0, height: 0 })
 const baseImageDataUrl = ref('')
 const previewMode = ref('compare')
+const textLayers = ref([])
+const selectedTextId = ref(null)
+const selectedTextLayer = computed(() => {
+  const layer = textLayers.value.find(item => item.id === selectedTextId.value)
+  if (!layer) return null
+  const canvas = canvasAreaRef.value?.canvas
+  const minEdge = Math.min(canvas?.width || 1, canvas?.height || 1)
+  return {
+    ...layer,
+    fontScale: layer.fontScale || (layer.fontSize / minEdge * 100)
+  }
+})
 
 // 图片选择器
 const imageSelectorVisible = ref(false)
@@ -231,6 +252,7 @@ const exportFormat = ref('png')
 const exportQuality = ref(90)
 const publishDialogVisible = ref(false)
 const publishing = ref(false)
+const artworkDialogMode = ref('community')
 const publishForm = reactive({
   title: '',
   tags: [],
@@ -336,6 +358,8 @@ const loadImage = async (url, name) => {
       currentImage.value = { url, name }
       thumbnailUrl.value = url
       baseImageDataUrl.value = url
+      textLayers.value = []
+      selectedTextId.value = null
 
       nextTick(() => {
         initCanvas()
@@ -458,6 +482,7 @@ const buildRenderedCanvas = () => {
   ctx.filter = canvasStyle.value.filter || 'none'
   ctx.drawImage(canvas, 0, 0)
   ctx.filter = 'none'
+  textLayers.value.forEach(layer => drawTextLayer(ctx, layer))
 
   return rendered
 }
@@ -489,7 +514,8 @@ const saveToHistory = () => {
   saveHistory({
     imageData: canvas.toDataURL('image/png'),
     filter: currentFilter.value,
-    adjustments: { ...adjustments }
+    adjustments: { ...adjustments },
+    textLayers: textLayers.value.map(layer => ({ ...layer }))
   })
   hasUnsavedChanges.value = true
 }
@@ -571,51 +597,131 @@ const updateOriginalFromCanvas = () => {
 }
 
 // ========== 像素画功能 ==========
-const drawCanvasText = ({ text, opacity = 100, position = 'mc', watermark = false }) => {
+const drawTextLayer = (ctx, layer) => {
+  ctx.save()
+  ctx.font = `700 ${layer.fontSize}px system-ui, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.globalAlpha = layer.opacity
+  ctx.lineJoin = 'round'
+  ctx.lineWidth = Math.max(2, layer.fontSize * 0.09)
+  ctx.strokeStyle = layer.strokeColor || '#000000'
+  ctx.fillStyle = layer.color || '#ffffff'
+  if (layer.strokeEnabled) ctx.strokeText(layer.text, layer.x, layer.y)
+  ctx.fillText(layer.text, layer.x, layer.y)
+  ctx.restore()
+}
+
+const getTextLayerPosition = (layer, position) => {
+  const canvas = canvasAreaRef.value?.canvas
+  if (!canvas) return { x: layer.x || 0, y: layer.y || 0 }
+
+  const ctx = canvas.getContext('2d')
+  const margin = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * 0.04))
+  ctx.save()
+  ctx.font = `700 ${layer.fontSize}px system-ui, sans-serif`
+  const textWidth = ctx.measureText(layer.text).width
+  ctx.restore()
+
+  const halfWidth = Math.min(textWidth / 2, Math.max(canvas.width / 2 - margin, 0))
+  const halfHeight = Math.min(layer.fontSize / 2, Math.max(canvas.height / 2 - margin, 0))
+  const horizontal = position[1]
+  const vertical = position[0]
+  return {
+    x: horizontal === 'l' ? margin + halfWidth : horizontal === 'r' ? canvas.width - margin - halfWidth : canvas.width / 2,
+    y: vertical === 't' ? margin + halfHeight : vertical === 'b' ? canvas.height - margin - halfHeight : canvas.height / 2
+  }
+}
+
+const addTextLayer = ({ text, opacity = 100, position = 'mc', watermark = false, fontScale = 10, color = '#ffffff', strokeEnabled = false, strokeColor = '#000000' }) => {
   const canvas = canvasAreaRef.value?.canvas
   if (!canvas || !text) return
 
-  const ctx = canvas.getContext('2d')
   const minEdge = Math.min(canvas.width, canvas.height)
-  const margin = Math.max(12, Math.round(minEdge * 0.04))
-  let fontSize = Math.max(watermark ? 14 : 24, Math.round(minEdge * (watermark ? 0.05 : 0.1)))
-  const maxWidth = canvas.width - margin * 2
-
-  ctx.save()
-  ctx.font = `700 ${fontSize}px system-ui, sans-serif`
-  const measuredWidth = ctx.measureText(text).width
-  if (measuredWidth > maxWidth) {
-    fontSize = Math.max(12, Math.floor(fontSize * maxWidth / measuredWidth))
-    ctx.font = `700 ${fontSize}px system-ui, sans-serif`
+  const normalizedScale = clamp(Number(fontScale) || (watermark ? 5 : 10), 2, 30)
+  const layer = {
+    id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    fontSize: Math.max(12, Math.round(minEdge * normalizedScale / 100)),
+    fontScale: normalizedScale,
+    color: color || '#ffffff',
+    strokeEnabled: Boolean(strokeEnabled),
+    strokeColor: strokeColor || '#000000',
+    opacity: Math.max(0.1, Math.min(opacity / 100, 1)),
+    position,
+    watermark
   }
-
-  const horizontal = position[1]
-  const vertical = position[0]
-  const x = horizontal === 'l' ? margin : horizontal === 'r' ? canvas.width - margin : canvas.width / 2
-  const y = vertical === 't' ? margin : vertical === 'b' ? canvas.height - margin : canvas.height / 2
-  ctx.textAlign = horizontal === 'l' ? 'left' : horizontal === 'r' ? 'right' : 'center'
-  ctx.textBaseline = vertical === 't' ? 'top' : vertical === 'b' ? 'bottom' : 'middle'
-  ctx.globalAlpha = Math.max(0.1, Math.min(opacity / 100, 1))
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = Math.max(2, fontSize * 0.09)
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'
-  ctx.fillStyle = '#ffffff'
-  ctx.strokeText(text, x, y)
-  ctx.fillText(text, x, y)
-  ctx.restore()
-
-  updateOriginalFromCanvas()
+  Object.assign(layer, getTextLayerPosition(layer, position))
+  textLayers.value.push(layer)
+  selectedTextId.value = layer.id
   saveToHistory()
-  ElMessage.success(watermark ? '水印已添加' : '文字已添加')
+  ElMessage.success(watermark ? '水印已添加，可继续调整样式' : '文字已添加，可继续调整样式')
 }
 
-const addTextToCanvas = ({ text }) => {
-  drawCanvasText({ text, position: 'mc' })
+const addTextToCanvas = payload => addTextLayer({ ...payload, opacity: 100 })
+const addWatermarkToCanvas = payload => addTextLayer({ ...payload, watermark: true })
+
+const updateSelectedTextLayer = (patch) => {
+  const layer = textLayers.value.find(item => item.id === selectedTextId.value)
+  const canvas = canvasAreaRef.value?.canvas
+  if (!layer || !canvas) return
+
+  if (patch.fontScale !== undefined) {
+    layer.fontScale = clamp(Number(patch.fontScale), 2, 30)
+    layer.fontSize = Math.max(12, Math.round(Math.min(canvas.width, canvas.height) * layer.fontScale / 100))
+  }
+  if (patch.color !== undefined) layer.color = patch.color || '#ffffff'
+  if (patch.strokeEnabled !== undefined) layer.strokeEnabled = Boolean(patch.strokeEnabled)
+  if (patch.strokeColor !== undefined) layer.strokeColor = patch.strokeColor || '#000000'
+  if (patch.opacity !== undefined && layer.watermark) layer.opacity = clamp(Number(patch.opacity), 0.1, 1)
+  if (patch.position !== undefined) layer.position = patch.position
+
+  if (layer.position) Object.assign(layer, getTextLayerPosition(layer, layer.position))
+  layer.x = clamp(layer.x, 0, canvas.width)
+  layer.y = clamp(layer.y, 0, canvas.height)
+  hasUnsavedChanges.value = true
 }
 
-const addWatermarkToCanvas = ({ text, opacity, position }) => {
-  drawCanvasText({ text, opacity, position, watermark: true })
+const commitSelectedTextLayer = () => {
+  if (!selectedTextId.value) return
+  saveToHistory()
 }
+
+const moveTextLayer = ({ id, x, y }) => {
+  const layer = textLayers.value.find(item => item.id === id)
+  const canvas = canvasAreaRef.value?.canvas
+  if (!layer || !canvas) return
+  layer.x = clamp(x, 0, canvas.width)
+  layer.y = clamp(y, 0, canvas.height)
+  layer.position = null
+  hasUnsavedChanges.value = true
+}
+
+const commitTextLayerMove = (id) => {
+  if (!textLayers.value.some(layer => layer.id === id)) return
+  saveToHistory()
+}
+
+const deleteTextLayer = (id = selectedTextId.value) => {
+  const index = textLayers.value.findIndex(layer => layer.id === id)
+  if (index < 0) return
+  textLayers.value.splice(index, 1)
+  selectedTextId.value = null
+  saveToHistory()
+  ElMessage.success('文字已删除')
+}
+
+const handleTextLayerKeydown = (event) => {
+  const target = event.target
+  if (['INPUT', 'TEXTAREA'].includes(target?.tagName) || target?.isContentEditable) return
+  if ((event.key === 'Delete' || event.key === 'Backspace') && selectedTextId.value) {
+    event.preventDefault()
+    deleteTextLayer()
+  }
+}
+
 const applyPixelate = () => {
   const canvas = canvasAreaRef.value?.canvas
   const renderedCanvas = buildRenderedCanvas()
@@ -640,6 +746,8 @@ const applyPixelate = () => {
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(pixelCanvas, 0, 0, canvas.width, canvas.height)
   ctx.imageSmoothingEnabled = true
+  textLayers.value = []
+  selectedTextId.value = null
 
   resetAdjustments()
   updateOriginalFromCanvas()
@@ -779,6 +887,8 @@ const redo = () => {
 const restoreHistory = (state) => {
   currentFilter.value = state.filter
   Object.assign(adjustments, state.adjustments)
+  textLayers.value = (state.textLayers || []).map(layer => ({ ...layer }))
+  selectedTextId.value = null
 
   const canvas = canvasAreaRef.value?.canvas
   if (!canvas) return
@@ -803,7 +913,8 @@ const resetImage = () => {
   const state = {
     imageData: baseImageDataUrl.value || currentImage.value?.url,
     filter: 'none',
-    adjustments: { ...adjustments }
+    adjustments: { ...adjustments },
+    textLayers: []
   }
 
   if (!state.imageData) return
@@ -826,6 +937,7 @@ const createDraftPayload = () => {
     imageData: canvas.toDataURL('image/png'),
     filter: currentFilter.value,
     adjustments: { ...adjustments },
+    textLayers: textLayers.value.map(layer => ({ ...layer })),
     pixelSize: pixelSize.value,
     colorCount: colorCount.value
   }
@@ -881,6 +993,8 @@ const restoreStoredDraft = async (draft) => {
   })
   pixelSize.value = Number(draft.pixelSize) || 8
   colorCount.value = Number(draft.colorCount) || 32
+  textLayers.value = (draft.textLayers || []).map(layer => ({ ...layer }))
+  selectedTextId.value = null
   hasUnsavedChanges.value = false
 }
 
@@ -944,11 +1058,13 @@ onMounted(async () => {
     await offerDraftRestore()
   }
   window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('keydown', handleTextLayerKeydown)
 })
 
 onUnmounted(() => {
   emit('workbench-editing-change', false)
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('keydown', handleTextLayerKeydown)
 })
 // ========== 导出保存 ==========
 const createEditedImageFile = async () => {
@@ -967,22 +1083,15 @@ const createEditedImageFile = async () => {
 const getUploadedImageId = (res) => res?.id || res?.data?.id
 const filenameWithoutExt = (name = '') => name.replace(/\.[^.]+$/, '')
 
-const saveToGallery = async () => {
-  try {
-    const file = await createEditedImageFile()
-    if (!file) return false
-
-    await uploadImage(file)
-    hasUnsavedChanges.value = false
-    clearStoredDraft()
-    ElMessage.success('已保存到个人中心')
-    return true
-  } catch (error) {
-    console.error('保存失败:', error)
-    ElMessage.error('保存失败')
-    return false
-  }
+const openArtworkDialog = (mode) => {
+  artworkDialogMode.value = mode
+  publishForm.title = filenameWithoutExt(currentImage.value?.name || '未命名作品')
+  publishForm.tags = []
+  publishForm.description = ''
+  publishDialogVisible.value = true
 }
+
+const saveToGallery = () => openArtworkDialog('gallery')
 
 const downloadImage = () => {
   exportDialogVisible.value = true
@@ -1004,14 +1113,9 @@ const confirmExport = () => {
   ElMessage.success('下载成功')
 }
 
-const openPublishDialog = () => {
-  publishForm.title = filenameWithoutExt(currentImage.value?.name || '未命名作品')
-  publishForm.tags = []
-  publishForm.description = ''
-  publishDialogVisible.value = true
-}
+const openPublishDialog = () => openArtworkDialog('community')
 
-const publishToCommunity = async () => {
+const submitArtwork = async () => {
   if (!publishForm.title.trim()) {
     ElMessage.warning('请先填写作品标题')
     return
@@ -1025,7 +1129,7 @@ const publishToCommunity = async () => {
     const res = await uploadImage(file)
     const imageId = getUploadedImageId(res)
     if (!imageId) {
-      ElMessage.warning('图片已上传，但未拿到作品ID，无法自动发布到社区')
+      ElMessage.warning('图片已上传，但未拿到作品ID，无法保存作品信息')
       return
     }
 
@@ -1035,14 +1139,16 @@ const publishToCommunity = async () => {
       tags: tags.join(','),
       description: publishForm.description.trim()
     })
-    await updateImageVisibility(imageId, true)
+    if (artworkDialogMode.value === 'community') {
+      await updateImageVisibility(imageId, true)
+    }
     hasUnsavedChanges.value = false
     clearStoredDraft()
     publishDialogVisible.value = false
-    ElMessage.success('已发布到社区')
+    ElMessage.success(artworkDialogMode.value === 'gallery' ? '已保存到个人中心' : '已发布到社区')
   } catch (error) {
-    console.error('发布到社区失败:', error)
-    ElMessage.error('发布到社区失败')
+    console.error('保存作品失败:', error)
+    ElMessage.error(artworkDialogMode.value === 'gallery' ? '保存失败' : '发布到社区失败')
   } finally {
     publishing.value = false
   }
