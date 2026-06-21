@@ -319,7 +319,7 @@ const popularTags = computed(() => {
   const source = publicTags.value.trendingTags.length
     ? publicTags.value.trendingTags
     : (publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags)
-        .map(name => ({ name, usageCount: 0 }))
+      .map(name => ({ name, usageCount: 0 }))
   return source.slice(0, 5)
     .map((tag, i) => ({
       name: tag.name,
@@ -774,6 +774,12 @@ onBeforeUnmount(stopHeroRotation)
   gap: var(--space-8);
 }
 
+.feed-column {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .section-heading,
 .rail-title {
   display: flex;
@@ -819,13 +825,17 @@ onBeforeUnmount(stopHeroRotation)
 }
 
 .feed-tabs {
+  width: 100%;
+  max-width: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2);
   margin-bottom: var(--space-5);
+  overflow: hidden;
 }
 
 .feed-tabs button {
+  flex: 0 0 auto;
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;

@@ -504,7 +504,7 @@ const shapeMenuVisible = ref(false)
 const aiDialogVisible = ref(false)
 const aiMode = ref('refine')
 const aiPrompt = ref('')
-const aiModel = ref('qwen-plus')
+const aiModel = ref('qwen-vl-plus')
 const aiFileList = ref([])
 const aiPreviewUrl = ref('')
 const aiResultUrl = ref('')
@@ -564,8 +564,8 @@ const aiModeOptions = [
 
 const aiModelGroups = {
   refine: [
-    { label: 'Qwen Plus - 润色建议', value: 'qwen-plus' },
-    { label: 'Qwen Max - 润色建议', value: 'qwen-max' }
+    { label: 'Qwen VL Plus - 润色建议（视觉）', value: 'qwen-vl-plus' },
+    { label: 'Qwen VL Max - 润色建议（视觉）', value: 'qwen-vl-max' }
   ],
   draw: [
     { label: 'Qwen Image Edit - 结果图', value: 'qwen-image-edit' }
@@ -1640,7 +1640,7 @@ const ensureAiModelForMode = () => {
     return
   }
 
-  aiModel.value = activeAiModels.value[0]?.value || 'qwen-plus'
+  aiModel.value = activeAiModels.value[0]?.value || 'qwen-vl-plus'
 }
 
 const handleAiModeChange = () => {
@@ -1714,7 +1714,7 @@ const runAiRefine = async () => {
       attachments
     })
 
-    aiResultUrl.value = result.imageUrl || ''
+    aiResultUrl.value = normalizeUploadedAssetUrl(result.imageUrl || '')
     aiResultText.value = result.text || ''
     aiResultNotice.value = result.notice || ''
     ElMessage.success(aiMode.value === 'draw' ? 'AI 创作完成' : 'AI 润色完成')
@@ -1744,6 +1744,22 @@ const useAiTextAsPrompt = () => {
     ? `已提取提示词，并自动裁剪到 ${AI_PROMPT_LIMIT} 字${suffix}`
     : `已提取提示词到要求${suffix}`
   )
+}
+
+const normalizeUploadedAssetUrl = (src) => {
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src
+
+  try {
+    const assetUrl = new URL(src, window.location.origin)
+    const apiUrl = new URL(import.meta.env.VITE_API_BASE_URL || window.location.origin, window.location.origin)
+    if (assetUrl.origin === apiUrl.origin && assetUrl.pathname.startsWith('/uploads/')) {
+      return `${assetUrl.pathname}${assetUrl.search}${assetUrl.hash}`
+    }
+  } catch (error) {
+    console.warn('[Draw] Invalid AI result URL:', src, error)
+  }
+
+  return src
 }
 
 const loadImageElement = (src) => {
@@ -1883,7 +1899,7 @@ const applyAiResult = async () => {
     const normalizedUrl = await normalizeAiResultToCanvas(aiResultUrl.value)
     const image = await FabricImage.fromURL(
       normalizedUrl,
-      { crossOrigin: 'anonymous' },
+      {},
       {
         left: 0,
         top: 0,
@@ -1912,7 +1928,7 @@ const applyAiResult = async () => {
     ElMessage.success('已应用到画布')
   } catch (error) {
     console.error('[Draw] Apply AI result failed:', error)
-    ElMessage.error('应用 AI 结果失败')
+    ElMessage.error(`应用 AI 结果失败：${error?.message || '图片加载异常'}`)
   }
 }
 

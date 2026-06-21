@@ -75,7 +75,7 @@
 
     <!-- 无限滚动哨兵 -->
     <div
-      v-if="hasMore"
+      v-show="hasMore"
       ref="scrollSentinel"
       class="scroll-sentinel"
     >
@@ -364,7 +364,7 @@ const loadWorks = async (reset = false) => {
       keyword: keyword.value,
       sortBy: sortBy.value
     })
-    const usersRequest = reset && keyword.value.trim()
+    const usersRequest = reset && keyword.value.trim() && !activeTag.value
       ? getPublicUsers({ keyword: keyword.value, limit: 10 })
       : Promise.resolve({ list: [] })
     const [res, userRes] = await Promise.all([imagesRequest, usersRequest])
@@ -376,10 +376,14 @@ const loadWorks = async (reset = false) => {
   } finally {
     loading.value = false
     loadingMore.value = false
+    nextTick(checkScrollSentinel)
   }
 }
 
-const handleSearch = () => loadWorks(true)
+const handleSearch = () => {
+  activeTag.value = ''
+  loadWorks(true)
+}
 
 const changeSort = (sort) => {
   sortBy.value = sort
@@ -619,18 +623,28 @@ const setupInfiniteScroll = () => {
   nextTick(() => {
     if (!scrollSentinel.value) return
     scrollObserver = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore.value && !loadingMore.value && !loading.value) {
-        page.value++
-        loadWorks()
-      }
+      if (entries[0].isIntersecting) loadNextPage()
     }, { rootMargin: '200px' })
     scrollObserver.observe(scrollSentinel.value)
   })
 }
 
+const loadNextPage = () => {
+  if (!hasMore.value || loadingMore.value || loading.value) return
+  page.value++
+  loadWorks()
+}
+
+const checkScrollSentinel = () => {
+  const sentinel = scrollSentinel.value
+  if (!sentinel || !hasMore.value) return
+  if (sentinel.getBoundingClientRect().top <= window.innerHeight + 200) loadNextPage()
+}
+
 watch(
   () => route.query.keyword,
   (value) => {
+    activeTag.value = ''
     keyword.value = value ? String(value) : ''
     loadWorks(true)
   }
@@ -653,6 +667,7 @@ onMounted(async () => {
   ])
   publicTags.value = tagsRes
   setupInfiniteScroll()
+  window.addEventListener('scroll', checkScrollSentinel, { passive: true })
   if (route.query.id) {
     openDetail({ id: route.query.id })
   }
@@ -660,6 +675,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   scrollObserver?.disconnect()
+  window.removeEventListener('scroll', checkScrollSentinel)
 })
 </script>
 
