@@ -208,7 +208,7 @@
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column label="预览" width="100">
             <template #default="{ row }">
-              <img :src="row.url" class="image-thumb" />
+              <img :src="cardImageUrl(row)" class="image-thumb" />
             </template>
           </el-table-column>
           <el-table-column label="作品名称" min-width="150">
@@ -351,7 +351,7 @@
           <el-table-column label="作品" min-width="220">
             <template #default="{ row }">
               <div class="report-work">
-                <img :src="row.url" class="image-thumb" />
+                <img :src="cardImageUrl(row)" class="image-thumb" />
                 <div>
                   <strong>{{ row.title || row.original_name || '未命名' }}</strong>
                   <span>作者：{{ row.author_name || '匿名' }}</span>
@@ -435,6 +435,7 @@ import { User, Picture, View, Star, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import { getUsers, updateUserStatus, updateUserRole, getImages, deleteImage, getStats, banUser, banImage, getAlbums, banAlbum, deleteAlbum, getReports, updateReportStatus, banReportedImage } from '@/api/admin'
+import { cardImageUrl } from '@/utils/media'
 
 const userStore = useUserStore()
 const activeTab = ref('stats')

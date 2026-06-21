@@ -30,7 +30,7 @@ public final class ImageVariantUtil {
   }
 
   public static boolean supports(String variant) {
-    return SPECS.containsKey(variant);
+    return variant != null && SPECS.containsKey(variant);
   }
 
   public static String withVariant(String url, String variant) {

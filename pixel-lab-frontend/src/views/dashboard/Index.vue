@@ -29,7 +29,7 @@
             class="hero-preview"
             @click="openWork(currentHeroWork)"
           >
-            <img :src="currentHeroWork.url" :alt="workTitle(currentHeroWork)">
+            <img :src="cardImageUrl(currentHeroWork)" :alt="workTitle(currentHeroWork)">
             <span v-if="primaryTag(currentHeroWork)" class="hero-preview-tag">#{{ primaryTag(currentHeroWork) }}</span>
             <span class="hero-preview-title">{{ workTitle(currentHeroWork) }}</span>
           </button>
@@ -200,6 +200,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import StableMasonry from '@/components/community/StableMasonry.vue'
 import { getUserStats } from '@/api/auth'
 import { getActivities, getPublicImages, getPublicTags } from '@/api/community'
+import { cardImageUrl } from '@/utils/media'
 
 const router = useRouter()
 const { t } = useI18n()
