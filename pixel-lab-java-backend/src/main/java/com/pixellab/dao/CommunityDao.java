@@ -32,8 +32,9 @@ public class CommunityDao {
     List<Object> params = new ArrayList<>();
     StringBuilder where = new StringBuilder(" WHERE i.is_public = 1 AND i.status = 1 ");
     if (keyword != null && !keyword.isBlank()) {
-      where.append(" AND (i.title LIKE ? OR i.tags LIKE ? OR u.nickname LIKE ?) ");
+      where.append(" AND (i.title LIKE ? OR i.original_name LIKE ? OR i.filename LIKE ? OR i.tags LIKE ?) ");
       String like = "%" + keyword.trim() + "%";
+      params.add(like);
       params.add(like);
       params.add(like);
       params.add(like);
@@ -57,6 +58,24 @@ public class CommunityDao {
       List<Map<String, Object>> rows = query(conn, sql, pageParams);
       addUserState(conn, rows, userId);
       return pageResult(rows, total, page, pageSize);
+    }
+  }
+
+  public List<Map<String, Object>> publicUsers(String keyword, int limit) throws Exception {
+    if (keyword == null || keyword.isBlank()) {
+      return List.of();
+    }
+    int safeLimit = Math.max(1, Math.min(limit, 20));
+    String trimmedKeyword = keyword.trim();
+    String like = "%" + trimmedKeyword + "%";
+    try (Connection conn = dataSource.getConnection()) {
+      return query(conn,
+          "SELECT u.id, u.username, u.nickname, u.avatar, COUNT(i.id) AS work_count "
+              + "FROM `user` u LEFT JOIN image i ON i.user_id = u.id AND i.is_public = 1 AND i.status = 1 "
+              + "WHERE u.status = 1 AND u.is_deleted = 0 AND (u.username LIKE ? OR u.nickname LIKE ?) "
+              + "GROUP BY u.id, u.username, u.nickname, u.avatar "
+              + "ORDER BY CASE WHEN u.username = ? OR u.nickname = ? THEN 0 ELSE 1 END, u.nickname, u.username LIMIT ?",
+          List.of(like, like, trimmedKeyword, trimmedKeyword, safeLimit));
     }
   }
 
@@ -422,6 +441,16 @@ public class CommunityDao {
           List.of(profileUserId, safePageSize, offset));
       addUserState(conn, works, viewerId);
 
+      List<Map<String, Object>> albums = query(conn,
+          "SELECT a.id, a.title, a.description, a.cover_image_id, a.created_at, a.updated_at, "
+              + "cover.url AS cover_url, cover.thumbnail_url AS cover_thumbnail_url, "
+              + "(SELECT COUNT(*) FROM album_images ai JOIN image album_image ON ai.image_id = album_image.id "
+              + "WHERE ai.album_id = a.id AND album_image.status = 1) AS image_count "
+              + "FROM albums a LEFT JOIN image cover ON a.cover_image_id = cover.id "
+              + "WHERE a.user_id = ? AND a.is_public = 1 AND a.status = 1 "
+              + "ORDER BY a.updated_at DESC",
+          List.of(profileUserId));
+
       Map<String, Object> stats = new LinkedHashMap<>();
       stats.put("works", workCount);
       stats.put("likes", likeCount);
@@ -436,6 +465,7 @@ public class CommunityDao {
           && exists(conn, "SELECT id FROM follows WHERE follower_id = ? AND followed_id = ?",
               List.of(viewerId, profileUserId)));
       result.put("works", pageResult(works, workCount, safePage, safePageSize));
+      result.put("albums", albums);
       return result;
     }
   }
@@ -447,9 +477,9 @@ public class CommunityDao {
       row.put("isCollected", userId != null && exists(conn, "SELECT id FROM collections WHERE user_id = ? AND image_id = ?", List.of(userId, imageId)));
     }
   }
-
   private Map<String, Object> pageResult(List<Map<String, Object>> rows, long total, int page, int pageSize) {
     Map<String, Object> result = new LinkedHashMap<>();
+
     result.put("list", rows);
     result.put("total", total);
     result.put("page", page);

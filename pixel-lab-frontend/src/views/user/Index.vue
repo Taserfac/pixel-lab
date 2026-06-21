@@ -35,6 +35,29 @@
       </div>
     </section>
 
+    <section v-if="profile && albums.length" class="albums-section">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">PUBLIC ALBUMS</span>
+          <h2>公开作品集</h2>
+        </div>
+        <span>{{ albums.length }} 个作品集</span>
+      </div>
+      <div class="album-grid">
+        <button v-for="album in albums" :key="album.id" type="button" class="album-card" @click="openAlbum(album)">
+          <span class="album-cover">
+            <img v-if="album.cover_thumbnail_url || album.cover_url" :src="album.cover_thumbnail_url || album.cover_url" :alt="album.title">
+            <span v-else class="album-cover-placeholder">作品集</span>
+            <small>{{ album.image_count || 0 }} 张</small>
+          </span>
+          <span class="album-copy">
+            <strong>{{ album.title }}</strong>
+            <span v-if="album.description">{{ album.description }}</span>
+          </span>
+        </button>
+      </div>
+    </section>
+
     <section v-if="profile" class="works-section">
       <div class="section-heading">
         <div>
@@ -61,6 +84,27 @@
       />
     </section>
 
+    <el-dialog v-model="albumDialogVisible" :title="selectedAlbum?.title || '作品集'" width="min(900px, 92vw)">
+      <div v-loading="albumLoading" class="album-dialog-content">
+        <p v-if="selectedAlbum?.description" class="album-dialog-description">{{ selectedAlbum.description }}</p>
+        <div v-if="selectedAlbum?.images?.length" class="album-image-grid">
+          <figure v-for="image in selectedAlbum.images" :key="image.id" class="album-image-item">
+            <img :src="cardImageUrl(image)" :alt="imageDisplayTitle(image)" loading="lazy" decoding="async">
+            <figcaption>
+              <strong>{{ imageDisplayTitle(image) }}</strong>
+              <span v-if="image.album_description">{{ image.album_description }}</span>
+            </figcaption>
+          </figure>
+        </div>
+        <EmptyState
+          v-else-if="!albumLoading"
+          title="作品集为空"
+          description="这个作品集暂时还没有图片。"
+          :show-action="false"
+        />
+      </div>
+    </el-dialog>
+
     <EmptyState
       v-if="!loading && !profile"
       title="用户不存在"
@@ -81,6 +125,9 @@ import StableMasonry from '@/components/community/StableMasonry.vue'
 import { getUserProfile } from '@/api/community'
 import { followUser, unfollowUser } from '@/api/social'
 import { useUserStore } from '@/store/user'
+import { getAlbumDetail } from '@/api/album'
+import { cardImageUrl } from '@/utils/media'
+import { imageDisplayTitle } from '@/utils/common'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,6 +139,10 @@ const profile = ref(null)
 const stats = ref({})
 const works = ref([])
 const isFollowing = ref(false)
+const albums = ref([])
+const selectedAlbum = ref(null)
+const albumDialogVisible = ref(false)
+const albumLoading = ref(false)
 
 const displayName = computed(() => profile.value?.nickname || profile.value?.username || '创作者')
 const isSelf = computed(() => Number(profile.value?.id) === Number(userStore.userInfo?.id))
@@ -112,11 +163,13 @@ const loadProfile = async () => {
   loading.value = true
   profile.value = null
   works.value = []
+  albums.value = []
   try {
     const result = await getUserProfile(route.params.id, { page: 1, pageSize: 40 })
     profile.value = result.user
     stats.value = result.stats || {}
     works.value = result.works?.list || []
+    albums.value = result.albums || []
     isFollowing.value = Boolean(result.isFollowing)
   } catch (error) {
     console.error('加载创作者主页失败:', error)
@@ -136,6 +189,20 @@ const toggleFollow = async () => {
     ElMessage.success(result.following ? '关注成功' : '已取消关注')
   } finally {
     followLoading.value = false
+  }
+}
+const openAlbum = async (album) => {
+  albumDialogVisible.value = true
+  albumLoading.value = true
+  selectedAlbum.value = null
+  try {
+    selectedAlbum.value = await getAlbumDetail(album.id)
+  } catch (error) {
+    console.error('加载作品集失败:', error)
+    albumDialogVisible.value = false
+    ElMessage.error('作品集加载失败')
+  } finally {
+    albumLoading.value = false
   }
 }
 
@@ -200,6 +267,101 @@ watch(() => route.params.id, loadProfile, { immediate: true })
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: var(--space-5); }
 .section-heading h2 { margin: 5px 0 0; color: var(--foreground); font-size: 26px; }
 .section-heading > span { color: var(--foreground-muted); font-size: 13px; }
+
+.albums-section { margin-top: var(--space-8); }
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-4);
+}
+
+.album-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.album-card:hover,
+.album-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+
+.album-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--background-muted);
+}
+
+.album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-cover-placeholder {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  color: var(--foreground-muted);
+}
+
+.album-cover small {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(20, 26, 23, 0.72);
+  color: #fff;
+  padding: 4px 9px;
+}
+
+.album-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-4);
+}
+
+.album-copy strong { color: var(--foreground); }
+
+.album-copy > span,
+.album-dialog-description,
+.album-image-item figcaption span { color: var(--foreground-muted); }
+
+.album-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.album-image-item { margin: 0; }
+
+.album-image-item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius);
+  object-fit: cover;
+}
+
+.album-image-item figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-2);
+}
+
 @media (max-width: 980px) {
   .stats-grid { grid-template-columns: repeat(3, 1fr); }
 }

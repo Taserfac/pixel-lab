@@ -61,9 +61,9 @@
       <div v-if="hotWorks.length > 0" class="works-list">
         <div v-for="(work, index) in hotWorks" :key="work.id" class="work-item">
           <span class="rank" :class="{ top: index < 3 }">{{ index + 1 }}</span>
-          <img :src="work.url" :alt="work.title || work.original_name" class="work-thumb" />
+          <img :src="work.url" :alt="imageDisplayTitle(work)" class="work-thumb" />
           <div class="work-info">
-            <span class="work-title">{{ work.title || work.original_name || '未命名' }}</span>
+            <span class="work-title">{{ imageDisplayTitle(work, '未命名') }}</span>
             <span class="work-date">{{ formatDate(work.created_at) }}</span>
           </div>
           <div class="work-stats">
@@ -83,6 +83,7 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Picture, View, Star, FolderOpened } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getUserStats } from '@/api/auth'
+import { imageDisplayTitle } from '@/utils/common'
 
 const dateRange = ref('7')
 const stats = ref({ works: 0, views: 0, likes: 0, collects: 0 })

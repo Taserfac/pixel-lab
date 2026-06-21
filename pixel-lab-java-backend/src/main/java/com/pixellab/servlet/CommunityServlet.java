@@ -34,6 +34,12 @@ public class CommunityServlet extends BaseApiServlet {
         ok(response, dao.publicTags(RequestUtil.intParam(request, "limit", 20)));
         return;
       }
+      if (segments.size() == 1 && "users".equals(segments.get(0))) {
+        ok(response, Map.of("list", dao.publicUsers(
+            request.getParameter("keyword"),
+            RequestUtil.intParam(request, "limit", 10))));
+        return;
+      }
 
       if (segments.size() == 2 && "images".equals(segments.get(0))) {
         SessionUser user = currentUser(request);

@@ -91,10 +91,12 @@ export default {
 
   // 社区相关
   community: {
-    searchPlaceholder: '搜索作品、标签...',
+    searchPlaceholder: '搜索作品、用户、标签...',
     searchPlaceholderFull: '搜索作品、作者、标签',
     latest: '最新',
     hottest: '最热',
+    userResults: '\u7528\u6237',
+    worksCount: '{count} \u4e2a\u516c\u5f00\u4f5c\u54c1',
     all: '全部',
     recommended: '推荐',
     following: '关注',

@@ -78,6 +78,7 @@
 import { computed } from 'vue'
 import { ChatDotRound, CollectionTag, Picture, Star } from '@element-plus/icons-vue'
 import { avatarImageUrl, cardImageUrl } from '@/utils/media'
+import { stripFileExtension } from '@/utils/common'
 
 const props = defineProps({
   work: {
@@ -90,9 +91,7 @@ const emit = defineEmits(['select', 'tag-click', 'author-select'])
 
 const title = computed(() => (
   props.work.title ||
-  props.work.original_name ||
-  props.work.filename ||
-  props.work.name ||
+  stripFileExtension(props.work.original_name || props.work.filename || props.work.name) ||
   '未命名作品'
 ))
 

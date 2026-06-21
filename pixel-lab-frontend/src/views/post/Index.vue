@@ -248,6 +248,7 @@ import {
 import EmptyState from '@/components/common/EmptyState.vue'
 import { addComment, deleteComment, getComments, getImageDetail, reportImage, toggleCollect, toggleLike } from '@/api/community'
 import { updateImageMetadata } from '@/api/image'
+import { imageDisplayTitle } from '@/utils/common'
 import { useUserStore } from '@/store/user'
 
 const route = useRoute()
@@ -268,7 +269,7 @@ const saving = ref(false)
 const editForm = ref({ title: '', tags: [], description: '' })
 const tagOptions = ['插画', '摄影', '设计', 'UI设计', '概念艺术', '动漫', '像素艺术', 'AI艺术', '人像摄影', '风景', '治愈系']
 
-const postTitle = computed(() => post.value?.title || post.value?.original_name || '未命名作品')
+const postTitle = computed(() => imageDisplayTitle(post.value))
 const isOwner = computed(() => Number(post.value?.user_id) === Number(userStore.userInfo?.id))
 const authorName = computed(() => post.value?.author_name || '匿名创作者')
 const currentUserInitial = computed(() => (

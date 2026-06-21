@@ -296,6 +296,7 @@
                     <el-icon><FolderOpened /></el-icon>
                   </div>
                   <span class="album-count">{{ album.image_count || 0 }} 张</span>
+                  <span class="album-visibility">{{ isPublic(album) ? '公开' : '私密' }}</span>
                   <el-dropdown
                     class="album-menu"
                     trigger="click"
@@ -347,7 +348,7 @@
                   <span v-if="selectedAlbum.cover_image_id === img.id" class="album-cover-badge">封面</span>
                 </div>
                 <div class="album-image-info">
-                  <h4>{{ img.title || img.original_name || '未命名' }}</h4>
+                  <h4>{{ imageTitle(img) }}</h4>
                   <p v-if="albumImageDescription(img)" class="album-image-desc">{{ albumImageDescription(img) }}</p>
                   <button class="desc-edit-btn" type="button" @click.stop="openAlbumImageDescEdit(img)">
                     <el-icon><Edit /></el-icon>
@@ -475,6 +476,10 @@
             maxlength="200"
           />
         </el-form-item>
+        <el-form-item label="可见范围">
+          <el-switch v-model="newAlbum.isPublic" active-text="公开到创作者主页" inactive-text="仅自己可见" />
+          <p class="visibility-hint">公开作品集只展示在你的创作者主页，不会出现在社区中。</p>
+        </el-form-item>
         <el-form-item label="封面图片">
           <div v-if="newAlbum.coverImage" class="cover-preview">
             <img :src="cardImageUrl(newAlbum.coverImage)" alt="封面预览">
@@ -521,6 +526,10 @@
             placeholder="简要描述这个作品集..."
             maxlength="200"
           />
+        </el-form-item>
+        <el-form-item label="可见范围">
+          <el-switch v-model="editAlbum.isPublic" active-text="公开到创作者主页" inactive-text="仅自己可见" />
+          <p class="visibility-hint">公开作品集只展示在你的创作者主页，不会出现在社区中。</p>
         </el-form-item>
         <el-form-item label="封面图片">
           <div v-if="editAlbum.coverImage" class="cover-preview">
@@ -632,6 +641,7 @@ import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateI
 import { getFollowingCreators, getPublicImages, getUserCollections, getUserLikes } from '@/api/community'
 import { unfollowUser } from '@/api/social'
 import { cardImageUrl } from '@/utils/media'
+import { imageDisplayTitle } from '@/utils/common'
 import {
   createAlbum,
   getAlbums,
@@ -655,7 +665,7 @@ const ContentFeed = defineComponent({
   },
   emits: ['item-click', 'empty-action'],
   setup(props, { emit }) {
-    const title = (item) => item.title || item.original_name || item.filename || '未命名作品'
+    const title = (item) => imageDisplayTitle(item)
     const format = (value) => Number(value || 0).toLocaleString('zh-CN')
     return () => h('div', { class: 'feed-shell compact-feed', directives: [] }, [
       props.items.length
@@ -743,14 +753,16 @@ const albumEditSaving = ref(false)
 const newAlbum = ref({
   title: '',
   description: '',
-  coverImage: null
+  coverImage: null,
+  isPublic: false
 })
 const editAlbum = ref({
   id: null,
   title: '',
   description: '',
   coverImage: null,
-  coverImageId: null
+  coverImageId: null,
+  isPublic: false
 })
 
 // Album image description editing
@@ -786,7 +798,7 @@ const formatNumber = (value) => {
   return String(num)
 }
 
-const imageTitle = (image = {}) => image.title || image.original_name || image.filename || '未命名作品'
+const imageTitle = (image = {}) => imageDisplayTitle(image)
 
 const isPublic = (image = {}) => image.is_public === true || image.is_public === 1 || image.is_public === '1'
 
@@ -799,7 +811,8 @@ const albumImageDescription = (image = {}) => image.album_description || ''
 const albumPayload = (form = {}) => ({
   title: form.title.trim(),
   description: form.description?.trim() || '',
-  coverImageId: form.coverImage?.id ?? form.coverImageId ?? null
+  coverImageId: form.coverImage?.id ?? form.coverImageId ?? null,
+  isPublic: Boolean(form.isPublic)
 })
 
 const normalizeStats = (stats = {}) => ({
@@ -1161,7 +1174,7 @@ const handleCreateAlbum = async () => {
     await fetchAlbums()
     ElMessage.success('作品集创建成功')
     showCreateAlbumDialog.value = false
-    newAlbum.value = { title: '', description: '', coverImage: null }
+    newAlbum.value = { title: '', description: '', coverImage: null, isPublic: false }
   } catch (error) {
     console.error('创建作品集失败:', error)
     ElMessage.error('创建失败')
@@ -1177,7 +1190,8 @@ const openAlbumEdit = (album = selectedAlbum.value) => {
     title: album.title || '',
     description: album.description || '',
     coverImage: null,
-    coverImageId: album.cover_image_id || null
+    coverImageId: album.cover_image_id || null,
+    isPublic: isPublic(album)
   }
   showEditAlbumDialog.value = true
 }
@@ -2202,6 +2216,23 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.65);
   color: #fff;
   padding: 4px 10px;
+  font-size: 12px;
+}
+
+.album-visibility {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(20, 26, 23, 0.72);
+  color: #fff;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+.visibility-hint {
+  margin: var(--space-2) 0 0;
+  color: var(--foreground-muted);
   font-size: 12px;
 }
 

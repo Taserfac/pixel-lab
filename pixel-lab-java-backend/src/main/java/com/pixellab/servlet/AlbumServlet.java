@@ -39,6 +39,13 @@ public class AlbumServlet extends BaseApiServlet {
           Result.notFound(response, "作品集不存在");
           return;
         }
+        SessionUser viewer = currentUser(request);
+        boolean isOwner = viewer != null && ((Number) album.get("user_id")).longValue() == viewer.getId();
+        boolean isPublic = RequestUtil.boolValue(album.get("is_public"), false);
+        if (!isOwner && !isPublic) {
+          Result.notFound(response, "作品集不存在");
+          return;
+        }
         List<Map<String, Object>> images = dao.getAlbumImages(albumId);
         album.put("images", images);
         ok(response, album);
@@ -48,6 +55,18 @@ public class AlbumServlet extends BaseApiServlet {
       if (segments.size() == 2 && "images".equals(segments.get(1))) {
         long albumId = parseId(segments.get(0));
         if (albumId <= 0) {
+          Result.notFound(response, "作品集不存在");
+          return;
+        }
+        Map<String, Object> album = dao.getAlbum(albumId);
+        if (album == null) {
+          Result.notFound(response, "作品集不存在");
+          return;
+        }
+        SessionUser viewer = currentUser(request);
+        boolean isOwner = viewer != null && ((Number) album.get("user_id")).longValue() == viewer.getId();
+        boolean isPublic = RequestUtil.boolValue(album.get("is_public"), false);
+        if (!isOwner && !isPublic) {
           Result.notFound(response, "作品集不存在");
           return;
         }
@@ -81,7 +100,8 @@ public class AlbumServlet extends BaseApiServlet {
         }
         String description = RequestUtil.string(body, "description");
         Long coverImageId = optionalLong(body, "coverImageId", "cover_image_id");
-        long albumId = dao.createAlbum(user.getId(), title, description, coverImageId);
+        boolean isPublic = RequestUtil.boolValue(body.get("isPublic"), false);
+        long albumId = dao.createAlbum(user.getId(), title, description, coverImageId, isPublic);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", albumId);
         Result.write(response, HttpServletResponse.SC_CREATED, 201, "创建成功", data);
@@ -193,7 +213,8 @@ public class AlbumServlet extends BaseApiServlet {
         }
         String description = RequestUtil.string(body, "description");
         Long coverImageId = optionalLong(body, "coverImageId", "cover_image_id");
-        boolean updated = dao.updateAlbum(albumId, user.getId(), title, description, coverImageId);
+        boolean isPublic = RequestUtil.boolValue(body.get("isPublic"), false);
+        boolean updated = dao.updateAlbum(albumId, user.getId(), title, description, coverImageId, isPublic);
         if (!updated) {
           Result.notFound(response, "作品集不存在或无权修改");
           return;

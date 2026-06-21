@@ -91,10 +91,12 @@ export default {
 
   // Community
   community: {
-    searchPlaceholder: 'Search works, tags...',
+    searchPlaceholder: 'Search works, users, tags...',
     searchPlaceholderFull: 'Search works, authors, tags',
     latest: 'Latest',
     hottest: 'Popular',
+    userResults: 'Users',
+    worksCount: '{count} public works',
     all: 'All',
     recommended: 'Recommended',
     following: 'Following',

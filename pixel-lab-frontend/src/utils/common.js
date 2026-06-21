@@ -134,3 +134,18 @@ export const isEmpty = (obj) => {
   if (typeof obj === 'object') return Object.keys(obj).length === 0
   return false
 }
+
+export const stripFileExtension = (filename) => {
+  const value = String(filename || '').trim()
+  const withoutExtension = value.replace(/\.[^./\\]+$/, '')
+  return withoutExtension || value
+}
+
+export const imageDisplayTitle = (image = {}, fallback = '\u672a\u547d\u540d\u4f5c\u54c1') => {
+  const source = image || {}
+  const title = String(source.title || '').trim()
+  if (title) return title
+
+  const generatedTitle = source.original_name || source.filename || source.name
+  return stripFileExtension(generatedTitle) || fallback
+}

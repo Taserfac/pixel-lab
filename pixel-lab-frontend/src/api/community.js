@@ -5,6 +5,10 @@ export function getPublicImages(params, config = {}) {
   return request.get('/api/community/images', { params, ...config })
 }
 
+// Search public users
+export function getPublicUsers(params, config = {}) {
+  return request.get('/api/community/users', { params, ...config })
+}
 // 获取系统标签与达到展示门槛的热门标签
 export function getPublicTags(params = {}, config = {}) {
   return request.get('/api/community/tags', { params, ...config })

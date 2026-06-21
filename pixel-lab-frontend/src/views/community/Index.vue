@@ -39,6 +39,28 @@
         {{ tag === '全部' ? $t('community.all') : `#${tag}` }}
       </button>
     </div>
+    <section v-if="keyword.trim() && users.length" class="user-results">
+      <h2>{{ $t('community.userResults') }}</h2>
+      <div class="user-result-list">
+        <button
+          v-for="user in users"
+          :key="user.id"
+          type="button"
+          class="user-result-card"
+          @click="openUser(user)"
+        >
+          <el-avatar :size="48" :src="avatarImageUrl(user.avatar)">
+            {{ (user.nickname || user.username || '?').charAt(0) }}
+          </el-avatar>
+          <span class="user-result-info">
+            <strong>{{ user.nickname || user.username }}</strong>
+            <span>@{{ user.username }}</span>
+            <small>{{ $t('community.worksCount', { count: user.work_count || 0 }) }}</small>
+          </span>
+        </button>
+      </div>
+    </section>
+
 
     <!-- 作品列表 -->
     <StableMasonry
@@ -66,7 +88,7 @@
 
     <!-- 空状态 -->
     <EmptyState
-      v-if="!loading && works.length === 0"
+      v-if="!loading && works.length === 0 && users.length === 0"
       :title="$t('community.noWorks')"
       :description="$t('community.noWorksDesc')"
     />
@@ -75,7 +97,7 @@
     <!-- 作品详情弹窗 -->
     <el-dialog
       v-model="detailVisible"
-      :title="currentWork?.title || currentWork?.original_name || $t('workDetail.details')"
+      :title="imageDisplayTitle(currentWork, $t('workDetail.details'))"
       width="800px"
       class="detail-dialog"
     >
@@ -284,6 +306,9 @@ import {
   getComments,
   addComment
 } from '@/api/community'
+import { getPublicUsers } from '@/api/community'
+import { imageDisplayTitle } from '@/utils/common'
+import { avatarImageUrl } from '@/utils/media'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
@@ -301,6 +326,7 @@ const pageSize = ref(12)
 const total = ref(0)
 const activeTag = ref('')
 const publicTags = ref({ systemTags: [], trendingTags: [] })
+const users = ref([])
 const tagList = computed(() => {
   const defaults = ['摄影', '插画', 'AI艺术', '设计', '旅行', '像素艺术', '城市', '生活']
   const systemTags = publicTags.value.systemTags.length ? publicTags.value.systemTags : defaults
@@ -332,13 +358,18 @@ const loadWorks = async (reset = false) => {
     loadingMore.value = true
   }
   try {
-    const res = await getPublicImages({
+    const imagesRequest = getPublicImages({
       page: page.value,
       pageSize: pageSize.value,
       keyword: keyword.value,
       sortBy: sortBy.value
     })
+    const usersRequest = reset && keyword.value.trim()
+      ? getPublicUsers({ keyword: keyword.value, limit: 10 })
+      : Promise.resolve({ list: [] })
+    const [res, userRes] = await Promise.all([imagesRequest, usersRequest])
     works.value = reset ? res.list : [...works.value, ...res.list]
+    if (reset) users.value = userRes.list || []
     total.value = res.total
   } catch (error) {
     console.error('加载失败:', error)
@@ -379,6 +410,8 @@ const openCreator = (work) => {
   const id = work.user_id || work.author_id
   if (id) router.push(`/user/${id}`)
 }
+
+const openUser = (user) => router.push(`/user/${user.id}`)
 
 const openDetail = async (work) => {
   detailVisible.value = true
@@ -684,6 +717,60 @@ onUnmounted(() => {
 .tag-filter-chip.active {
   color: var(--primary);
   background: var(--primary-muted);
+}
+.user-results {
+  margin-bottom: var(--space-6);
+}
+
+.user-results h2 {
+  margin: 0 0 var(--space-3);
+  font-size: 16px;
+}
+
+.user-result-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.user-result-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background-card);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.user-result-card:hover,
+.user-result-card:focus-visible {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.user-result-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-result-info strong,
+.user-result-info span,
+.user-result-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-result-info span,
+.user-result-info small {
+  color: var(--foreground-muted);
 }
 
 .works-grid {
