@@ -804,7 +804,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   position: relative;
   isolation: isolate;
-  background: var(--background);
+  background: color-mix(in srgb, var(--background) 94%, transparent);
   color: var(--foreground);
 }
 
@@ -829,8 +829,20 @@ onBeforeUnmount(() => {
   -webkit-backdrop-filter: blur(18px);
 }
 
-[data-theme='dark'] .top-bar {
+:global([data-theme='dark'] .top-bar) {
+  background: rgba(16, 23, 19, 0.86);
   box-shadow: 0 1px 0 var(--border), 0 16px 32px rgba(0, 0, 0, 0.18);
+}
+
+:global([data-theme='dark'] .search-bar .el-input__wrapper) {
+  background: rgba(12, 18, 15, 0.78) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035) !important;
+}
+
+:global([data-theme='dark'] .icon-action),
+:global([data-theme='dark'] .user-avatar) {
+  background: rgba(31, 42, 36, 0.92);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
 }
 
 .brand {
@@ -1342,9 +1354,10 @@ onBeforeUnmount(() => {
   max-width: calc(100vw - var(--space-8));
 }
 
-[data-theme='dark'] .dock-nav {
+:global([data-theme='dark'] .dock-nav) {
   border-color: rgba(255, 255, 255, 0.08);
-  background: rgba(24, 32, 28, 0.72);
+  background: rgba(18, 25, 21, 0.88);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
 }
 
 .dock-item {
@@ -1387,7 +1400,7 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dock-accent) 18%, transparent);
 }
 
-[data-theme='dark'] .dock-item.active {
+:global([data-theme='dark'] .dock-item.active) {
   background: color-mix(in srgb, var(--dock-accent) 16%, transparent);
 }
 

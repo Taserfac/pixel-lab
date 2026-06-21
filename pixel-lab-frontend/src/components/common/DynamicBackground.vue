@@ -233,7 +233,7 @@ watch(() => [props.styleName, props.motion, props.mode], () => {
   contain: layout paint style;
 }
 
-:global([data-theme='dark']) .dynamic-bg {
+:global([data-theme='dark'] .dynamic-bg) {
   --ambient-primary: rgba(25, 212, 142, 0.22);
   --ambient-accent: rgba(151, 117, 255, 0.2);
   --ambient-warm: rgba(255, 180, 84, 0.1);
@@ -266,7 +266,7 @@ watch(() => [props.styleName, props.motion, props.mode], () => {
   transform: translate3d(calc((50% - var(--bg-pointer-x)) * 0.02), calc((50% - var(--bg-pointer-y)) * 0.02), 0);
 }
 
-:global([data-theme='dark']) .ambient-base {
+:global([data-theme='dark'] .ambient-base) {
   background:
     radial-gradient(circle at var(--bg-pointer-x) var(--bg-pointer-y), rgba(25, 212, 142, 0.1), transparent 28vw),
     radial-gradient(circle at 16% 22%, var(--ambient-primary), transparent 32vw),
@@ -308,7 +308,7 @@ watch(() => [props.styleName, props.motion, props.mode], () => {
   mix-blend-mode: multiply;
 }
 
-:global([data-theme='dark']) .ambient-glow {
+:global([data-theme='dark'] .ambient-glow) {
   mix-blend-mode: screen;
   opacity: 0.22;
 }
