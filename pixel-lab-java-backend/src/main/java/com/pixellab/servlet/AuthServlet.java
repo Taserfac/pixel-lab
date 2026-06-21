@@ -7,6 +7,7 @@ import com.pixellab.model.SessionUser;
 import com.pixellab.util.PasswordUtil;
 import com.pixellab.util.RequestUtil;
 import com.pixellab.util.Result;
+import com.pixellab.util.ImageVariantUtil;
 
 import javax.imageio.ImageIO;
 import javax.servlet.ServletException;
@@ -247,7 +248,13 @@ public class AuthServlet extends BaseApiServlet {
       return;
     }
 
-    String avatarUrl = publicBaseUrl(request) + "/uploads/avatars/" + filename;
+    String originalAvatarUrl = publicBaseUrl(request) + "/uploads/avatars/" + filename;
+    String avatarUrl = ImageVariantUtil.withVariant(originalAvatarUrl, ImageVariantUtil.AVATAR);
+    try {
+      ImageVariantUtil.getOrCreateVariant(uploadDir, target, "avatars/" + filename, ImageVariantUtil.AVATAR);
+    } catch (Exception ex) {
+      getServletContext().log("[Pixel Lab] Failed to pre-generate avatar thumbnail for " + filename, ex);
+    }
     UserDao userDao = new UserDao(dataSource());
     userDao.updateProfile(current.getId(), null, avatarUrl);
     Map<String, Object> user = userDao.findById(current.getId());

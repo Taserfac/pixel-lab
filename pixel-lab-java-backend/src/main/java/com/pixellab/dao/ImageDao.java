@@ -17,8 +17,8 @@ public class ImageDao {
     this.dataSource = dataSource;
   }
 
-  public long create(long userId, String filename, String originalName, String url, Integer width,
-                     Integer height, long size, String format, String description) throws Exception {
+  public long create(long userId, String filename, String originalName, String url, String thumbnailUrl,
+                     Integer width, Integer height, long size, String format, String description) throws Exception {
     String sql = "INSERT INTO image (user_id, filename, original_name, url, thumbnail_url, width, height, size, format, description) "
         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     try (Connection conn = dataSource.getConnection();
@@ -27,7 +27,7 @@ public class ImageDao {
       stmt.setString(2, filename);
       stmt.setString(3, originalName);
       stmt.setString(4, url);
-      stmt.setString(5, url);
+      stmt.setString(5, thumbnailUrl);
       if (width == null) {
         stmt.setNull(6, java.sql.Types.INTEGER);
       } else {

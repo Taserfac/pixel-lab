@@ -6,6 +6,7 @@ import com.pixellab.dao.ImageDao;
 import com.pixellab.model.SessionUser;
 import com.pixellab.util.RequestUtil;
 import com.pixellab.util.Result;
+import com.pixellab.util.ImageVariantUtil;
 
 import javax.imageio.ImageIO;
 import javax.servlet.ServletException;
@@ -211,12 +212,20 @@ public class ImageServlet extends BaseApiServlet {
     }
 
     String url = publicBaseUrl(request) + "/uploads/" + filename;
+    String thumbnailUrl = ImageVariantUtil.withVariant(url, ImageVariantUtil.CARD);
+    try {
+      ImageVariantUtil.getOrCreateVariant(uploadDir, target, filename, ImageVariantUtil.CARD);
+    } catch (Exception ex) {
+      getServletContext().log("[Pixel Lab] Failed to pre-generate card thumbnail for " + filename, ex);
+    }
     String description = request.getParameter("description");
-    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, width, height, target.length(), ext, description);
+    long imageId = new ImageDao(dataSource()).create(user.getId(), filename, originalName, url, thumbnailUrl,
+        width, height, target.length(), ext, description);
 
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("id", imageId);
     data.put("url", url);
+    data.put("thumbnailUrl", thumbnailUrl);
     data.put("originalName", originalName);
     data.put("size", target.length());
     data.put("width", width);

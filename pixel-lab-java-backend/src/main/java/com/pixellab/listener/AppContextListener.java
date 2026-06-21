@@ -42,6 +42,7 @@ public class AppContextListener implements ServletContextListener {
 
       HikariDataSource dataSource = new HikariDataSource(hikari);
       context.setAttribute(AppContextKeys.DATA_SOURCE, dataSource);
+      ensureMediaVariantUrls(dataSource);
       ensureReportingSchema(dataSource);
       ensureTutorialSchema(dataSource);
       seedTutorialVideos(context, dataSource);
@@ -100,6 +101,21 @@ public class AppContextListener implements ServletContextListener {
     try (Connection conn = dataSource.getConnection();
          Statement stmt = conn.createStatement()) {
       stmt.executeUpdate(sql);
+    }
+  }
+
+  private void ensureMediaVariantUrls(DataSource dataSource) throws Exception {
+    String updateThumbnails = "UPDATE image SET thumbnail_url = CONCAT(url, "
+        + "CASE WHEN LOCATE('?', url) > 0 THEN '&' ELSE '?' END, 'variant=card') "
+        + "WHERE url LIKE '%/uploads/%' "
+        + "AND (thumbnail_url IS NULL OR thumbnail_url = '' OR thumbnail_url = url)";
+    String updateAvatars = "UPDATE `user` SET avatar = CONCAT(avatar, "
+        + "CASE WHEN LOCATE('?', avatar) > 0 THEN '&' ELSE '?' END, 'variant=avatar') "
+        + "WHERE avatar LIKE '%/uploads/%' AND LOCATE('variant=', avatar) = 0";
+    try (Connection conn = dataSource.getConnection();
+         Statement stmt = conn.createStatement()) {
+      stmt.executeUpdate(updateThumbnails);
+      stmt.executeUpdate(updateAvatars);
     }
   }
 

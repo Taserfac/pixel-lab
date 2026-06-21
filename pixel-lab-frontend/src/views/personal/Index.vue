@@ -69,7 +69,7 @@
             <article v-for="image in filteredImages" :key="image.id" class="work-card">
               <div class="cover-shell">
                 <button class="work-cover" type="button" @click="viewImage(image)">
-                  <img :src="image.url" :alt="imageTitle(image)" loading="lazy">
+                  <img :src="cardImageUrl(image)" :alt="imageTitle(image)" loading="lazy" decoding="async">
                   <span class="visibility-badge" :class="{ public: isPublic(image) }">
                     {{ isPublic(image) ? '公开' : '私有' }}
                   </span>
@@ -343,7 +343,7 @@
             <div v-if="selectedAlbum.images?.length" class="album-image-list">
               <article v-for="(img, index) in selectedAlbum.images" :key="img.id" class="album-image-item">
                 <div class="album-image-cover" @click="viewImage(img)">
-                  <img :src="img.url" :alt="img.title || '图片'" loading="lazy">
+                  <img :src="cardImageUrl(img)" :alt="img.title || '图片'" loading="lazy" decoding="async">
                   <span v-if="selectedAlbum.cover_image_id === img.id" class="album-cover-badge">封面</span>
                 </div>
                 <div class="album-image-info">
@@ -400,7 +400,7 @@
             </div>
             <div v-if="hotWorks.length" class="hot-list">
               <button v-for="work in hotWorks" :key="work.id" class="hot-item" type="button" @click="viewImage(work)">
-                <img :src="work.url" :alt="imageTitle(work)" loading="lazy">
+                <img :src="cardImageUrl(work)" :alt="imageTitle(work)" loading="lazy" decoding="async">
                 <span class="hot-rank">#{{ hotWorks.indexOf(work) + 1 }}</span>
                 <div>
                   <strong :title="imageTitle(work)">{{ imageTitle(work) }}</strong>
@@ -477,7 +477,7 @@
         </el-form-item>
         <el-form-item label="封面图片">
           <div v-if="newAlbum.coverImage" class="cover-preview">
-            <img :src="newAlbum.coverImage.url" alt="封面预览">
+            <img :src="cardImageUrl(newAlbum.coverImage)" alt="封面预览">
             <el-button text type="danger" size="small" @click="newAlbum.coverImage = null">
               <el-icon><Delete /></el-icon>
             </el-button>
@@ -493,7 +493,7 @@
                 :class="{ active: newAlbum.coverImage?.id === img.id }"
                 @click="newAlbum.coverImage = img"
               >
-                <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
+                <img :src="cardImageUrl(img)" :alt="imageTitle(img)" loading="lazy" decoding="async">
               </button>
             </div>
           </div>
@@ -524,7 +524,7 @@
         </el-form-item>
         <el-form-item label="封面图片">
           <div v-if="editAlbum.coverImage" class="cover-preview">
-            <img :src="editAlbum.coverImage.url" alt="封面预览">
+            <img :src="cardImageUrl(editAlbum.coverImage)" alt="封面预览">
             <el-button text type="danger" size="small" @click="editAlbum.coverImage = null; editAlbum.coverImageId = null">
               <el-icon><Delete /></el-icon>
             </el-button>
@@ -540,7 +540,7 @@
                 :class="{ active: editAlbum.coverImageId === img.id }"
                 @click="editAlbum.coverImage = img; editAlbum.coverImageId = img.id"
               >
-                <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
+                <img :src="cardImageUrl(img)" :alt="imageTitle(img)" loading="lazy" decoding="async">
               </button>
             </div>
           </div>
@@ -582,7 +582,7 @@
           :class="{ selected: imagesToAdd.includes(img.id) }"
           @click="toggleImageToAdd(img.id)"
         >
-          <img :src="img.url" :alt="imageTitle(img)" loading="lazy">
+          <img :src="cardImageUrl(img)" :alt="imageTitle(img)" loading="lazy" decoding="async">
           <span v-if="imagesToAdd.includes(img.id)" class="add-check">
             <el-icon><Check /></el-icon>
           </span>
@@ -631,6 +631,7 @@ import { getUserStats } from '@/api/auth'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription, updateImageMetadata } from '@/api/image'
 import { getFollowingCreators, getPublicImages, getUserCollections, getUserLikes } from '@/api/community'
 import { unfollowUser } from '@/api/social'
+import { cardImageUrl } from '@/utils/media'
 import {
   createAlbum,
   getAlbums,
@@ -667,7 +668,7 @@ const ContentFeed = defineComponent({
               type: 'button',
               onClick: () => emit('item-click', item.id)
             }, [
-              h('img', { src: item.url, alt: title(item), loading: 'lazy' })
+              h('img', { src: cardImageUrl(item), alt: title(item), loading: 'lazy', decoding: 'async' })
             ]),
             h('div', { class: 'work-meta' }, [
               h('div', null, [
@@ -791,7 +792,7 @@ const isPublic = (image = {}) => image.is_public === true || image.is_public ===
 
 const asList = (res) => Array.isArray(res) ? res : (res?.list || [])
 
-const albumCoverUrl = (album = {}) => album.cover_url || album.cover_thumbnail_url || ''
+const albumCoverUrl = (album = {}) => album.cover_thumbnail_url || album.cover_url || ''
 
 const albumImageDescription = (image = {}) => image.album_description || ''
 

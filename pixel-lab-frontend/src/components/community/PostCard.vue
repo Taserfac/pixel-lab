@@ -48,7 +48,7 @@
         >
           <el-avatar
             :size="24"
-            :src="work.author_avatar"
+            :src="authorAvatarUrl"
           >
             {{ authorInitial }}
           </el-avatar>
@@ -77,6 +77,7 @@
 <script setup>
 import { computed } from 'vue'
 import { ChatDotRound, CollectionTag, Picture, Star } from '@element-plus/icons-vue'
+import { avatarImageUrl, cardImageUrl } from '@/utils/media'
 
 const props = defineProps({
   work: {
@@ -95,7 +96,8 @@ const title = computed(() => (
   '未命名作品'
 ))
 
-const coverUrl = computed(() => props.work.url || props.work.image_url || '')
+const coverUrl = computed(() => cardImageUrl(props.work))
+const authorAvatarUrl = computed(() => avatarImageUrl(props.work.author_avatar))
 const tags = computed(() => {
   const value = props.work.tags
   if (Array.isArray(value)) return value.slice(0, 3)

@@ -26,13 +26,13 @@
         class="creator-card"
       >
         <button class="creator-cover" type="button" @click="openCreator(creator)">
-          <img v-if="creator.representativeWorks[0]?.url" :src="creator.representativeWorks[0].url" alt="">
+          <img v-if="creator.representativeWorks[0]?.url" :src="cardImageUrl(creator.representativeWorks[0])" alt="" loading="lazy" decoding="async">
           <span v-else>{{ creator.name.charAt(0) }}</span>
         </button>
 
         <div class="creator-body">
           <div class="creator-identity">
-            <el-avatar :size="52" :src="creator.avatar">{{ creator.name.charAt(0) }}</el-avatar>
+            <el-avatar :size="52" :src="avatarImageUrl(creator.avatar)">{{ creator.name.charAt(0) }}</el-avatar>
             <div>
               <h2>{{ creator.name }}</h2>
               <p>{{ creator.workCount }} 件公开作品</p>
@@ -53,7 +53,7 @@
               type="button"
               @click="openWork(work)"
             >
-              <img :src="work.url" :alt="work.title || '代表作品'">
+              <img :src="cardImageUrl(work)" :alt="work.title || '代表作品'" loading="lazy" decoding="async">
             </button>
           </div>
         </div>
@@ -76,6 +76,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { getFollowingCreators, getPublicImages } from '@/api/community'
+import { avatarImageUrl, cardImageUrl } from '@/utils/media'
 
 const route = useRoute()
 const router = useRouter()
