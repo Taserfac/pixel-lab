@@ -80,7 +80,7 @@ public class AiServlet extends BaseApiServlet {
     }
 
     byte[] imageBytes = readAll(currentImage);
-    List<String> attachmentNotes = collectAttachmentNotes(request);
+    AttachmentContext attachments = collectAttachments(request);
     BufferedImage canvasImage = ImageIO.read(new ByteArrayInputStream(imageBytes));
     String canvasNote = canvasImage == null
         ? "当前画布: " + currentImage.getSubmittedFileName()
@@ -88,8 +88,8 @@ public class AiServlet extends BaseApiServlet {
 
     AppConfig config = (AppConfig) getServletContext().getAttribute(AppContextKeys.APP_CONFIG);
     String aiPrompt = "draw".equals(mode)
-        ? buildDrawPrompt(prompt, canvasNote, attachmentNotes)
-        : buildRefinePrompt(prompt, canvasNote, attachmentNotes);
+        ? buildDrawPrompt(prompt, canvasNote, attachments.notes)
+        : buildRefinePrompt(prompt, canvasNote, attachments.notes);
 
     String notice = "";
     String text;
@@ -109,14 +109,15 @@ public class AiServlet extends BaseApiServlet {
           aiPrompt,
           imageBytes,
           currentImage.getContentType(),
-          canvasImage
+          canvasImage,
+          attachments.images
       );
       imageUrl = generated.imageUrl;
       text = generated.revisedPrompt == null || generated.revisedPrompt.isBlank()
           ? "AI 已根据当前画布生成二次创作结果图。"
           : generated.revisedPrompt;
     } else {
-      text = callQwen(config, resolveQwenModel(config, mode, model), aiPrompt, imageBytes, currentImage.getContentType(), false);
+      text = callQwen(config, resolveQwenModel(config, mode, model), aiPrompt, imageBytes, currentImage.getContentType(), true, attachments.images);
     }
 
     Map<String, Object> data = new LinkedHashMap<>();
@@ -129,7 +130,7 @@ public class AiServlet extends BaseApiServlet {
     ok(response, "AI 润色完成", data);
   }
 
-  private String callQwen(AppConfig config, String model, String prompt, byte[] imageBytes, String contentType, boolean includeImage) throws Exception {
+  private String callQwen(AppConfig config, String model, String prompt, byte[] imageBytes, String contentType, boolean includeImage, List<ImageAttachment> imageAttachments) throws Exception {
     String baseUrl = config.get("qwen.base.url", "https://dashscope.aliyuncs.com/compatible-mode/v1").replaceAll("/+$", "");
     String apiKey = config.get("qwen.api.key", "");
 
@@ -139,10 +140,18 @@ public class AiServlet extends BaseApiServlet {
       String mimeType = contentType == null || contentType.isBlank() ? "image/png" : contentType;
       List<Map<String, Object>> content = new ArrayList<>();
       content.add(Map.of("type", "text", "text", prompt));
+      content.add(Map.of("type", "text", "text", "当前画布图像："));
       content.add(Map.of(
           "type", "image_url",
           "image_url", Map.of("url", "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes))
       ));
+      for (ImageAttachment attachment : imageAttachments) {
+        content.add(Map.of("type", "text", "text", "参考图：" + attachment.filename));
+        content.add(Map.of(
+            "type", "image_url",
+            "image_url", Map.of("url", "data:" + attachment.contentType + ";base64," + Base64.getEncoder().encodeToString(attachment.bytes))
+        ));
+      }
       message.put("content", content);
     } else {
       message.put("content", prompt);
@@ -183,7 +192,8 @@ public class AiServlet extends BaseApiServlet {
       String prompt,
       byte[] imageBytes,
       String contentType,
-      BufferedImage canvasImage
+      BufferedImage canvasImage,
+      List<ImageAttachment> imageAttachments
   ) throws Exception {
     String imageUrl = resolveQwenImageEndpoint(config);
     String apiKey = config.get("qwen.api.key", "");
@@ -191,7 +201,13 @@ public class AiServlet extends BaseApiServlet {
 
     List<Map<String, Object>> content = new ArrayList<>();
     content.add(Map.of("image", "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(imageBytes)));
-    content.add(Map.of("text", prompt));
+    for (ImageAttachment attachment : imageAttachments) {
+      content.add(Map.of("image", "data:" + attachment.contentType + ";base64," + Base64.getEncoder().encodeToString(attachment.bytes)));
+    }
+    String instruction = imageAttachments.isEmpty()
+        ? prompt
+        : prompt + "\n图像顺序说明：第 1 张是当前画布，后续为参考图：" + imageAttachmentNames(imageAttachments) + "。";
+    content.add(Map.of("text", instruction));
 
     Map<String, Object> message = new LinkedHashMap<>();
     message.put("role", "user");
@@ -554,21 +570,77 @@ public class AiServlet extends BaseApiServlet {
     return lower.contains("pixel") || lower.contains("pico") || prompt.contains("像素");
   }
 
-  private List<String> collectAttachmentNotes(HttpServletRequest request) throws Exception {
+  private AttachmentContext collectAttachments(HttpServletRequest request) throws Exception {
     List<String> notes = new ArrayList<>();
+    List<ImageAttachment> images = new ArrayList<>();
     for (Part part : request.getParts()) {
       if (!"attachments".equals(part.getName()) || part.getSize() == 0) {
         continue;
       }
       String type = part.getContentType() == null ? "" : part.getContentType();
-      if (type.startsWith("text/") || type.equals("application/json")) {
+      String filename = part.getSubmittedFileName() == null || part.getSubmittedFileName().isBlank()
+          ? "attachment"
+          : part.getSubmittedFileName();
+      if (isTextAttachment(type, filename)) {
         String text = new String(readAll(part), StandardCharsets.UTF_8);
-        notes.add("参考文本 " + part.getSubmittedFileName() + ":\n" + text.substring(0, Math.min(4000, text.length())));
+        notes.add("参考文本 " + filename + ":\n" + text.substring(0, Math.min(4000, text.length())));
+      } else if (isImageAttachment(type, filename)) {
+        byte[] bytes = readAll(part);
+        String imageType = normalizeImageContentType(type, filename);
+        images.add(new ImageAttachment(filename, imageType, bytes));
+        notes.add("参考图: " + filename + " (" + imageType + ", " + bytes.length + " bytes)");
       } else {
-        notes.add("参考文件: " + part.getSubmittedFileName() + " (" + type + ", " + part.getSize() + " bytes)");
+        notes.add("参考文件: " + filename + " (" + type + ", " + part.getSize() + " bytes)");
       }
     }
-    return notes;
+    return new AttachmentContext(notes, images);
+  }
+
+  private boolean isTextAttachment(String contentType, String filename) {
+    String type = contentType.toLowerCase(Locale.ROOT);
+    String name = filename.toLowerCase(Locale.ROOT);
+    return type.startsWith("text/")
+        || type.equals("application/json")
+        || name.endsWith(".txt")
+        || name.endsWith(".md")
+        || name.endsWith(".json");
+  }
+
+  private boolean isImageAttachment(String contentType, String filename) {
+    String type = contentType.toLowerCase(Locale.ROOT);
+    String name = filename.toLowerCase(Locale.ROOT);
+    return type.startsWith("image/")
+        || name.endsWith(".png")
+        || name.endsWith(".jpg")
+        || name.endsWith(".jpeg")
+        || name.endsWith(".webp")
+        || name.endsWith(".gif");
+  }
+
+  private String normalizeImageContentType(String contentType, String filename) {
+    String type = contentType == null ? "" : contentType.toLowerCase(Locale.ROOT);
+    if (type.startsWith("image/")) {
+      return type;
+    }
+    String name = filename.toLowerCase(Locale.ROOT);
+    if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
+      return "image/jpeg";
+    }
+    if (name.endsWith(".webp")) {
+      return "image/webp";
+    }
+    if (name.endsWith(".gif")) {
+      return "image/gif";
+    }
+    return "image/png";
+  }
+
+  private String imageAttachmentNames(List<ImageAttachment> imageAttachments) {
+    List<String> names = new ArrayList<>();
+    for (ImageAttachment attachment : imageAttachments) {
+      names.add(attachment.filename);
+    }
+    return String.join("、", names);
   }
 
   private String notesText(List<String> notes) {
@@ -610,6 +682,28 @@ public class AiServlet extends BaseApiServlet {
     private ImageGenerationResult(String imageUrl, String revisedPrompt) {
       this.imageUrl = imageUrl;
       this.revisedPrompt = revisedPrompt;
+    }
+  }
+
+  private static final class AttachmentContext {
+    private final List<String> notes;
+    private final List<ImageAttachment> images;
+
+    private AttachmentContext(List<String> notes, List<ImageAttachment> images) {
+      this.notes = notes;
+      this.images = images;
+    }
+  }
+
+  private static final class ImageAttachment {
+    private final String filename;
+    private final String contentType;
+    private final byte[] bytes;
+
+    private ImageAttachment(String filename, String contentType, byte[] bytes) {
+      this.filename = filename;
+      this.contentType = contentType;
+      this.bytes = bytes;
     }
   }
 }
