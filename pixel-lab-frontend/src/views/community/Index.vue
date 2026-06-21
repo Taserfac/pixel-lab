@@ -303,9 +303,12 @@ const activeTag = ref('')
 const publicTags = ref({ systemTags: [], trendingTags: [] })
 const tagList = computed(() => {
   const defaults = ['摄影', '插画', 'AI艺术', '设计', '旅行', '像素艺术', '城市', '生活']
-  const systemTags = publicTags.value.systemTags.length ? publicTags.value.systemTags : defaults
-  const trendingNames = publicTags.value.trendingTags.map(tag => tag.name)
-  return ['全部', ...new Set([...systemTags, ...trendingNames])]
+  // systemTags 现在是 [{id, name, usage_count}] 格式
+  const systemTagNames = publicTags.value.systemTags.length
+    ? publicTags.value.systemTags.map(t => typeof t === 'object' ? t.name : String(t))
+    : defaults
+  const trendingNames = publicTags.value.trendingTags.map(tag => typeof tag === 'object' ? tag.name : String(tag))
+  return ['全部', ...new Set([...systemTagNames, ...trendingNames])]
 })
 
 const hasMore = computed(() => works.value.length < total.value)

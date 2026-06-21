@@ -401,15 +401,7 @@
           <el-input v-model="saveForm.title" maxlength="100" show-word-limit placeholder="给作品起一个标题" />
         </el-form-item>
         <el-form-item label="标签">
-          <el-select
-            v-model="saveForm.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入标签后按回车添加"
-            style="width: 100%"
-          />
+          <TagSelector v-model="saveForm.tags" />
         </el-form-item>
         <el-form-item label="说明">
           <el-input
@@ -445,6 +437,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Canvas as FabricCanvas, Circle, CircleBrush, Control, FabricImage, IText, Line, Path, PencilBrush, Rect, Shadow, SprayBrush } from 'fabric'
 import { updateImageMetadata, uploadImage } from '@/api/image'
 import { refineDrawing } from '@/api/ai'
+import TagSelector from '@/components/common/TagSelector.vue'
 
 const router = useRouter()
 const canvasRef = ref(null)
@@ -1945,7 +1938,7 @@ const confirmSaveToGallery = async () => {
     const tags = [...new Set(saveForm.tags.map(tag => tag.trim()).filter(Boolean))]
     await updateImageMetadata(imageId, {
       title: saveForm.title.trim(),
-      tags: tags.join(','),
+      tagIds: saveForm.tags.map(t => t.id),
       description: saveForm.description.trim()
     })
     clearStoredDraft()

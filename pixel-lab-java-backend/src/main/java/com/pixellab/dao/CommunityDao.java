@@ -8,19 +8,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class CommunityDao {
-  private static final List<String> SYSTEM_TAGS = List.of(
-      "摄影", "插画", "AI艺术", "设计", "旅行", "像素艺术", "城市", "生活");
-  private static final int MIN_TRENDING_USAGE = 2;
-  private static final int MIN_TRENDING_LIKES = 3;
-
   private final DataSource dataSource;
 
   public CommunityDao(DataSource dataSource) {
@@ -32,11 +24,13 @@ public class CommunityDao {
     List<Object> params = new ArrayList<>();
     StringBuilder where = new StringBuilder(" WHERE i.is_public = 1 AND i.status = 1 ");
     if (keyword != null && !keyword.isBlank()) {
-      where.append(" AND (i.title LIKE ? OR i.tags LIKE ? OR u.nickname LIKE ?) ");
-      String like = "%" + keyword.trim() + "%";
+      String kw = keyword.trim();
+      // 精确匹配标签名称
+      where.append(" AND (i.title LIKE ? OR u.nickname LIKE ? OR EXISTS (SELECT 1 FROM image_tag it JOIN tag t ON it.tag_id = t.id WHERE it.image_id = i.id AND t.name = ?)) ");
+      String like = "%" + kw + "%";
       params.add(like);
       params.add(like);
-      params.add(like);
+      params.add(kw);
     }
 
     String orderBy = "i.created_at DESC";
@@ -62,46 +56,22 @@ public class CommunityDao {
 
   public Map<String, Object> publicTags(int limit) throws Exception {
     int safeLimit = Math.max(1, Math.min(limit, 50));
-    Map<String, TagStats> statsByTag = new LinkedHashMap<>();
-
     try (Connection conn = dataSource.getConnection()) {
-      List<Map<String, Object>> rows = query(conn,
-          "SELECT tags, like_count FROM image "
-              + "WHERE is_public = 1 AND status = 1 AND tags IS NOT NULL AND tags != ''",
-          List.of());
+      // 系统标签：usage_count > 0 的标签，按热度排序
+      List<Map<String, Object>> systemTags = query(conn,
+          "SELECT id, name, usage_count FROM tag ORDER BY usage_count DESC LIMIT ?",
+          List.of(safeLimit));
 
-      for (Map<String, Object> row : rows) {
-        String rawTags = String.valueOf(row.get("tags"));
-        long likes = number(row.get("like_count"));
-        Set<String> uniquePostTags = new HashSet<>();
-        for (String rawTag : rawTags.split("[,，]")) {
-          String tagName = rawTag.trim().replaceFirst("^#+", "");
-          if (tagName.isEmpty() || !uniquePostTags.add(tagName)) continue;
-          statsByTag.computeIfAbsent(tagName, ignored -> new TagStats()).addPost(likes);
-        }
-      }
+      // 热门标签：usage_count >= 2 的标签
+      List<Map<String, Object>> trendingTags = query(conn,
+          "SELECT id, name, usage_count FROM tag WHERE usage_count >= 2 ORDER BY usage_count DESC LIMIT ?",
+          List.of(safeLimit));
+
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("systemTags", systemTags);
+      result.put("trendingTags", trendingTags);
+      return result;
     }
-
-    List<Map<String, Object>> trendingTags = statsByTag.entrySet().stream()
-        .filter(entry -> entry.getValue().usageCount >= MIN_TRENDING_USAGE
-            || entry.getValue().likeCount >= MIN_TRENDING_LIKES)
-        .sorted(Comparator
-            .<Map.Entry<String, TagStats>>comparingDouble(entry -> entry.getValue().score()).reversed()
-            .thenComparing(Map.Entry::getKey))
-        .limit(safeLimit)
-        .map(entry -> {
-          Map<String, Object> tag = new LinkedHashMap<>();
-          tag.put("name", entry.getKey());
-          tag.put("usageCount", entry.getValue().usageCount);
-          tag.put("score", entry.getValue().score());
-          return tag;
-        })
-        .toList();
-
-    Map<String, Object> result = new LinkedHashMap<>();
-    result.put("systemTags", SYSTEM_TAGS);
-    result.put("trendingTags", trendingTags);
-    return result;
   }
 
   public Map<String, Object> imageDetail(long imageId, Long userId) throws Exception {
@@ -337,26 +307,23 @@ public class CommunityDao {
 
   public List<Map<String, Object>> similarWorks(long imageId, int limit) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
-      Map<String, Object> image = queryOne(conn,
-          "SELECT tags FROM image WHERE id = ? AND status = 1", List.of(imageId));
-      if (image == null) {
+      // 获取图片的第一个标签 ID
+      Map<String, Object> firstTag = queryOne(conn,
+          "SELECT tag_id FROM image_tag WHERE image_id = ? LIMIT 1", List.of(imageId));
+      if (firstTag == null) {
         return List.of();
       }
-      String tags = (String) image.get("tags");
-      if (tags == null || tags.isBlank()) {
-        return List.of();
-      }
-      String firstTag = tags.contains(",") ? tags.substring(0, tags.indexOf(",")).trim() : tags.trim();
-      if (firstTag.isEmpty()) {
-        return List.of();
-      }
+      int tagId = ((Number) firstTag.get("tag_id")).intValue();
+      // 通过标签关联查找相似作品
       return query(conn,
-          "SELECT i.id, i.title, i.original_name, i.url, i.like_count, "
+          "SELECT DISTINCT i.id, i.title, i.original_name, i.url, i.like_count, "
               + "u.nickname AS author_name "
-              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
-              + "WHERE i.is_public = 1 AND i.status = 1 AND i.id != ? AND i.tags LIKE ? "
+              + "FROM image i "
+              + "LEFT JOIN `user` u ON i.user_id = u.id "
+              + "JOIN image_tag it ON i.id = it.image_id "
+              + "WHERE i.is_public = 1 AND i.status = 1 AND i.id != ? AND it.tag_id = ? "
               + "ORDER BY i.like_count DESC LIMIT ?",
-          List.of(imageId, "%" + firstTag + "%", limit));
+          List.of(imageId, tagId, limit));
     }
   }
 
@@ -563,17 +530,4 @@ public class CommunityDao {
     }
   }
 
-  private static final class TagStats {
-    private long usageCount;
-    private long likeCount;
-
-    private void addPost(long likes) {
-      usageCount++;
-      likeCount += likes;
-    }
-
-    private double score() {
-      return usageCount * 1.5 + likeCount * 2;
-    }
-  }
 }

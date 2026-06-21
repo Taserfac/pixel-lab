@@ -104,13 +104,12 @@ public class ImageDao {
     }
   }
 
-  public void updateMetadata(long id, String title, String description, String tags) throws Exception {
+  public void updateMetadata(long id, String title, String description) throws Exception {
     try (Connection conn = dataSource.getConnection();
-         PreparedStatement stmt = conn.prepareStatement("UPDATE image SET title = ?, description = ?, tags = ? WHERE id = ?")) {
+         PreparedStatement stmt = conn.prepareStatement("UPDATE image SET title = ?, description = ? WHERE id = ?")) {
       stmt.setString(1, title == null || title.isBlank() ? null : title.trim());
       stmt.setString(2, description == null || description.isBlank() ? null : description.trim());
-      stmt.setString(3, tags == null || tags.isBlank() ? null : tags.trim());
-      stmt.setLong(4, id);
+      stmt.setLong(3, id);
       stmt.executeUpdate();
     }
   }

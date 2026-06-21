@@ -207,17 +207,7 @@
           <el-input v-model="editForm.title" maxlength="100" show-word-limit />
         </el-form-item>
         <el-form-item label="标签">
-          <el-select
-            v-model="editForm.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="选择或输入标签"
-            style="width: 100%"
-          >
-            <el-option v-for="option in tagOptions" :key="option" :label="option" :value="option" />
-          </el-select>
+          <TagSelector v-model="editForm.tags" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="editForm.description" type="textarea" :rows="5" maxlength="2000" show-word-limit />
@@ -246,6 +236,7 @@ import {
   Warning
 } from '@element-plus/icons-vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import TagSelector from '@/components/common/TagSelector.vue'
 import { addComment, deleteComment, getComments, getImageDetail, reportImage, toggleCollect, toggleLike } from '@/api/community'
 import { updateImageMetadata } from '@/api/image'
 import { useUserStore } from '@/store/user'
@@ -266,7 +257,6 @@ const replyTarget = ref(null)
 const editVisible = ref(false)
 const saving = ref(false)
 const editForm = ref({ title: '', tags: [], description: '' })
-const tagOptions = ['插画', '摄影', '设计', 'UI设计', '概念艺术', '动漫', '像素艺术', 'AI艺术', '人像摄影', '风景', '治愈系']
 
 const postTitle = computed(() => post.value?.title || post.value?.original_name || '未命名作品')
 const isOwner = computed(() => Number(post.value?.user_id) === Number(userStore.userInfo?.id))
@@ -423,11 +413,16 @@ const cancelReply = () => {
 }
 
 const openEditor = () => {
+  // 从 post 数据中解析标签（可能是数组或逗号分隔字符串）
+  let tags = []
+  if (Array.isArray(post.value.tags)) {
+    tags = post.value.tags.map(t => typeof t === 'object' ? t : { id: 0, name: String(t) })
+  } else if (post.value.tags) {
+    tags = String(post.value.tags).split(/[,，]/).map(tag => tag.trim()).filter(Boolean).map(name => ({ id: 0, name }))
+  }
   editForm.value = {
     title: post.value.title || '',
-    tags: Array.isArray(post.value.tags)
-      ? [...post.value.tags]
-      : String(post.value.tags || '').split(/[,，]/).map(tag => tag.trim()).filter(Boolean),
+    tags,
     description: post.value.description || ''
   }
   editVisible.value = true
@@ -436,13 +431,13 @@ const openEditor = () => {
 const saveMetadata = async () => {
   saving.value = true
   try {
+    const tagIds = editForm.value.tags.filter(t => t.id > 0).map(t => t.id)
     const payload = {
       title: editForm.value.title.trim(),
-      tags: editForm.value.tags.map(tag => tag.trim()).filter(Boolean).join(','),
+      tagIds,
       description: editForm.value.description.trim()
     }
     await updateImageMetadata(post.value.id, payload)
-    Object.assign(post.value, payload)
     editVisible.value = false
     ElMessage.success('作品信息已更新')
   } finally {

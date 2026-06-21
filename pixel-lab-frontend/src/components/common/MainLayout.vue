@@ -280,23 +280,7 @@
       </template>
       <el-form v-else label-position="top" class="upload-metadata-form">
         <el-form-item label="标签">
-          <el-select
-            v-model="uploadedMetadata.tags"
-            :loading="uploadTagOptionsLoading"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="选择已有标签，或输入新标签后按回车添加"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="tag in sortedUploadTagOptions"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            />
-          </el-select>
+          <TagSelector v-model="uploadedMetadata.tags" />
         </el-form-item>
         <el-form-item label="说明">
           <el-input
@@ -444,9 +428,9 @@ import { useThemeStore } from '@/store/theme'
 import { useNotificationStore } from '@/store/notification'
 import { logout as logoutApi } from '@/api/auth'
 import { deleteImage, updateImageMetadata, uploadImage } from '@/api/image'
-import { getPublicImages } from '@/api/community'
 import BrandLogo from '@/components/common/BrandLogo.vue'
 import DynamicBackground from '@/components/common/DynamicBackground.vue'
+import TagSelector from '@/components/common/TagSelector.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -463,10 +447,6 @@ const savingUploadedMetadata = ref(false)
 const cancelingUpload = ref(false)
 const uploadedImage = ref(null)
 const uploadedMetadata = ref({ tags: [], description: '' })
-const uploadTagOptions = ref([])
-const uploadTagOptionsLoading = ref(false)
-const uploadTagOptionsLoaded = ref(false)
-const sortedUploadTagOptions = computed(() => [...uploadTagOptions.value].sort((a, b) => a.localeCompare(b, 'zh-CN')))
 const searchInputRef = ref(null)
 const showSearchSuggestions = ref(false)
 let searchSuggestionsCloseTimer
@@ -665,38 +645,8 @@ const openUploadedImageInWorkbench = () => {
   router.push('/workbench')
 }
 
-const imageTagList = (image = {}) => (
-  Array.isArray(image.tags)
-    ? image.tags
-    : String(image.tags || '').split(',')
-).map(tag => tag.trim()).filter(Boolean)
-
-const fetchUploadTagOptions = async () => {
-  if (uploadTagOptionsLoaded.value || uploadTagOptionsLoading.value) return
-
-  uploadTagOptionsLoading.value = true
-  try {
-    const pageSize = 200
-    const firstPage = await getPublicImages({ page: 1, pageSize }, { silent: true })
-    const works = [...(firstPage.list || [])]
-    const totalPages = Math.max(1, Number(firstPage.totalPages || 1))
-    for (let page = 2; page <= totalPages; page += 1) {
-      const result = await getPublicImages({ page, pageSize }, { silent: true })
-      works.push(...(result.list || []))
-    }
-    uploadTagOptions.value = [...new Set(works.flatMap(imageTagList))]
-    uploadTagOptionsLoaded.value = true
-  } catch (error) {
-    console.error('获取全站标签失败:', error)
-    ElMessage.error('获取全站标签失败')
-  } finally {
-    uploadTagOptionsLoading.value = false
-  }
-}
-
 const openUploadedMetadataEditor = () => {
   editingUploadedMetadata.value = true
-  fetchUploadTagOptions()
 }
 
 const saveUploadedMetadata = async () => {
@@ -704,14 +654,12 @@ const saveUploadedMetadata = async () => {
 
   savingUploadedMetadata.value = true
   try {
-    const tags = [...new Set(uploadedMetadata.value.tags.map(tag => tag.trim()).filter(Boolean))]
+    const tagIds = uploadedMetadata.value.tags.map(t => t.id)
     await updateImageMetadata(uploadedImage.value.id, {
       title: '',
       description: uploadedMetadata.value.description.trim(),
-      tags: tags.join(',')
+      tagIds
     })
-    uploadedMetadata.value.tags = tags
-    uploadTagOptions.value = [...new Set([...uploadTagOptions.value, ...tags])]
     editingUploadedMetadata.value = false
     ElMessage.success('标签和说明已保存')
   } catch (error) {

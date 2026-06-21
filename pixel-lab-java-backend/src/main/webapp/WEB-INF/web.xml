@@ -167,6 +167,15 @@
   </servlet-mapping>
 
   <servlet>
+    <servlet-name>TagServlet</servlet-name>
+    <servlet-class>com.pixellab.servlet.TagServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>TagServlet</servlet-name>
+    <url-pattern>/api/tags/*</url-pattern>
+  </servlet-mapping>
+
+  <servlet>
     <servlet-name>UploadFileServlet</servlet-name>
     <servlet-class>com.pixellab.servlet.UploadFileServlet</servlet-class>
   </servlet>

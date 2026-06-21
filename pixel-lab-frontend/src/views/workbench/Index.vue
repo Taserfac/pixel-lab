@@ -149,15 +149,7 @@
           />
         </el-form-item>
         <el-form-item label="标签">
-          <el-select
-            v-model="publishForm.tags"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="输入标签后按回车添加"
-            style="width: 100%"
-          />
+          <TagSelector v-model="publishForm.tags" />
         </el-form-item>
         <el-form-item label="说明">
           <el-input
@@ -201,6 +193,7 @@ import ActionBar from './components/ActionBar.vue'
 import ImageSelector from './components/ImageSelector.vue'
 import CropDialog from './components/CropDialog.vue'
 import { getUserImages, uploadImage, updateImageVisibility, updateImageMetadata } from '@/api/image'
+import TagSelector from '@/components/common/TagSelector.vue'
 import { useHistory } from './composables/useHistory'
 
 const emit = defineEmits(['workbench-editing-change'])
@@ -1136,7 +1129,7 @@ const submitArtwork = async () => {
     const tags = [...new Set(publishForm.tags.map(tag => tag.trim()).filter(Boolean))]
     await updateImageMetadata(imageId, {
       title: publishForm.title.trim(),
-      tags: tags.join(','),
+      tagIds: publishForm.tags.map(t => t.id),
       description: publishForm.description.trim()
     })
     if (artworkDialogMode.value === 'community') {

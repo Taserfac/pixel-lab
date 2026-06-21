@@ -419,23 +419,7 @@
     <el-dialog v-model="tagDialogVisible" title="编辑标签" width="480px">
       <el-form label-position="top">
         <el-form-item label="当前标签">
-          <el-select
-            v-model="tagEditValue"
-            :loading="tagOptionsLoading"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            placeholder="选择已有标签，或输入新标签后按回车添加"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="tag in existingTagOptions"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            />
-          </el-select>
+          <TagSelector v-model="tagEditValue" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -629,7 +613,8 @@ import * as echarts from 'echarts'
 import { useUserStore } from '@/store/user'
 import { getUserStats } from '@/api/auth'
 import { uploadImage, getUserImages, deleteImage, updateImageVisibility, updateImageDescription, updateImageMetadata } from '@/api/image'
-import { getFollowingCreators, getPublicImages, getUserCollections, getUserLikes } from '@/api/community'
+import { getFollowingCreators, getUserCollections, getUserLikes } from '@/api/community'
+import TagSelector from '@/components/common/TagSelector.vue'
 import { unfollowUser } from '@/api/social'
 import { cardImageUrl } from '@/utils/media'
 import {
@@ -722,9 +707,6 @@ let trendChart = null
 // Description editing
 const tagDialogVisible = ref(false)
 const tagEditValue = ref([])
-const siteTagOptions = ref([])
-const tagOptionsLoading = ref(false)
-const tagOptionsLoaded = ref(false)
 const tagSaving = ref(false)
 let tagEditTarget = null
 const descDialogVisible = ref(false)
@@ -770,14 +752,12 @@ const avatarText = computed(() => {
 })
 
 const toNumber = (value) => Number(value || 0)
-const imageTagList = (image = {}) => (
-  Array.isArray(image.tags)
-    ? image.tags
-    : String(image.tags || '').split(',')
-).map(tag => tag.trim()).filter(Boolean)
-const existingTagOptions = computed(() => (
-  [...siteTagOptions.value].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-))
+const imageTagList = (image = {}) => {
+  if (Array.isArray(image.tags)) {
+    return image.tags.map(t => typeof t === 'object' ? t.name : String(t))
+  }
+  return String(image.tags || '').split(',').map(tag => tag.trim()).filter(Boolean)
+}
 
 const formatNumber = (value) => {
   const num = toNumber(value)
@@ -1055,48 +1035,30 @@ const handleUnfollowCreator = async (creator) => {
 }
 
 // Tags and description editing functions
-const fetchSiteTagOptions = async () => {
-  if (tagOptionsLoaded.value || tagOptionsLoading.value) return
-  tagOptionsLoading.value = true
-  try {
-    const pageSize = 200
-    const firstPage = await getPublicImages({ page: 1, pageSize }, { silent: true })
-    const works = [...(firstPage.list || [])]
-    const totalPages = Math.max(1, Number(firstPage.totalPages || 1))
-    for (let page = 2; page <= totalPages; page += 1) {
-      const result = await getPublicImages({ page, pageSize }, { silent: true })
-      works.push(...(result.list || []))
-    }
-    siteTagOptions.value = [...new Set(works.flatMap(imageTagList))]
-    tagOptionsLoaded.value = true
-  } catch (error) {
-    console.error('获取全站标签失败:', error)
-    ElMessage.error('获取全站标签失败')
-  } finally {
-    tagOptionsLoading.value = false
-  }
-}
-
 const openTagsEdit = (image) => {
   tagEditTarget = image
-  tagEditValue.value = imageTagList(image)
+  // 将标签转换为 {id, name} 格式
+  if (Array.isArray(image.tags)) {
+    tagEditValue.value = image.tags.map(t => typeof t === 'object' ? t : { id: 0, name: String(t) })
+  } else {
+    tagEditValue.value = String(image.tags || '').split(',').map(tag => tag.trim()).filter(Boolean).map(name => ({ id: 0, name }))
+  }
   tagDialogVisible.value = true
-  fetchSiteTagOptions()
 }
 
 const saveTags = async () => {
   if (!tagEditTarget) return
   tagSaving.value = true
   try {
-    const tags = [...new Set(tagEditValue.value.map(tag => tag.trim()).filter(Boolean))]
+    const tagIds = tagEditValue.value.filter(t => t.id > 0).map(t => t.id)
     const payload = {
       title: tagEditTarget.title || '',
       description: tagEditTarget.description || '',
-      tags: tags.join(',')
+      tagIds
     }
     await updateImageMetadata(tagEditTarget.id, payload)
-    tagEditTarget.tags = payload.tags
-    siteTagOptions.value = [...new Set([...siteTagOptions.value, ...tags])]
+    // 更新本地数据
+    tagEditTarget.tags = tagEditValue.value.map(t => t.name)
     ElMessage.success('标签已更新')
     tagDialogVisible.value = false
   } catch (error) {

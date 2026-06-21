@@ -3,6 +3,7 @@ package com.pixellab.servlet;
 import com.pixellab.config.AppConfig;
 import com.pixellab.context.AppContextKeys;
 import com.pixellab.dao.ImageDao;
+import com.pixellab.dao.TagDao;
 import com.pixellab.model.SessionUser;
 import com.pixellab.util.RequestUtil;
 import com.pixellab.util.Result;
@@ -128,16 +129,26 @@ public class ImageServlet extends BaseApiServlet {
         Map<String, Object> body = body(request);
         String title = RequestUtil.string(body, "title");
         String description = RequestUtil.string(body, "description");
-        String tags = RequestUtil.string(body, "tags");
         if (title != null && title.length() > 100) {
           Result.badRequest(response, "标题不能超过 100 个字符");
           return;
         }
-        if (tags != null && tags.length() > 255) {
-          Result.badRequest(response, "标签不能超过 255 个字符");
-          return;
+        imageDao.updateMetadata(id, title, description);
+
+        // 处理标签
+        Object tagIdsRaw = body.get("tagIds");
+        if (tagIdsRaw instanceof List<?> tagIdsList) {
+          if (tagIdsList.size() > 3) {
+            Result.badRequest(response, "最多只能选择3个标签");
+            return;
+          }
+          java.util.List<Integer> tagIds = new java.util.ArrayList<>();
+          for (Object item : tagIdsList) {
+            tagIds.add(Integer.parseInt(String.valueOf(item)));
+          }
+          new TagDao(dataSource()).setImageTags((int) id, tagIds);
         }
-        imageDao.updateMetadata(id, title, description, tags);
+
         ok(response, "更新成功", null);
         return;
       }

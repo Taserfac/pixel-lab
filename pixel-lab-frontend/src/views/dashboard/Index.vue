@@ -310,20 +310,22 @@ const currentHeroWork = computed(() => (
 ))
 
 const feedTabs = computed(() => {
-  const systemTags = publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags
-  const trendingNames = publicTags.value.trendingTags.map(tag => tag.name)
-  return ['推荐', '最新', '关注', ...new Set([...systemTags, ...trendingNames])]
+  // systemTags 现在是 [{id, name, usage_count}] 格式
+  const systemTagNames = publicTags.value.systemTags.length
+    ? publicTags.value.systemTags.map(t => typeof t === 'object' ? t.name : String(t))
+    : defaultSystemTags
+  const trendingNames = publicTags.value.trendingTags.map(tag => typeof tag === 'object' ? tag.name : String(tag))
+  return ['推荐', '最新', '关注', ...new Set([...systemTagNames, ...trendingNames])]
 })
 
 const popularTags = computed(() => {
   const source = publicTags.value.trendingTags.length
     ? publicTags.value.trendingTags
-    : (publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags)
-        .map(name => ({ name, usageCount: 0 }))
+    : (publicTags.value.systemTags.length ? publicTags.value.systemTags : defaultSystemTags.map(name => ({ name, usage_count: 0 })))
   return source.slice(0, 5)
     .map((tag, i) => ({
-      name: tag.name,
-      count: String(tag.usageCount || 0),
+      name: typeof tag === 'object' ? tag.name : String(tag),
+      count: String(typeof tag === 'object' ? tag.usage_count : 0),
       tone: tagTones[i % tagTones.length]
     }))
 })

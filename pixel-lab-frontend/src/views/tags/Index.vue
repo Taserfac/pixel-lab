@@ -111,23 +111,25 @@ const displayedTags = computed(() => {
 })
 
 const buildTagCards = (tagData, works) => {
-  const systemNames = new Set(tagData.systemTags || [])
-  const trendingByName = new Map(
-    (tagData.trendingTags || []).map(tag => [tag.name, tag])
-  )
-  const allowedNames = [...new Set([...systemNames, ...trendingByName.keys()])]
+  // systemTags 现在是 [{id, name, usage_count}] 格式
+  const systemTags = (tagData.systemTags || []).map(t => typeof t === 'object' ? t : { id: 0, name: String(t), usage_count: 0 })
+  const trendingTags = (tagData.trendingTags || []).map(t => typeof t === 'object' ? t : { id: 0, name: String(t), usage_count: 0 })
+  const systemNames = new Set(systemTags.map(t => t.name))
+  const trendingByName = new Map(trendingTags.map(tag => [tag.name, tag]))
+  const allTags = [...new Map([...systemTags, ...trendingTags].map(t => [t.name, t])).values()]
 
-  const cards = allowedNames.map(name => {
+  const cards = allTags.map(tag => {
+    const name = tag.name
     const matchingWorks = works.filter(work => normalizeTags(work.tags).includes(name))
     const trending = trendingByName.get(name)
     return {
       name,
       isSystem: systemNames.has(name),
       isTrending: Boolean(trending),
-      workCount: number(trending?.usageCount) || matchingWorks.length,
+      workCount: number(tag.usage_count) || matchingWorks.length,
       likeCount: matchingWorks.reduce((sum, work) => sum + number(work.like_count), 0),
       collectCount: matchingWorks.reduce((sum, work) => sum + number(work.collect_count), 0),
-      score: number(trending?.score),
+      score: number(tag.usage_count),
       representativeWorks: [...matchingWorks]
         .sort((a, b) => number(b.like_count) - number(a.like_count))
         .slice(0, 3)

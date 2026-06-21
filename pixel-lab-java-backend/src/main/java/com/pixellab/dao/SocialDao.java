@@ -176,26 +176,21 @@ public class SocialDao {
 
   public List<Map<String, Object>> getSimilarWorks(long imageId, int limit) throws Exception {
     try (Connection conn = dataSource.getConnection()) {
-      Map<String, Object> image = queryOne(conn,
-          "SELECT tags FROM image WHERE id = ? AND status = 1", List.of(imageId));
-      if (image == null) {
+      Map<String, Object> firstTag = queryOne(conn,
+          "SELECT tag_id FROM image_tag WHERE image_id = ? LIMIT 1", List.of(imageId));
+      if (firstTag == null) {
         return List.of();
       }
-      String tags = (String) image.get("tags");
-      if (tags == null || tags.isBlank()) {
-        return List.of();
-      }
-      String firstTag = tags.contains(",") ? tags.substring(0, tags.indexOf(",")).trim() : tags.trim();
-      if (firstTag.isEmpty()) {
-        return List.of();
-      }
+      int tagId = ((Number) firstTag.get("tag_id")).intValue();
       return query(conn,
-          "SELECT i.id, i.title, i.original_name, i.url, i.like_count, "
+          "SELECT DISTINCT i.id, i.title, i.original_name, i.url, i.like_count, "
               + "u.nickname AS author_name "
-              + "FROM image i LEFT JOIN `user` u ON i.user_id = u.id "
-              + "WHERE i.is_public = 1 AND i.status = 1 AND i.id != ? AND i.tags LIKE ? "
+              + "FROM image i "
+              + "LEFT JOIN `user` u ON i.user_id = u.id "
+              + "JOIN image_tag it ON i.id = it.image_id "
+              + "WHERE i.is_public = 1 AND i.status = 1 AND i.id != ? AND it.tag_id = ? "
               + "ORDER BY i.like_count DESC LIMIT ?",
-          List.of(imageId, "%" + firstTag + "%", limit));
+          List.of(imageId, tagId, limit));
     }
   }
 
