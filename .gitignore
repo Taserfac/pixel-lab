@@ -39,9 +39,6 @@ stop-fullstack-new.bat
 # Claude 本地配置
 CLAUDE.md
 
-# Augenstern Ignore
-Augenstern_FIX_NOTES.md
-
 # 手绘板CSDN文件
 html-tools-master.zip
 html-tools-master
@@ -51,5 +48,7 @@ html-tools-master
 ~*.*
 .patch-test.txt
 
-# ppt文件
-projects/
+# Augenstern文件
+Augenstern_FIX_NOTES.md
+localFiles
+AGENTS.md
